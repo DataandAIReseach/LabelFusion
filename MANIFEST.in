@@ -1,0 +1,13 @@
+include README.md
+include LICENSE
+include CHANGELOG.md
+include requirements.txt
+include pytest.ini
+recursive-include textclassify *.py
+recursive-include textclassify/examples *.py
+recursive-include tests *.py
+exclude tests/integration/test_*_live.py
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .DS_Store
+
