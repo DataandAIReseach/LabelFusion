@@ -20,3 +20,6 @@ class prompt_engineer:
         This method should be overridden by subclasses.
         """
         raise NotImplementedError("Subclasses should implement this method.")
+    
+    
+    
