@@ -24,21 +24,125 @@ class PromptEngineer:
         This method should be overridden by subclasses.
         """
         raise NotImplementedError("Subclasses should implement this method.")
-    
-    def generate_theory_prompt(self) -> None:
-        theory_background="""
-            Given the following dataset, generate a theory prompt. As an example the following theory prompt for stereotypical and hegemonic masculinity is given:
-            {theory_background}
+
+
+    def generate_role_prompt_single(self) -> None:
         """
-        self.full_prompt += theory_background
-    
-    def generate_role_prompt(self) -> None:
-        role_prompt = """
-        Given the following dataset, generate a role prompt. As an example the following role prompt for stereotypical and hegemonic masculinity is given:
-        {role_prompt}
+        Generate a role prompt based on the role of the model.
+        This method should be overridden by subclasses.
         """
         self.full_prompt += role_prompt
 
+    def generate_role_prompt_multiple(self) -> None:
+        """
+        Generate a role prompt for multiple labels.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += role_prompt
+    
+    def generate_context_prompt_single(self) -> None:
+        """
+        Generate a context prompt for single label classification.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += train_data_intro_prompt
+    
+    def generate_context_prompt_single_auto(self) -> None:
+        """
+        Generate a context prompt for single label classification.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += train_data_intro_prompt
+
+    def generate_context_prompt_single_man(self) -> None:
+        """
+        Generate a context prompt for single label classification.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += train_data_intro_prompt
+
+    def generate_context_prompt_multiple(self) -> None:
+        """
+        Generate a context prompt for multiple label classification.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += train_data_intro_prompt
+
+    def generate_context_prompt_multiple_auto(self) -> None:
+        """
+        Generate a context prompt for multiple label classification.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += train_data_intro_prompt
+    
+    def generate_context_prompt_multiple_man(self) -> None:
+        """
+        Generate a context prompt for multiple label classification.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += train_data_intro_prompt
+    
+    def generate_feat_def_prompt(self) -> None:
+        """
+        Generate a feature definition prompt based on the features of the model.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += "The features are defined as follows: \n" + answer_format_prompt
+    
+    def generate_feat_def_prompt_auto(self) -> None:
+        """
+        Generate a feature definition prompt for automatic classification.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += "The features are defined as follows: \n" + answer_format_prompt
+    
+    def generate_feat_def_prompt_man(self):
+        """
+        Generate a feature definition prompt for manual classification.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += "The features are defined as follows: \n" + answer_format_prompt
+    
+    def generate_procedure_prompt(self) -> None:
+        """
+        Generate a procedure prompt for single label classification.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += procedure_prompt
+    
+    def generate_train_data_intro_prompt(self) -> None:
+        """
+        Generate a training data introduction prompt.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += train_data_intro_prompt
+    
+    def generate_mode_prompt(self) -> None:
+        """
+        Generate a mode prompt based on the mode of the model.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += "The model is in single label classification mode."
+    
+    def answer_format_prompt(self) -> None:
+        """
+        Generate an answer format prompt based on the answer format of the model.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += answer_format_prompt
+    
+
+    def generate_procedure_prompt(self) -> None:
+        """
+        Generate a procedure prompt based on the procedure of the model.
+        This method should be overridden by subclasses.
+        """
+        self.full_prompt += procedure_prompt
+
+
+    
+
+    
     
     
     
