@@ -9,48 +9,65 @@ from ..core.base import AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType, TrainingData
 from ..core.exceptions import PredictionError, ValidationError, APIError
 from .prompts import get_prompt_template
-
+from ..llm.prompt_engineer import PromptEngineer
 
 class BaseLLMClassifier(AsyncBaseClassifier):
     """Base class for all LLM-based text classifiers."""
     
     def __init__(self, config):
-        """Initialize the LLM classifier.
-        
-        Args:
-            config: Model configuration
-        """
+
         super().__init__(config)
         self.config.model_type = ModelType.LLM
-        self.examples = []  # Few-shot examples
+        self.examples = []
+        self.context = None
+        self.label_definitions = {}
+        self.prompt_engineer = PromptEngineer()
+
         
-    def fit(self, training_data: TrainingData) -> None:
+
+    def fit(
+        self,
+        training_data: TrainingData,
+        context: str = None,
+        label_definitions: dict = None
+    ) -> None:
         """Fit the LLM classifier (stores examples for few-shot learning).
-        
+
         Args:
             training_data: Training data containing texts and labels
+            context: Optional context string for prompt engineering
+            label_definitions: Optional dict of label definitions
         """
+        if context is not None:
+            self.context = context
+            self.prompt_engineer.context = context
+        if label_definitions is not None:
+            self.label_definitions = label_definitions
+            self.prompt_engineer.label_definitions = label_definitions
+
         self.classification_type = training_data.classification_type
-        
+
         # Extract unique classes
         if self.classification_type == ClassificationType.MULTI_CLASS:
             self.classes_ = list(set(training_data.labels))
+            label_type = "single"
         else:
-            # For multi-label, flatten all labels
             all_labels = []
             for label_list in training_data.labels:
                 all_labels.extend(label_list)
             self.classes_ = list(set(all_labels))
-        
+            label_type = "multiple"
+
+        self.prompt_engineer.set_labels(self.classes_, label_type=label_type)
+
         # Store examples for few-shot learning (limit to avoid token limits)
         max_examples = self.config.parameters.get('max_examples', 5)
         self.examples = []
-        
         for i, (text, label) in enumerate(zip(training_data.texts, training_data.labels)):
             if i >= max_examples:
                 break
             self.examples.append({'text': text, 'label': label})
-        
+
         self.is_trained = True
     
     def predict(self, texts: List[str]) -> ClassificationResult:
