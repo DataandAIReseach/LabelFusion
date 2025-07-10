@@ -36,19 +36,30 @@ class PromptEngineer:
     def generate_answer_format_prompt(self) -> None:
         self.prompt.add_part("answer_format", PromptWarehouse.answer_format_prompt)
 
+    def generate_examples_prompt(self):
+        if self.examples:
+            examples_str = "\n".join(
+                f"Example:\nText: {ex['text']}\nLabel: {ex['label']}" for ex in self.examples
+            )
+            self.prompt.add_part("examples", examples_str)
+
     def build_prompt_single_label(self, input_text: str, mode: str = "auto") -> str:
+        self.reset()
         self.generate_role_prompt()
         self.generate_context_prompt(label_type="single", mode=mode)
         self.generate_feat_def_prompt()
+        self.generate_examples_prompt()  # <-- Add this line
         self.generate_procedure_prompt()
         self.generate_answer_format_prompt()
         self.generate_input_prompt(input_text)
         return self.prompt.render()
 
     def build_prompt_multiple_labels(self, input_text: str, mode: str = "auto") -> str:
+        self.reset()
         self.generate_role_prompt()
         self.generate_context_prompt(label_type="multiple", mode=mode)
         self.generate_feat_def_prompt()
+        self.generate_examples_prompt()  # <-- Add this line
         self.generate_procedure_prompt()
         self.generate_answer_format_prompt()
         self.generate_input_prompt(input_text)

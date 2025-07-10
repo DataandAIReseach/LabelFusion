@@ -4,12 +4,13 @@ import asyncio
 import json
 import re
 from typing import Any, Dict, List, Optional, Union
+import pandas as pd
 
 from ..core.base import AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType, TrainingData
 from ..core.exceptions import PredictionError, ValidationError, APIError
 from .prompts import get_prompt_template
-from ..llm.prompt_engineer import PromptEngineer
+from ..prompt_engineer import PromptEngineer
 
 class BaseLLMClassifier(AsyncBaseClassifier):
     """Base class for all LLM-based text classifiers."""
@@ -69,6 +70,45 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             self.examples.append({'text': text, 'label': label})
 
         self.is_trained = True
+    
+    def fit_from_dataframe(
+        self,
+        df: pd.DataFrame,
+        text_column: str,
+        label_column: str,
+        context: str = None,
+        label_definitions: dict = None,
+        classification_type: str = None
+        ) -> None:
+            """
+            Fit the classifier using a pandas DataFrame directly.
+
+            Args:
+                df: The DataFrame containing the data.
+                text_column: Name of the column with input texts.
+                label_column: Name of the column with labels.
+                context: Optional context string for prompt engineering.
+                label_definitions: Optional dict of label definitions.
+                classification_type: "multi_class" or "multi_label". If None, inferred automatically.
+            """
+            texts = df[text_column].tolist()
+            labels = df[label_column].tolist()
+
+            # Infer classification type if not provided
+            if classification_type is None:
+                if all(isinstance(label, str) for label in labels):
+                    ctype = ClassificationType.MULTI_CLASS
+                elif all(isinstance(label, list) for label in labels):
+                    ctype = ClassificationType.MULTI_LABEL
+                else:
+                    raise ValueError("Could not infer classification type from label column.")
+            else:
+                if classification_type == "multi_class":
+                    ctype = ClassificationType.MULTI_CLASS
+                elif classification_type == "multi_label":
+                    ctype = ClassificationType.MULTI_LABEL
+                else:
+                    raise ValueError("classification_type must be 'multi_class' or 'multi_label'.")
     
     def predict(self, texts: List[str]) -> ClassificationResult:
         """Predict labels for texts (synchronous wrapper).
