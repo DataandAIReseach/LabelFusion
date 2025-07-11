@@ -16,4 +16,96 @@ class PromptWarehouse:
 
     """
 
-    answer_format_prompt = "Given the above training data, make a prediction for the following paragraph: {paragraph}. Keep in mind the Output format: rating|power_centricity rating|negativity rating|abstractivity rating|agent_centricity. No additional text shall be shown."
+    answer_format_prompt_single = f"""
+        Given the above training data, make a prediction for the following paragraph.
+
+        The output format shall be:
+
+            {' | '.join(data['label'].unique())}
+
+        Each value must be either 1 (feature present) or 0 (feature absent).
+        Only one value may be 1, as this is a multi-class classification task — 
+        meaning the paragraph can belong to only one class (mutually exclusive).
+
+        No additional text shall be shown — output only the classification line.
+
+        Example:
+            If the task is to classify sentiment in Amazon product reviews with the following categories:
+                very negative
+                slightly negative
+                neutral
+                slightly positive
+                very positive
+
+            Then, for a very negative review, the prediction would be:
+                1 | 0 | 0 | 0 | 0
+        """.strip()
+    
+    answer_format_prompt_mult = f"""
+        Given the above training data, make a prediction for the following paragraph.
+
+        The output format shall be:
+
+            {' | '.join(data['label'].unique())}
+
+        Each value must be either 1 (label present) or 0 (absent).  
+        Multiple values may be 1, as this is a multi-label classification task — 
+        a paragraph can belong to more than one class.
+
+        No additional text shall be shown — output only the classification line.
+
+        Example:
+            If the task is to classify toxic online comments with the following categories:
+                toxic
+                insult
+                threat
+                obscene
+                identity hate
+
+            Then, for a comment that is both toxic and obscene, the prediction would be:
+                1 | 0 | 0 | 1 | 0
+        """.strip()
+    
+    #answer_format_prompt = "Given the above training data, make a prediction for the following paragraph: {paragraph}. Keep in mind the Output format: rating|power_centricity rating|negativity rating|abstractivity rating|agent_centricity. No additional text shall be shown."
+
+    
+    
+    
+    
+    
+    
+    role_prompt_creator_prompt = """
+    You are given a series of examples, each consisting of a piece of text and its associated label.
+    From these examples, infer the kind of role or persona that would most appropriately be analyzing,
+    producing, or categorizing this type of content.
+
+    Your task is to describe the role in one or two sentences only. This could include the speaker’s goals,
+    responsibilities, or context — such as a politician addressing voters, a scientist analyzing results,
+    a customer writing a review, etc.
+
+    Here are the examples:
+    {data}
+
+    Based on the patterns above, describe the role you are taking in this context in one or two sentences:
+    """
+
+    procedure_prompt_creator_prompt = """
+You are about to write a procedure prompt designed to guide the analysis of a text using a specific theoretical or conceptual lens.
+
+A well-structured procedure prompt must include the following main components:
+
+1. **Input Specification** – Clearly state what kind of text or data the user or model will receive.
+2. **Primary Task Instruction** – Define what the user is expected to do with the input.
+3. **Theoretical or Analytical Focus** – Indicate the specific lens, concept, or framework through which the input should be analyzed.
+4. **Depth of Analysis Required** – Specify the level of detail, reasoning, or argumentation expected.
+5. **Use of Evidence** – Instruct the user to ground their analysis in specific examples from the input text.
+6. **Connection to Theory or Definitions** – Request that findings be linked back to theoretical definitions, frameworks, or scholarly concepts.
+
+Below is an example of a procedure prompt. Based on the language, structure, and focus of the example, describe in two or three sentences what kind of task this prompt is designed to accomplish:
+
+{data}
+"""
+
+
+
+
