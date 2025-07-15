@@ -124,122 +124,122 @@ class PromptWarehouse:
     """
 
     @classmethod
-    def load_role_prompt(cls) -> str:
-        """Load the default role prompt."""
+    def get_role_prompt(cls) -> str:
+        """Get the default role prompt."""
         return cls.role_prompt
 
     @classmethod
-    def load_theory_background(cls) -> str:
-        """Load the theory background prompt."""
+    def get_theory_background(cls) -> str:
+        """Get the theory background prompt."""
         return cls.theory_background
 
     @classmethod
-    def load_train_data_intro(cls) -> str:
-        """Load the training data introduction prompt."""
+    def get_train_data_intro(cls) -> str:
+        """Get the training data introduction prompt."""
         return cls.train_data_intro_prompt
 
     @classmethod
-    def load_train_data(cls, data_columns: List[str]) -> str:
-        """Load the training data prompt with column information."""
+    def get_train_data_prompt(cls, data_columns: List[str]) -> str:
+        """Get the training data prompt with column information."""
         return cls.train_data_prompt.format(
             data=data_columns
         )
 
     @classmethod
-    def load_context_brainstorm(cls, data: pd.DataFrame, features: List[str]) -> str:
-        """Load the context brainstorming prompt with data and features."""
+    def get_context_brainstorm(cls, data: pd.DataFrame, features: List[str]) -> str:
+        """Get the context brainstorming prompt with data and features."""
         return cls.context_brainstorm_prompt.format(
             data=data.to_string(),
             features=", ".join(features)
         )
 
     @classmethod
-    def load_context_brainstorm_role(cls, data_columns: List[str]) -> str:
-        """Load the context brainstorming role prompt."""
+    def get_context_brainstorm_role(cls, data_columns: List[str]) -> str:
+        """Get the context brainstorming role prompt."""
         return cls.context_brainstorm_role_prompt.format(
             data=", ".join(data_columns)
         )
 
     @classmethod
-    def load_create_context(cls, keywords: List[str]) -> str:
-        """Load the context creation prompt with keywords."""
+    def get_create_context(cls, keywords: List[str]) -> str:
+        """Get the context creation prompt with keywords."""
         return cls.create_context_prompt.format(
             keywords=", ".join(keywords)
         )
 
     @classmethod
-    def load_procedure(cls) -> str:
-        """Load the default procedure prompt."""
+    def get_procedure_prompt(cls) -> str:
+        """Get the default procedure prompt."""
         return cls.procedure_prompt
 
     @classmethod
-    def load_procedure_creator(cls, data: pd.DataFrame) -> str:
-        """Load the procedure creator prompt with data."""
+    def get_procedure_creator(cls, data: pd.DataFrame) -> str:
+        """Get the procedure creator prompt with data."""
         return cls.procedure_prompt_creator_prompt.format(
             data=data.to_string()
         )
 
     @classmethod
-    def load_answer_format_single(cls, labels: List[str]) -> str:
-        """Load the single-label answer format prompt."""
+    def get_answer_format_single(cls, labels: List[str]) -> str:
+        """Get the single-label answer format prompt."""
         return cls.answer_format_prompt_single.format(
             data={'label': {'unique': lambda: labels}}
         )
 
     @classmethod
-    def load_answer_format_multi(cls, labels: List[str]) -> str:
-        """Load the multi-label answer format prompt."""
+    def get_answer_format_multi(cls, labels: List[str]) -> str:
+        """Get the multi-label answer format prompt."""
         return cls.answer_format_prompt_mult.format(
             data={'label': {'unique': lambda: labels}}
         )
 
     @classmethod
-    def load_role_creator(cls, data: pd.DataFrame) -> str:
-        """Load the role creator prompt with example data."""
+    def get_role_creator(cls, data: pd.DataFrame) -> str:
+        """Get the role creator prompt with example data."""
         return cls.role_prompt_creator_prompt.format(
             data=data.to_string()
         )
 
     @classmethod
-    def load_all_prompts(
+    def get_all_prompts(
         cls,
         data: Optional[pd.DataFrame] = None,
         labels: Optional[List[str]] = None,
         keywords: Optional[List[str]] = None,
         is_multi_label: bool = False
     ) -> Dict[str, str]:
-        """Load all available prompts with given data."""
+        """Get all available prompts with given data."""
         prompts = {
-            'role': cls.load_role_prompt(),
-            'theory': cls.load_theory_background(),
-            'procedure': cls.load_procedure(),
-            'train_data_intro': cls.load_train_data_intro()
+            'role': cls.get_role_prompt(),
+            'theory': cls.get_theory_background(),
+            'procedure': cls.get_procedure_prompt(),
+            'train_data_intro': cls.get_train_data_intro()
         }
 
         if data is not None:
             data_columns = data.columns.tolist()
             prompts.update({
-                'train_data': cls.load_train_data(data_columns),
-                'context_brainstorm_role': cls.load_context_brainstorm_role(data_columns),
-                'procedure_creator': cls.load_procedure_creator(data),
-                'role_creator': cls.load_role_creator(data)
+                'train_data': cls.get_train_data_prompt(data_columns),
+                'context_brainstorm_role': cls.get_context_brainstorm_role(data_columns),
+                'procedure_creator': cls.get_procedure_creator(data),
+                'role_creator': cls.get_role_creator(data)
             })
-
+            
             if labels:
                 prompts.update({
-                    'context_brainstorm': cls.load_context_brainstorm(data, labels)
+                    'context_brainstorm': cls.get_context_brainstorm(data, labels)
                 })
 
         if labels:
             prompts.update({
-                'answer_format': (cls.load_answer_format_multi(labels) 
+                'answer_format': (cls.get_answer_format_multi(labels) 
                                 if is_multi_label 
-                                else cls.load_answer_format_single(labels))
+                                else cls.get_answer_format_single(labels))
             })
 
         if keywords:
             prompts.update({
-                'create_context': cls.load_create_context(keywords)
+                'create_context': cls.get_create_context(keywords)
             })
 
         return prompts
