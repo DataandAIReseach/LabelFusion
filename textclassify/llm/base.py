@@ -9,7 +9,7 @@ import pandas as pd
 from ..core.base import AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType
 from ..core.exceptions import PredictionError, ValidationError, APIError
-from ..prompt_engineer import PromptEngineer
+from ..prompt_engineer.base import PromptEngineer
 
 class BaseLLMClassifier(AsyncBaseClassifier):
     """Base class for all LLM-based text classifiers."""
@@ -235,3 +235,24 @@ class BaseLLMClassifier(AsyncBaseClassifier):
     async def _call_llm(self, prompt: str) -> str:
         """Call the LLM API with the given prompt."""
         raise NotImplementedError("Subclasses must implement _call_llm method")
+
+    async def predict_async(self, texts: List[str]) -> List[str]:
+        """Predict classifications for multiple texts."""
+        # Get prompts from PromptEngineer
+        prompts = self.prompt_engineer.create_prompts(
+            texts=texts,
+            is_multi_label=self.is_multi_label
+        )
+        
+        # Make API calls
+        responses = await asyncio.gather(
+            *[self._call_llm(prompt.render()) for prompt in prompts],
+            return_exceptions=True
+        )
+        
+        # Parse responses
+        return [
+            self._parse_prediction_response(r) if not isinstance(r, Exception)
+            else self._handle_error(r)
+            for r in responses
+        ]
