@@ -16,12 +16,10 @@ class PromptEngineer:
     ):
         self.text_column = text_column
         self.label_columns = label_columns
-        self.prompt = Prompt()
-        self.examples = []
         self.few_shot_mode = few_shot_mode
         self.role_prompt = None
-        self.data = None
-
+        
+    
     def set_few_shot_mode(self, mode: str):
         assert mode in ("zero_shot", "one_shot", "few_shot", "full_coverage")
         self.few_shot_mode = mode
@@ -53,8 +51,29 @@ class PromptEngineer:
         else:
             self.examples = []
 
-    def generate_role_prompt(self) -> None:
+    
+    def engineer_prompts(self, data: Optional[pd.DataFrame] = None):
+        """Set the training data for prompt engineering."""
+        if data is not None:
+            if not isinstance(data, pd.DataFrame):
+                raise ValueError("Data must be a pandas DataFrame")
+            self.data = data
+        else:
+            self.data = None
+        for i, row in self.data.iterrows():
+            text = row[self.text_column]
+            self.add_role_prompt()
+            self.add_context_brainstorm(text)
+            
+    def add_role_prompt(self) -> None:
+        """Add default role prompt."""
         self.prompt.add_part("role", PromptWarehouse.role_prompt)
+
+    def generate_role_prompt(self) -> None:
+
+        self.prompt.add_part("role", PromptWarehouse.role_prompt)
+
+    
 
     def generate_context_prompt(self, label_type: str = "single", mode: str = "auto") -> None:
         context = PromptWarehouse.get_context_prompt(label_type, mode)
