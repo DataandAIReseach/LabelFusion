@@ -13,6 +13,7 @@ class PromptEngineer:
         self.prompt = Prompt()
         self.examples = []
         self.few_shot_mode = few_shot_mode
+        self.role_prompt = None  # Initialize role prompt as None
 
     def set_few_shot_mode(self, mode: str):
         assert mode in ("zero_shot", "one_shot", "few_shot", "full_coverage")
@@ -73,7 +74,8 @@ class PromptEngineer:
 
     def build_prompt_single_label(self, input_text: str, mode: str = "auto") -> str:
         self.reset()
-        self.generate_role_prompt()
+        if self.role_prompt:  # Only add role if set
+            self.prompt.add_part("role", self.role_prompt)
         self.generate_context_prompt(label_type="single", mode=mode)
         self.generate_feat_def_prompt()
         self.generate_examples_prompt()
@@ -93,8 +95,39 @@ class PromptEngineer:
         self.generate_input_prompt(input_text)
         return self.prompt.render()
 
+
     def get_full_prompt(self) -> str:
         return self.prompt.render()
 
     def reset(self):
         self.prompt = Prompt()
+
+    def set_role(self, role_prompt: str) -> None:
+        """Set a custom role prompt."""
+        self.role_prompt = role_prompt
+
+    def clear_role(self) -> None:
+        """Clear the role prompt."""
+        self.role_prompt = None
+
+    async def call_llm(self, prompt: str) -> str:
+        """Call OpenAI API with optional role prompt."""
+        try:
+            messages = []
+            
+            # Add system role message only if role prompt is set
+            if self.role_prompt:
+                messages.append({"role": "system", "content": self.role_prompt})
+                
+            # Add user message
+            messages.append({"role": "user", "content": prompt})
+            
+            response = await openai.ChatCompletion.create(
+                model=self.model_name,
+                messages=messages,
+                temperature=0.0
+            )
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            raise ValueError(f"API call failed: {str(e)}")
