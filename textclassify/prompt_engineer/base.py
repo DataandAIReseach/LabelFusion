@@ -63,9 +63,46 @@ class PromptEngineer:
         for i, row in self.data.iterrows():
             p = Prompt()
             text = row[self.text_column]
-            self.add_role_prompt()
-            self.add_context_brainstorm(text)
             
+            p = self.add_role_prompt(p)
+            role_prompt_creator_prompt = self.generate_role_prompt_creator_prompt(n=20)
+            self.add_context_brainstorm(text)
+    
+    def generate_role_prompt_creator_prompt(self, sample_size: int = 20) -> str:
+        """Generate a role prompt creator prompt using sampled data with text-label pairs.
+        
+        Args:
+            sample_size: Number of examples to use for role creation (default: 20)
+            
+        Returns:
+            str: Role prompt creator prompt with formatted text-label pairs
+            
+        Raises:
+            ValueError: If no data is available
+        """
+        if self.data is None:
+            raise ValueError("Data must be set before generating role prompt")
+            
+        # Take a random sample of the data
+        sampled_data = self.data.sample(n=min(sample_size, len(self.data)), random_state=42)
+        
+        # Create text-label pairs
+        example_pairs = []
+        for idx, row in sampled_data.iterrows():
+            text = row[self.text_column]
+            labels = [f"{col}: {row[col]}" for col in self.label_columns]
+            example_pairs.append(
+                f"Example {idx + 1}:\n"
+                f"Text: {text}\n"
+                f"Labels: {', '.join(labels)}"
+            )
+        
+        formatted_examples = "\n\n".join(example_pairs)
+        
+        return PromptWarehouse.role_prompt_creator_prompt.format(
+            data=formatted_examples
+        )
+
     def add_role_prompt(self, prompt: Prompt) -> Prompt:
         """Add role prompt to the given prompt object."""
         content = self.role_prompt or PromptWarehouse.get_role_prompt()
