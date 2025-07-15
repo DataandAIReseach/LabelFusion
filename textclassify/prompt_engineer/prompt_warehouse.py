@@ -16,6 +16,44 @@ class PromptWarehouse:
 
     """
 
+    context_brainstorm_prompt = f"""
+    Given the dataset {{data}}, which includes text samples and ratings for features 
+    ({", ".join(features)}), analyze the content and associated ratings to infer the general topic 
+    the dataset likely represents. Based on this analysis, generate a list of keywords or concepts 
+    that are representative of the topic.
+    """
+
+    context_brainstorm_role_prompt = f"""
+    You are a brainstormer. You are part of a package for classyfying texts with regard to the features {', '.join(data.columns)}.
+    """
+
+    create_context_prompt = f"""
+    You are tasked with creating a context prompt that will help in understanding the dataset provided. For that sake take the keywords {', '.join(keywords)} as an input and write a context prompt of 3 to 4 sentences for the underlying dataset.
+    """
+
+    procedure_prompt_creator_prompt = """
+        You are about to write a procedure prompt designed to guide the analysis of a text using a specific theoretical or conceptual lens.
+
+        A well-structured procedure prompt must include the following main components:
+
+        1. Input Specification – Clearly state what kind of text or data the user or model will receive.
+        2. Primary Task Instruction – Define what the user is expected to do with the input.
+        3. Theoretical or Analytical Focus – Indicate the specific lens, concept, or framework through which the input should be analyzed.
+        4. Depth of Analysis Required – Specify the level of detail, reasoning, or argumentation expected.
+        5. Use of Evidence – Instruct the user to ground their analysis in specific examples from the input text.
+        6. Connection to Theory or Definitions – Request that findings be linked back to theoretical definitions, frameworks, or scholarly concepts.
+
+        Find below the dataset so that you can assume the concept to be classified.
+
+        {data}
+
+        Now create the procedure prompt and confine yourself to two to three sentences
+        
+        """
+
+    train_data_prompt = f"""In the following, paragraphs and the corresponding ratings are given for the features {', '.join(data.columns)}.\nThey are formatted in the following way:\n\n    {" rating|".join(data.columns)} rating\n\nTake these as examples for learning the value of each feature given an unknown text.""".strip()
+
+
     answer_format_prompt_single = f"""
         Given the above training data, make a prediction for the following paragraph.
 
@@ -68,12 +106,6 @@ class PromptWarehouse:
     
     #answer_format_prompt = "Given the above training data, make a prediction for the following paragraph: {paragraph}. Keep in mind the Output format: rating|power_centricity rating|negativity rating|abstractivity rating|agent_centricity. No additional text shall be shown."
 
-    
-    
-    
-    
-    
-    
     role_prompt_creator_prompt = """
     You are given a series of examples, each consisting of a piece of text and its associated label.
     From these examples, infer the kind of role or persona that would most appropriately be analyzing,
@@ -89,22 +121,6 @@ class PromptWarehouse:
     Based on the patterns above, describe the role you are taking in this context in one or two sentences:
     """
 
-    procedure_prompt_creator_prompt = """
-You are about to write a procedure prompt designed to guide the analysis of a text using a specific theoretical or conceptual lens.
-
-A well-structured procedure prompt must include the following main components:
-
-1. **Input Specification** – Clearly state what kind of text or data the user or model will receive.
-2. **Primary Task Instruction** – Define what the user is expected to do with the input.
-3. **Theoretical or Analytical Focus** – Indicate the specific lens, concept, or framework through which the input should be analyzed.
-4. **Depth of Analysis Required** – Specify the level of detail, reasoning, or argumentation expected.
-5. **Use of Evidence** – Instruct the user to ground their analysis in specific examples from the input text.
-6. **Connection to Theory or Definitions** – Request that findings be linked back to theoretical definitions, frameworks, or scholarly concepts.
-
-Below is an example of a procedure prompt. Based on the language, structure, and focus of the example, describe in two or three sentences what kind of task this prompt is designed to accomplish:
-
-{data}
-"""
 
 
 
