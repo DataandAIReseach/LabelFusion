@@ -4,6 +4,8 @@ from typing import List, Optional, Dict, Any
 from prompt_warehouse import PromptWarehouse
 from prompt import Prompt  # Assuming you've implemented the modular Prompt class
 from .prompt_collection import PromptCollection
+from ..services.llm_content_generator import LLMContentGenerator
+from ..config.api_keys import APIKeyManager
 
 class PromptEngineer:
     """Builds prompts for LLM-based text classification."""
@@ -12,47 +14,64 @@ class PromptEngineer:
         self,
         text_column: str,
         label_columns: List[str],
-        few_shot_mode: str = "few_shot"
+        few_shot_mode: str = "few_shot",
+        provider: str = "openai",
+        model_name: str = "gpt-4"
     ):
         self.text_column = text_column
         self.label_columns = label_columns
         self.few_shot_mode = few_shot_mode
+        
+        # Get API key from environment
+        key_manager = APIKeyManager()
+        api_key = key_manager.get_key(provider)
+        if not api_key:
+            raise ValueError(f"No API key found for {provider}")
+            
+        # Initialize LLM generator
+        self.llm_generator = create_llm_generator(
+            provider=provider,
+            model_name=model_name,
+            api_key=api_key
+        )
+        
         self.role_prompt = None
+        self.collection = PromptCollection()
         
     
     def set_few_shot_mode(self, mode: str):
         assert mode in ("zero_shot", "one_shot", "few_shot", "full_coverage")
         self.few_shot_mode = mode
 
-    def set_examples(self, texts, labels):
-        n = len(texts)
-        indices = list(range(n))
-        if self.few_shot_mode == "zero_shot":
-            self.examples = []
-        elif self.few_shot_mode == "one_shot":
-            if n > 0:
-                idx = random.choice(indices)
-                self.examples = [{'text': texts[idx], 'label': labels[idx]}]
-            else:
-                self.examples = []
-        elif self.few_shot_mode == "few_shot":
-            k = min(5, n)
-            if k > 0:
-                idxs = random.sample(indices, k)
-                self.examples = [{'text': texts[i], 'label': labels[i]} for i in idxs]
-            else:
-                self.examples = []
-        elif self.few_shot_mode == "full_coverage":
-            if n > 0:
-                idxs = random.sample(indices, n)
-                self.examples = [{'text': texts[i], 'label': labels[i]} for i in idxs]
-            else:
-                self.examples = []
-        else:
-            self.examples = []
+    # def set_examples(self, texts, labels):
+    #     n = len(texts)
+    #     indices = list(range(n))
+    #     if self.few_shot_mode == "zero_shot":
+    #         self.examples = []
+    #     elif self.few_shot_mode == "one_shot":
+    #         if n > 0:
+    #             idx = random.choice(indices)
+    #             self.examples = [{'text': texts[idx], 'label': labels[idx]}]
+    #         else:
+    #             self.examples = []
+    #     elif self.few_shot_mode == "few_shot":
+    #         k = min(5, n)
+    #         if k > 0:
+    #             idxs = random.sample(indices, k)
+    #             self.examples = [{'text': texts[i], 'label': labels[i]} for i in idxs]
+    #         else:
+    #             self.examples = []
+    #     elif self.few_shot_mode == "full_coverage":
+    #         if n > 0:
+    #             idxs = random.sample(indices, n)
+    #             self.examples = [{'text': texts[i], 'label': labels[i]} for i in idxs]
+    #         else:
+    #             self.examples = []
+    #     else:
+    #         self.examples = []
 
     
-    def engineer_prompts(self, data: Optional[pd.DataFrame] = None):
+    async def engineer_prompts(self, data: Optional[pd.DataFrame] = None):
         """Set the training data for prompt engineering."""
         if data is not None:
             if not isinstance(data, pd.DataFrame):
@@ -60,14 +79,41 @@ class PromptEngineer:
             self.data = data
         else:
             self.data = None
-        for i, row in self.data.iterrows():
+        
+        # Generate and set role prompt using LLM
+        role_prompt_creator_prompt = self.generate_role_prompt_creator_prompt(n=20)
+        self.role_prompt = await self.llm_generator.generate_content(role_prompt_creator_prompt)
+        
+        prompts = []
+        for _, row in self.data.iterrows():
+            # Create new prompt for each text
             p = Prompt()
             text = row[self.text_column]
             
+            # Add role prompt
             p = self.add_role_prompt(p)
-            role_prompt_creator_prompt = self.generate_role_prompt_creator_prompt(n=20)
-            self.add_context_brainstorm(text)
-    
+            
+            # Generate context brainstorming using LLM
+            brainstorm_prompt = PromptWarehouse.get_context_brainstorm(
+                self.data, 
+                self.label_columns, 
+                sample_size=20
+            )
+            brainstorm_content = await self.llm_generator.generate_content(brainstorm_prompt)
+            p = self.add_context_brainstorm(p)
+            
+            # Add remaining prompt parts
+            p = self.add_theory_background(p)
+            p = self.add_train_data_intro(p)
+            p = self.add_train_data(p)
+            p = self.add_procedure_prompt(p)
+            p = self.add_answer_format(p, is_multi_label=False)
+            p = self.add_input_text(p, text)
+            
+            prompts.append(p)
+            
+        return prompts
+
     def generate_role_prompt_creator_prompt(self, sample_size: int = 20) -> str:
         """Generate a role prompt creator prompt using sampled data with text-label pairs.
         
