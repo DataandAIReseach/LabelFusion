@@ -84,16 +84,19 @@ class DeepseekContentGenerator(BaseLLMContentGenerator):
         except Exception as e:
             raise APIError(f"Deepseek API call failed: {str(e)}")
 
-def create_llm_generator(provider: str, model_name: str, api_key: Optional[str] = None) -> BaseLLMContentGenerator:
-    """Factory function to create appropriate LLM generator.
+def create_llm_generator(provider: str, model_name: str, api_key: str) -> BaseLLMContentGenerator:
+    """Create LLM generator based on provider.
     
     Args:
-        provider: LLM provider ('openai', 'gemini', or 'deepseek')
+        provider: Name of LLM provider ('openai', 'gemini', 'deepseek')
         model_name: Name of the model to use
-        api_key: Optional API key
+        api_key: API key for the provider
         
     Returns:
-        Configured LLM content generator
+        Initialized LLM content generator
+        
+    Raises:
+        ValueError: If provider is not supported
     """
     generators = {
         'openai': OpenAIContentGenerator,
@@ -102,6 +105,8 @@ def create_llm_generator(provider: str, model_name: str, api_key: Optional[str] 
     }
     
     if provider not in generators:
-        raise ValueError(f"Unknown provider: {provider}. Available: {list(generators.keys())}")
+        supported = list(generators.keys())
+        raise ValueError(f"Provider '{provider}' not supported. Use one of: {supported}")
         
-    return generators[provider](model_name, api_key)
+    generator_class = generators[provider]
+    return generator_class(model_name=model_name, api_key=api_key)

@@ -58,3 +58,33 @@ class Prompt:
         """Reset parts and variables."""
         self.parts.clear()
         self.variables.clear()
+
+    def fuse(self, other: 'Prompt', parts: Optional[List[str]] = None) -> 'Prompt':
+        """Fuse another prompt's parts into this prompt.
+        
+        Args:
+            other: Another Prompt object to fuse with
+            parts: Optional list of part names to fuse (default: all parts)
+            
+        Returns:
+            self: The modified prompt for method chaining
+            
+        Raises:
+            ValueError: If specified part name doesn't exist in other prompt
+        """
+        # Determine which parts to fuse
+        parts_to_fuse = parts if parts is not None else [p["name"] for p in other.parts]
+        
+        # Add each part from other prompt
+        for part_name in parts_to_fuse:
+            for part in other.parts:
+                if part["name"] == part_name:
+                    self.add_part(part["name"], part["content"])
+                    break
+            else:
+                raise ValueError(f"Part '{part_name}' not found in other prompt")
+        
+        # Merge variables
+        self.variables.update(other.variables)
+        
+        return self

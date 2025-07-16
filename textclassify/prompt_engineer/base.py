@@ -2,10 +2,10 @@ import random
 import pandas as pd
 from typing import List, Optional, Dict, Any
 from prompt_warehouse import PromptWarehouse
-from prompt import Prompt  # Assuming you've implemented the modular Prompt class
 from .prompt_collection import PromptCollection
-from ..services.llm_content_generator import LLMContentGenerator
+from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
+from ..prompt_engineer.prompt import Prompt
 
 class PromptEngineer:
     """Builds prompts for LLM-based text classification."""
@@ -71,171 +71,325 @@ class PromptEngineer:
     #         self.examples = []
 
     
-    async def engineer_prompts(self, data: Optional[pd.DataFrame] = None):
-        """Set the training data for prompt engineering."""
+    async def engineer_prompts(
+        self,
+        data: Optional[pd.DataFrame] = None,
+        sample_size: int = 20,
+        custom_prompts: Optional[Dict[str, str]] = None,
+        custom_role_prompt: Optional[str] = None
+    ):
+        """Engineer prompts using LLM-based generation.
+        
+        Args:
+            data: Optional DataFrame to use for prompt engineering
+            sample_size: Number of examples to use for each prompt generation (default: 20)
+            custom_prompts: Optional dict of custom prompts for each stage (role, context, keywords)
+            custom_role_prompt: Optional custom role prompt to use
+        """
         if data is not None:
             if not isinstance(data, pd.DataFrame):
                 raise ValueError("Data must be a pandas DataFrame")
             self.data = data
-        else:
-            self.data = None
+        elif self.data is None:
+            raise ValueError("No data available for prompt engineering")
         
-        # Generate and set role prompt using LLM
-        role_prompt_creator_prompt = self.generate_role_prompt_creator_prompt(n=20)
-        self.role_prompt = await self.llm_generator.generate_content(role_prompt_creator_prompt)
+        init_p = Prompt()
+        pc = PromptCollection
         
-        prompts = []
-        for _, row in self.data.iterrows():
-            # Create new prompt for each text
-            p = Prompt()
-            text = row[self.text_column]
-            
-            # Add role prompt
-            p = self.add_role_prompt(p)
-            
-            # Generate context brainstorming using LLM
-            brainstorm_prompt = PromptWarehouse.get_context_brainstorm(
-                self.data, 
-                self.label_columns, 
-                sample_size=20
-            )
-            brainstorm_content = await self.llm_generator.generate_content(brainstorm_prompt)
-            p = self.add_context_brainstorm(p)
-            
-            # Add remaining prompt parts
-            p = self.add_theory_background(p)
-            p = self.add_train_data_intro(p)
-            p = self.add_train_data(p)
-            p = self.add_procedure_prompt(p)
-            p = self.add_answer_format(p, is_multi_label=False)
-            p = self.add_input_text(p, text)
-            
-            prompts.append(p)
-            
-        return prompts
+        # Get custom prompts if provided
+        role_prompt = custom_prompts.get('role') if custom_prompts else None
+        context_prompt = custom_prompts.get('context') if custom_prompts else None
+        keywords_prompt = custom_prompts.get('keywords') if custom_prompts else None
+        
+        # Generate role prompt
+        role_prompt_creator_prompt = self.fill_role_prompt_creator_prompt(
+            sample_size=sample_size,
+            custom_prompt=PromptWarehouse.role_prompt_creator_prompt,
+            custom_role_prompt=custom_role_prompt,
+            include_role=False
+        )
 
-    def generate_role_prompt_creator_prompt(self, sample_size: int = 20) -> str:
+        role_prompt_str = await self.llm_generator.generate_content(role_prompt_creator_prompt)
+
+        init_p.add_part("role_prompt", role_prompt_str)
+
+        create_context_keywords_str = self.generate_context_keywords(
+            sample_size=sample_size,
+            custom_prompt=PromptWarehouse.context_brainstorm_role_prompt,
+            custom_role_prompt=PromptWarehouse.context_brainstorm_prompt,
+            include_role=True  # Include the newly generated role prompt
+        )
+
+        context_keywords = await self.llm_generator.generate_content(create_context_keywords_str)
+
+
+        # Generate context brainstorm with the new role
+        context_brainstorm_str = self.fill_context_brainstorm_prompt(
+            sample_size=sample_size,
+            custom_prompt=PromptWarehouse.create_context_prompt,
+            custom_role_prompt=custom_role_prompt,
+            include_role=True,
+            keywords_content=context_keywords  # Pass the generated keywords
+        )
+        context = await self.llm_generator.generate_content(context_brainstorm_str)
+        
+        init_p.add_part("context", context)
+        pc = PromptCollection()
+
+        for idx, row in self.data.iterrows():
+            p = Prompt()
+            p.fuse(init_p.copy())
+            # Add all components as parts
+            p.add_part("procedure_prompt", )
+            p.add_part("train_data_intro_prompt", )
+            p.add_part("answer_format_prompt",)
+            
+            # Add to collection
+            self.collection.add_prompt(str(idx), p)
+        return pc
+        
+
+    def generate_role_prompt_creator_prompt(
+        self,
+        sample_size: int = 20,
+        custom_prompt: Optional[str] = None,
+        custom_role_prompt: Optional[str] = None,
+        include_role: bool = True
+    ) -> str:
         """Generate a role prompt creator prompt using sampled data with text-label pairs.
         
         Args:
             sample_size: Number of examples to use for role creation (default: 20)
+            custom_prompt: Optional custom prompt to use instead of default
+            custom_role_prompt: Optional custom role prompt to use instead of default
+            include_role: Whether to include the role prompt (default: True)
             
         Returns:
-            str: Role prompt creator prompt with formatted text-label pairs
+            str: Role prompt creator content
             
         Raises:
             ValueError: If no data is available
         """
         if self.data is None:
-            raise ValueError("Data must be set before generating role prompt")
+            raise ValueError("No data available for role prompt creation")
+            
+        # Sample data
+        sampled_data = self.data.sample(n=min(sample_size, len(self.data)))
+        examples = []
+        for _, row in sampled_data.iterrows():
+            text = row[self.text_column]
+            labels = {col: row[col] for col in self.label_columns}
+            examples.append({'text': text, 'labels': labels})
+            
+        # Get prompt template
+        if custom_prompt:
+            prompt_template = custom_prompt
+        else:
+            prompt_template = PromptWarehouse.get_role_creator_template()
+            
+        # Format prompt with examples
+        formatted_examples = "\n".join([
+            f"Text: {ex['text']}\nLabels: {ex['labels']}"
+            for ex in examples
+        ])
+        
+        prompt_text = prompt_template.format(examples=formatted_examples)
+        
+        if include_role and custom_role_prompt:
+            return f"{custom_role_prompt}\n\n{prompt_text}"
+        elif include_role and self.role_prompt:
+            return f"{self.role_prompt}\n\n{prompt_text}"
+        else:
+            return prompt_text
+
+    def generate_context_brainstorm_prompt(
+        self,
+        sample_size: int = 20,
+        custom_prompt: Optional[str] = None,
+        custom_role_prompt: Optional[str] = None,
+        include_role: bool = True
+    ) -> str:
+        """Generate a context brainstorming prompt using sampled data.
+        
+        Args:
+            sample_size: Number of examples to use for context brainstorming (default: 20)
+            custom_prompt: Optional custom prompt to use instead of default
+            custom_role_prompt: Optional custom role prompt to use instead of default
+            include_role: Whether to include the role prompt (default: True)
+            
+        Returns:
+            str: Context brainstorming prompt content
+            
+        Raises:
+            ValueError: If no data is available
+        """
+        if self.data is None:
+            raise ValueError("No data available for context brainstorming")
+            
+        # Sample data
+        sampled_data = self.data.sample(n=min(sample_size, len(self.data)))
+        examples = []
+        for _, row in sampled_data.iterrows():
+            text = row[self.text_column]
+            labels = {col: row[col] for col in self.label_columns}
+            examples.append({'text': text, 'labels': labels})
+            
+        # Get prompt template
+        if custom_prompt:
+            prompt_template = custom_prompt
+        else:
+            prompt_template = PromptWarehouse.get_context_brainstorm_template()
+            
+        # Format prompt with examples
+        formatted_examples = "\n".join([
+            f"Text: {ex['text']}\nLabels: {ex['labels']}"
+            for ex in examples
+        ])
+        
+        prompt_text = prompt_template.format(examples=formatted_examples)
+        
+        if include_role and custom_role_prompt:
+            return f"{custom_role_prompt}\n\n{prompt_text}"
+        elif include_role and self.role_prompt:
+            return f"{self.role_prompt}\n\n{prompt_text}"
+        else:
+            return prompt_text
+
+    def generate_context_keywords(
+        self,
+        sample_size: int = 20,
+        custom_prompt: Optional[str] = None,
+        custom_role_prompt: Optional[str] = None,
+        include_role: bool = True
+    ) -> str:
+        """Generate a prompt to extract keywords from context brainstorming.
+        
+        Args:
+            sample_size: Number of examples to use for keyword generation (default: 20)
+            custom_prompt: Optional custom prompt to use instead of default
+            custom_role_prompt: Optional custom role prompt to use instead of default
+            include_role: Whether to include the role prompt (default: True)
+            
+        Returns:
+            str: Prompt for generating context keywords
+            
+        Raises:
+            ValueError: If no data is available
+        """
+        if self.data is None:
+            raise ValueError("Data must be set before generating context keywords")
             
         # Take a random sample of the data
         sampled_data = self.data.sample(n=min(sample_size, len(self.data)), random_state=42)
         
-        # Create text-label pairs
-        example_pairs = []
+        # Format the data
+        formatted_data = []
         for idx, row in sampled_data.iterrows():
             text = row[self.text_column]
             labels = [f"{col}: {row[col]}" for col in self.label_columns]
-            example_pairs.append(
-                f"Example {idx + 1}:\n"
-                f"Text: {text}\n"
+            formatted_data.append(
+                f"Text {idx + 1}: {text}\n"
                 f"Labels: {', '.join(labels)}"
             )
         
-        formatted_examples = "\n\n".join(example_pairs)
+        data_str = "\n\n".join(formatted_data)
+        prompts = []
         
-        return PromptWarehouse.role_prompt_creator_prompt.format(
-            data=formatted_examples
+        # Add role prompt if requested
+        if include_role:
+            role_prompt = custom_role_prompt or PromptWarehouse.context_brainstorm_role_prompt.format(
+                data=self.data
+            )
+            prompts.append(role_prompt)
+        
+        # Add main prompt
+        main_prompt = custom_prompt or PromptWarehouse.create_context_prompt.format(
+            data=data_str,
+            features=", ".join(self.label_columns)
         )
+        prompts.append(main_prompt)
+        
+        return "\n\n".join(prompts)
 
-    def add_role_prompt(self, prompt: Prompt) -> Prompt:
-        """Add role prompt to the given prompt object."""
+    def add_role_prompt(self, base_prompt: str = "") -> str:
+        """Add role prompt to the base prompt.
+        
+        Args:
+            base_prompt: Existing prompt text to append to (default: "")
+            
+        Returns:
+            str: Combined prompt text
+        """
         content = self.role_prompt or PromptWarehouse.get_role_prompt()
-        prompt.add_part("role", content)
-        return prompt
+        return f"{content}\n\n{base_prompt}" if base_prompt else content
 
-    def add_theory_background(self, prompt: Prompt) -> Prompt:
-        """Add theory background to the given prompt object."""
-        prompt.add_part("theory", PromptWarehouse.get_theory_background())
-        return prompt
+    def add_theory_background(self, base_prompt: str) -> str:
+        """Add theory background to the base prompt."""
+        theory = PromptWarehouse.get_theory_background()
+        return f"{base_prompt}\n\n{theory}"
 
-    def add_train_data_intro(self, prompt: Prompt) -> Prompt:
-        """Add training data introduction to the given prompt object."""
-        prompt.add_part("train_data_intro", PromptWarehouse.get_train_data_intro())
-        return prompt
+    def add_train_data_intro(self, base_prompt: str) -> str:
+        """Add training data introduction to the base prompt."""
+        intro = PromptWarehouse.get_train_data_intro()
+        return f"{base_prompt}\n\n{intro}"
 
-    def add_train_data(self, prompt: Prompt) -> Prompt:
-        """Add training data prompt to the given prompt object."""
-        if self.data is not None:
-            prompt.add_part(
-                "train_data",
-                PromptWarehouse.get_train_data_prompt(self.data.columns.tolist())
-            )
-        return prompt
+    def add_train_data(self, base_prompt: str) -> str:
+        """Add training data prompt to the base prompt."""
+        if self.data is None:
+            return base_prompt
+            
+        train_data = PromptWarehouse.get_train_data_prompt(self.data.columns.tolist())
+        return f"{base_prompt}\n\n{train_data}"
 
-    def add_context_brainstorm(self, prompt: Prompt, sample_size: int = 20) -> Prompt:
-        """Add context brainstorm to the given prompt object."""
-        if self.data is not None:
-            prompt.add_part(
-                "context_brainstorm",
-                PromptWarehouse.get_context_brainstorm(
-                    self.data, 
-                    self.label_columns, 
-                    sample_size
-                )
-            )
-        return prompt
-
-    def add_context_brainstorm_role(self, prompt: Prompt) -> Prompt:
-        """Add context brainstorm role to the given prompt object."""
-        if self.data is not None:
-            prompt.add_part(
-                "context_brainstorm_role",
-                PromptWarehouse.get_context_brainstorm_role(self.data.columns.tolist())
-            )
-        return prompt
-
-    def add_create_context(self, prompt: Prompt, keywords: List[str]) -> Prompt:
-        """Add context creation prompt to the given prompt object."""
-        prompt.add_part(
-            "create_context",
-            PromptWarehouse.get_create_context(keywords)
+    def add_context_brainstorm(self, base_prompt: str, sample_size: int = 20) -> str:
+        """Add context brainstorm to the base prompt."""
+        if self.data is None:
+            return base_prompt
+            
+        context = PromptWarehouse.get_context_brainstorm(
+            self.data, 
+            self.label_columns, 
+            sample_size
         )
-        return prompt
+        return f"{base_prompt}\n\n{context}"
 
-    def add_procedure_prompt(self, prompt: Prompt) -> Prompt:
-        """Add procedure prompt to the given prompt object."""
-        prompt.add_part("procedure", PromptWarehouse.get_procedure_prompt())
-        return prompt
+    def add_context_brainstorm_role(self, base_prompt: str) -> str:
+        """Add context brainstorm role to the base prompt."""
+        if self.data is None:
+            return base_prompt
+            
+        role = PromptWarehouse.get_context_brainstorm_role(self.data.columns.tolist())
+        return f"{base_prompt}\n\n{role}"
 
-    def add_procedure_creator(self, prompt: Prompt) -> Prompt:
-        """Add procedure creator prompt to the given prompt object."""
-        if self.data is not None:
-            prompt.add_part(
-                "procedure_creator",
-                PromptWarehouse.get_procedure_creator(self.data)
-            )
-        return prompt
+    def add_create_context(self, base_prompt: str, keywords: List[str]) -> str:
+        """Add context creation prompt to the base prompt."""
+        context = PromptWarehouse.get_create_context(keywords)
+        return f"{base_prompt}\n\n{context}"
 
-    def add_answer_format(self, prompt: Prompt, is_multi_label: bool) -> Prompt:
-        """Add appropriate answer format to the given prompt object."""
+    def add_procedure_prompt(self, base_prompt: str) -> str:
+        """Add procedure prompt to the base prompt."""
+        procedure = PromptWarehouse.get_procedure_prompt()
+        return f"{base_prompt}\n\n{procedure}"
+
+    def add_procedure_creator(self, base_prompt: str) -> str:
+        """Add procedure creator prompt to the base prompt."""
+        if self.data is None:
+            return base_prompt
+            
+        creator = PromptWarehouse.get_procedure_creator(self.data)
+        return f"{base_prompt}\n\n{creator}"
+
+    def add_answer_format(self, base_prompt: str, is_multi_label: bool) -> str:
+        """Add appropriate answer format to the base prompt."""
         if is_multi_label:
-            prompt.add_part(
-                "answer_format",
-                PromptWarehouse.get_answer_format_multi(self.label_columns)
-            )
+            format_text = PromptWarehouse.get_answer_format_multi(self.label_columns)
         else:
-            prompt.add_part(
-                "answer_format",
-                PromptWarehouse.get_answer_format_single(self.label_columns)
-            )
-        return prompt
+            format_text = PromptWarehouse.get_answer_format_single(self.label_columns)
+        return f"{base_prompt}\n\n{format_text}"
 
-    def add_input_text(self, prompt: Prompt, text: str) -> Prompt:
-        """Add input text to the given prompt object."""
-        prompt.add_part("input", f"Text to analyze: {text}")
-        return prompt
+    def add_input_text(self, base_prompt: str, text: str) -> str:
+        """Add input text to the base prompt."""
+        return f"{base_prompt}\n\nText to analyze: {text}"
 
     def build_complete_prompt(
         self,
@@ -244,42 +398,31 @@ class PromptEngineer:
         include_theory: bool = True
     ) -> str:
         """Build complete prompt with all components."""
-        self.reset()
-        
-        # Add role prompt (either default or created)
-        if self.role_prompt:
-            self.prompt.add_part("role", self.role_prompt)
-        else:
-            self.add_role_prompt()
+        # Start with role prompt
+        prompt = self.add_role_prompt()
 
         # Add theory if requested
         if include_theory:
-            self.add_theory_background()
+            prompt = self.add_theory_background(prompt)
 
         # Add context and training data
         if self.data is not None:
-            self.add_train_data_intro()
-            self.add_train_data()
+            prompt = self.add_train_data_intro(prompt)
+            prompt = self.add_train_data(prompt)
 
         # Add procedure
-        self.add_procedure_prompt()
+        prompt = self.add_procedure_prompt(prompt)
 
         # Add answer format based on classification type
-        if is_multi_label:
-            self.add_answer_format_multi()
-        else:
-            self.add_answer_format_single()
+        prompt = self.add_answer_format(prompt, is_multi_label)
 
         # Add input text
-        self.prompt.add_part("input", f"Text to analyze: {text}")
+        prompt = self.add_input_text(prompt, text)
 
-        return self.prompt.render()
+        return prompt
 
     def get_full_prompt(self) -> str:
         return self.prompt.render()
-
-    def reset(self):
-        self.prompt = Prompt()
 
     def set_role(self, role_prompt: str) -> None:
         """Set a custom role prompt."""
@@ -289,25 +432,111 @@ class PromptEngineer:
         """Clear the role prompt."""
         self.role_prompt = None
 
-    async def call_llm(self, prompt: str) -> str:
-        """Call OpenAI API with optional role prompt."""
-        try:
-            messages = []
+    def fill_role_prompt_creator_prompt(
+        self,
+        sample_size: int = 20,
+        custom_prompt: Optional[str] = None,
+        custom_role_prompt: Optional[str] = None,
+        include_role: bool = True
+    ) -> str:
+        """Fill a role prompt creator prompt using sampled data with text-label pairs.
+        
+        Args:
+            sample_size: Number of examples to use for role creation (default: 20)
+            custom_prompt: Optional custom prompt to use instead of default
+            custom_role_prompt: Optional custom role prompt to use instead of default
+            include_role: Whether to include the role prompt (default: True)
             
-            # Add system role message only if role prompt is set
-            if self.role_prompt:
-                messages.append({"role": "system", "content": self.role_prompt})
-                
-            # Add user message
-            messages.append({"role": "user", "content": prompt})
+        Returns:
+            str: Role prompt creator content
             
-            response = await openai.ChatCompletion.create(
-                model=self.model_name,
-                messages=messages,
-                temperature=0.0
-            )
-            return response.choices[0].message.content
+        Raises:
+            ValueError: If no data is available
+        """
+        if self.data is None:
+            raise ValueError("No data available for role prompt creation")
             
-        except Exception as e:
-            raise ValueError(f"API call failed: {str(e)}")
+        # Sample data
+        sampled_data = self.data.sample(n=min(sample_size, len(self.data)))
+        examples = []
+        for _, row in sampled_data.iterrows():
+            text = row[self.text_column]
+            labels = {col: row[col] for col in self.label_columns}
+            examples.append({'text': text, 'labels': labels})
+            
+        # Get prompt template
+        if custom_prompt:
+            prompt_template = custom_prompt
+        else:
+            prompt_template = PromptWarehouse.get_role_creator_template()
+            
+        # Format prompt with examples
+        formatted_examples = "\n".join([
+            f"Text: {ex['text']}\nLabels: {ex['labels']}"
+            for ex in examples
+        ])
+        
+        prompt_text = prompt_template.format(examples=formatted_examples)
+        
+        if include_role and custom_role_prompt:
+            return f"{custom_role_prompt}\n\n{prompt_text}"
+        elif include_role and self.role_prompt:
+            return f"{self.role_prompt}\n\n{prompt_text}"
+        else:
+            return prompt_text
+
+    def fill_context_brainstorm_prompt(
+        self,
+        sample_size: int = 20,
+        custom_prompt: Optional[str] = None,
+        custom_role_prompt: Optional[str] = None,
+        include_role: bool = True,
+        keywords_content: Optional[str] = None
+    ) -> str:
+        """Fill a context brainstorming prompt using sampled data.
+    
+        Args:
+            sample_size: Number of examples to use for context brainstorming (default: 20)
+            custom_prompt: Optional custom prompt to use instead of default
+            custom_role_prompt: Optional custom role prompt to use instead of default
+            include_role: Whether to include the role prompt (default: True)
+            keywords_content: Optional keywords to include in the prompt
+        
+        Returns:
+            str: Context brainstorming prompt content
+            
+        Raises:
+            ValueError: If no data is available
+        """
+        if self.data is None:
+            raise ValueError("No data available for context brainstorming")
+        
+        # Sample data
+        sampled_data = self.data.sample(n=min(sample_size, len(self.data)))
+        examples = []
+        for _, row in sampled_data.iterrows():
+            text = row[self.text_column]
+            labels = {col: row[col] for col in self.label_columns}
+            examples.append({'text': text, 'labels': labels})
+        
+        # Format prompt with examples
+        formatted_examples = "\n".join([
+            f"Text: {ex['text']}\nLabels: {ex['labels']}"
+            for ex in examples
+        ])
+        
+        # Use custom prompt or default template
+        if custom_prompt and keywords_content:
+            prompt_template = custom_prompt.format(keywords=keywords_content)
+        else:
+            prompt_template = PromptWarehouse.get_context_brainstorm_template()
+        
+        prompt_text = prompt_template.format(examples=formatted_examples)
+        
+        if include_role and custom_role_prompt:
+            return f"{custom_role_prompt}\n\n{prompt_text}"
+        elif include_role and self.role_prompt:
+            return f"{self.role_prompt}\n\n{prompt_text}"
+        else:
+            return prompt_text
 
