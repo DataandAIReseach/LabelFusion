@@ -53,7 +53,7 @@ class PromptWarehouse:
         
         """
 
-    train_data_prompt = f"""In the following, paragraphs and the corresponding ratings are given for the features {', '.join(data.columns)}.\nThey are formatted in the following way:\n\n    {" rating|".join(data.columns)} rating\n\nTake these as examples for learning the value of each feature given an unknown text.""".strip()
+    train_data_intro_prompt = f"""In the following, paragraphs and the corresponding ratings are given for the features {', '.join(data.columns)}.\nThey are formatted in the following way:\n\n    {" rating|".join(data.columns)} rating\n\nTake these as examples for learning the value of each feature given an unknown text.""".strip()
 
 
     answer_format_prompt_single = f"""
@@ -61,7 +61,7 @@ class PromptWarehouse:
 
         The output format shall be:
 
-            {' | '.join(data['label'].unique())}
+            {output_format}
 
         Each value must be either 1 (feature present) or 0 (feature absent).
         Only one value may be 1, as this is a multi-class classification task — 
@@ -86,7 +86,7 @@ class PromptWarehouse:
 
         The output format shall be:
 
-            {' | '.join(data['label'].unique())}
+            {output_format}
 
         Each value must be either 1 (label present) or 0 (absent).  
         Multiple values may be 1, as this is a multi-label classification task — 
