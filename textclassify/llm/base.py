@@ -77,28 +77,34 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if label_columns is None:
                 label_columns = getattr(self.config, 'label_columns', ["label"])
                 
-            self._validate_prediction_inputs(
+            # Validate input DataFrame
+            self._validate_prediction_inputs(df, text_column, label_columns)
+            
+            self._setup_prompt_configuration(context, label_definitions)
+            
+            # Engineer prompts and add to DataFrame
+            df_with_prompts = await self._engineer_prompts_for_data(
                 df=df,
                 text_column=text_column,
                 label_columns=label_columns
             )
             
-            self._setup_prompt_configuration(context, label_definitions, few_shot_mode)
+            # Generate predictions using engineered prompts
+            predictions = await self._generate_predictions(df_with_prompts, text_column)
             
-            if train_df is not None:
-                self._validate_prediction_inputs(
-                    df=train_df,
+            # Evaluate if test data provided
+            metrics = None
+            if test_df is not None:
+                test_df_with_prompts = await self._engineer_prompts_for_data(
+                    df=test_df,
                     text_column=text_column,
-                    label_columns=label_columns,
-                    multi_label=multi_label
+                    label_columns=label_columns
                 )
-                
-            predictions = await self._generate_predictions(df, text_column)
-            metrics = await self._evaluate_test_data(
-                test_df=test_df,
-                text_column=text_column,
-                label_columns=label_columns
-            ) if test_df is not None else None
+                metrics = await self._evaluate_test_data(
+                    test_df=test_df_with_prompts,
+                    text_column=text_column,
+                    label_columns=label_columns
+                )
             
             return self._create_result(predictions=predictions, metrics=metrics)
         except Exception as e:
@@ -108,20 +114,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self, 
         df: pd.DataFrame, 
         text_column: str,
-        label_columns: List[str],
-        multi_label: bool
+        label_columns: List[str]
     ) -> None:
-        """Validate prediction inputs.
-        
-        Args:
-            df: DataFrame to validate
-            text_column: Name of the column containing text data
-            label_columns: Names of the columns containing labels
-            multi_label: Whether this is a multi-label classification task
-            
-        Raises:
-            ValidationError: If inputs are invalid
-        """
+        """Validate prediction inputs."""
         # Validate DataFrame
         if not isinstance(df, pd.DataFrame):
             raise ValidationError("Input must be a pandas DataFrame")
@@ -148,8 +143,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Get sum of 1s for each row across label columns
         label_sums = df[label_columns].sum(axis=1)
         
-        if not multi_label:
-            # For single-label: check if exactly one 1 per row
+        if not self.multi_label:  # Use class attribute
             invalid_rows = label_sums != 1
             if invalid_rows.any():
                 problematic_rows = df.index[invalid_rows].tolist()
@@ -158,7 +152,6 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                     f"Problematic rows: {problematic_rows}"
                 )
         else:
-            # For multi-label: check if number of 1s per row <= number of labels
             invalid_rows = label_sums > len(label_columns)
             if invalid_rows.any():
                 problematic_rows = df.index[invalid_rows].tolist()
@@ -170,16 +163,19 @@ class BaseLLMClassifier(AsyncBaseClassifier):
     def _setup_prompt_configuration(
         self,
         context: Optional[str],
-        label_definitions: Optional[Dict[str, str]],
-        few_shot_mode: str
+        label_definitions: Optional[Dict[str, str]]
     ) -> None:
-        """Configure the prompt engineer."""
+        """Configure the prompt engineer.
+    
+        Args:
+        context: Optional context string to use
+        label_definitions: Optional dict mapping labels to definitions
+        """
         if context is not None:
             self.prompt_engineer.context = context
         if label_definitions is not None:
             self.prompt_engineer.label_definitions = label_definitions
-        self.prompt_engineer.set_few_shot_mode(few_shot_mode)
-        # Set multi_label based on the classifier's label type
+        # few_shot_mode and multi_label are already set in constructor
         label_type = getattr(self.config, 'label_type', 'single')
         self.prompt_engineer.multi_label = (label_type == "multiple")
 
@@ -339,3 +335,103 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             else self._handle_error(r)
             for r in responses
         ]
+
+    async def _engineer_prompts_for_data(
+        self,
+        df: pd.DataFrame,
+        text_column: str,
+        label_columns: List[str]
+    ) -> pd.DataFrame:
+        """Engineer prompts for all texts in DataFrame using PromptEngineer.
+    
+        Args:
+            df: DataFrame containing texts to classify
+            text_column: Name of column containing text data
+            label_columns: Names of columns containing labels
+        
+        Returns:
+            DataFrame with engineered prompts added as new column
+        """
+        # Create copy to avoid modifying original
+        df_with_prompts = df.copy()
+    
+        # Engineer prompts using PromptEngineer
+        engineered_prompts = await self.prompt_engineer.engineer_prompts(
+            data=df,
+            sample_size=self.batch_size
+        )
+    
+        # Convert prompts to strings and add as new column
+        df_with_prompts['engineered_prompt'] = [
+            prompt.render() for prompt in engineered_prompts
+        ]
+    
+        return df_with_prompts
+
+    def fill_procedure_prompt_creator_prompt(
+        self,
+        train_df: pd.DataFrame,
+        sample_size: int = 20,
+        custom_prompt: Optional[str] = None,
+        custom_role_prompt: Optional[str] = None,
+        include_role: bool = True,
+        context_content: Optional[str] = None
+    ) -> str:
+        """Fill a procedure prompt creator prompt using sampled data.
+    
+        Args:
+            train_df: DataFrame containing training examples
+            sample_size: Number of examples to use for procedure creation
+            custom_prompt: Optional custom prompt template
+            custom_role_prompt: Optional custom role prompt
+            include_role: Whether to include the role prompt
+            context_content: Optional context to include in the prompt
+    
+        Returns:
+            str: Procedure prompt creator content
+    
+        Raises:
+            ValueError: If train_df is None
+        """
+        if train_df is None:
+            raise ValueError("No data available for procedure prompt creation")
+    
+        # Sample data
+        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
+        examples = []
+        for _, row in sampled_data.iterrows():
+            text = row[self.text_column]
+            labels = {col: row[col] for col in self.label_columns}
+            examples.append({'text': text, 'labels': labels})
+    
+        # Format prompt with examples
+        formatted_examples = "\n".join([
+            f"Text: {ex['text']}\nLabels: {ex['labels']}"
+            for ex in examples
+        ])
+    
+        # Select prompt template
+        if custom_prompt:
+            prompt_template = custom_prompt
+            # Only apply context formatting if template expects it
+            if context_content and '{context}' in custom_prompt:
+                prompt_template = prompt_template.format(context=context_content)
+        else:
+            prompt_template = PromptWarehouse.procedure_prompt_creator_prompt
+    
+        # Format with available data
+        try:
+            prompt_text = prompt_template.format(
+                data=formatted_examples,
+                features=", ".join(self.label_columns)
+            )
+        except KeyError as e:
+            raise ValueError(f"Prompt template contains unknown placeholder: {e}")
+    
+        # Add role prompt if requested
+        if include_role and custom_role_prompt:
+            return f"{custom_role_prompt}\n\n{prompt_text}"
+        elif include_role and self.role_prompt:
+            return f"{self.role_prompt}\n\n{prompt_text}"
+        else:
+            return prompt_text
