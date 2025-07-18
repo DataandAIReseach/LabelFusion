@@ -14,10 +14,29 @@ from ..prompt_engineer.base import PromptEngineer
 class BaseLLMClassifier(AsyncBaseClassifier):
     """Base class for all LLM-based text classifiers."""
     
-    def __init__(self, config):
+    def __init__(
+        self, 
+        config,
+        multi_label: bool = False,
+        few_shot_mode: str = "few_shot"
+    ):
+        """Initialize the LLM classifier.
+        
+        Args:
+            config: Configuration object
+            multi_label: Whether this is a multi-label classifier (default: False)
+            few_shot_mode: Mode for few-shot learning (default: "few_shot")
+        """
         super().__init__(config)
         self.config.model_type = ModelType.LLM
-        self.prompt_engineer = PromptEngineer()
+        self.multi_label = multi_label
+        self.few_shot_mode = few_shot_mode
+        
+        # Initialize prompt engineer with configuration
+        self.prompt_engineer = PromptEngineer(
+            multi_label=self.multi_label,
+            few_shot_mode=self.few_shot_mode
+        )
         self.classes_: List[str] = []
         self._setup_config()
 
@@ -26,9 +45,18 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self.batch_size = self.config.parameters.get('batch_size', 32)
         self.threshold = self.config.parameters.get('threshold', 0.5)
 
-    def predict(self, texts: List[str]) -> ClassificationResult:
+    def predict(
+        self,
+        df: pd.DataFrame,
+        text_column: str = "text",
+        label_columns: List[str] = None
+    ) -> ClassificationResult:
         """Synchronous wrapper for predictions."""
-        return asyncio.run(self.predict_async(texts))
+        return asyncio.run(self.predict_async(
+            df=df,
+            text_column=text_column,
+            label_columns=label_columns
+        ))
 
     def predict_proba(self, texts: List[str]) -> ClassificationResult:
         """Synchronous wrapper for probability predictions."""
@@ -36,25 +64,41 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
     async def predict_async(
         self,
-        texts: List[str],
+        df: pd.DataFrame,
         train_df: Optional[pd.DataFrame] = None,
         test_df: Optional[pd.DataFrame] = None,
         text_column: str = "text",
-        label_column: str = "label",
+        label_columns: List[str] = None,
         context: Optional[str] = None,
-        label_definitions: Optional[Dict[str, str]] = None,
-        few_shot_mode: str = "few_shot"
+        label_definitions: Optional[Dict[str, str]] = None
     ) -> ClassificationResult:
-        """Asynchronously predict labels for texts with optional train/test data."""
+        """Asynchronously predict labels for texts."""
         try:
-            self._validate_prediction_inputs(texts)
+            if label_columns is None:
+                label_columns = getattr(self.config, 'label_columns', ["label"])
+                
+            self._validate_prediction_inputs(
+                df=df,
+                text_column=text_column,
+                label_columns=label_columns
+            )
+            
             self._setup_prompt_configuration(context, label_definitions, few_shot_mode)
             
             if train_df is not None:
-                self._setup_few_shot_learning(train_df, text_column, label_column)
-            
-            predictions = await self._generate_predictions(texts)
-            metrics = await self._evaluate_test_data(test_df, text_column, label_column) if test_df is not None else None
+                self._validate_prediction_inputs(
+                    df=train_df,
+                    text_column=text_column,
+                    label_columns=label_columns,
+                    multi_label=multi_label
+                )
+                
+            predictions = await self._generate_predictions(df, text_column)
+            metrics = await self._evaluate_test_data(
+                test_df=test_df,
+                text_column=text_column,
+                label_columns=label_columns
+            ) if test_df is not None else None
             
             return self._create_result(predictions=predictions, metrics=metrics)
         except Exception as e:
@@ -140,21 +184,34 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self.prompt_engineer.multi_label = (label_type == "multiple")
 
 
-    async def _generate_predictions(self, texts: List[str]) -> List[Union[str, List[str]]]:
+    async def _generate_predictions(
+        self,
+        df: pd.DataFrame,
+        text_column: str
+    ) -> List[Union[str, List[str]]]:
         """Generate predictions in batches."""
         predictions = []
-        for batch in self._get_batches(texts):
-            batch_predictions = await self._process_batch(batch)
+        for batch_df in self._get_batches(df, text_column):
+            batch_predictions = await self._process_batch(batch_df, text_column)
             predictions.extend(batch_predictions)
         return predictions
 
-    def _get_batches(self, texts: List[str]) -> Iterator[List[str]]:
-        """Yield batches of texts."""
-        for i in range(0, len(texts), self.batch_size):
-            yield texts[i:i + self.batch_size]
+    def _get_batches(
+        self,
+        df: pd.DataFrame,
+        text_column: str
+    ) -> Iterator[pd.DataFrame]:
+        """Yield batches of DataFrame."""
+        for i in range(0, len(df), self.batch_size):
+            yield df.iloc[i:i + self.batch_size]
 
-    async def _process_batch(self, texts: List[str]) -> List[Union[str, List[str]]]:
+    async def _process_batch(
+        self,
+        batch_df: pd.DataFrame,
+        text_column: str
+    ) -> List[Union[str, List[str]]]:
         """Process a batch of texts for prediction."""
+        texts = batch_df[text_column].tolist()
         prompts = [self.prompt_engineer.build_prompt(text) for text in texts]
         responses = await asyncio.gather(
             *[self._call_llm(prompt) for prompt in prompts],
@@ -197,16 +254,15 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self,
         test_df: pd.DataFrame,
         text_column: str,
-        label_column: str
+        label_columns: List[str]
     ) -> Optional[Dict[str, float]]:
         """Evaluate model performance on test data."""
         if test_df is None:
             return None
-        test_texts = test_df[text_column].tolist()
-        test_labels = test_df[label_column].tolist()
-        
-        test_predictions = await self._generate_predictions(test_texts)
-        return self._calculate_metrics(test_predictions, test_labels)
+            
+        predictions = await self._generate_predictions(test_df, text_column)
+        true_labels = test_df[label_columns].values.tolist()
+        return self._calculate_metrics(predictions, true_labels)
 
     def _calculate_metrics(
         self,
