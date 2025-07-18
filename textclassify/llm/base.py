@@ -60,12 +60,68 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         except Exception as e:
             raise PredictionError(f"Prediction failed: {str(e)}", self.config.model_name)
 
-    def _validate_prediction_inputs(self, texts: List[str]) -> None:
-        """Validate prediction inputs."""
-        if not texts:
-            raise ValidationError("No texts provided for prediction")
-        if not all(isinstance(text, str) for text in texts):
-            raise ValidationError("All inputs must be strings")
+    def _validate_prediction_inputs(
+        self, 
+        df: pd.DataFrame, 
+        text_column: str,
+        label_columns: List[str],
+        multi_label: bool
+    ) -> None:
+        """Validate prediction inputs.
+        
+        Args:
+            df: DataFrame to validate
+            text_column: Name of the column containing text data
+            label_columns: Names of the columns containing labels
+            multi_label: Whether this is a multi-label classification task
+            
+        Raises:
+            ValidationError: If inputs are invalid
+        """
+        # Validate DataFrame
+        if not isinstance(df, pd.DataFrame):
+            raise ValidationError("Input must be a pandas DataFrame")
+        if df.empty:
+            raise ValidationError("DataFrame is empty")
+            
+        # Validate text column
+        if text_column not in df.columns:
+            raise ValidationError(f"Text column '{text_column}' not found in DataFrame")
+        if not df[text_column].dtype == 'object':
+            raise ValidationError(f"Text column '{text_column}' must be of type string/object")
+        if not df[text_column].apply(lambda x: isinstance(x, str)).all():
+            raise ValidationError(f"All entries in text column '{text_column}' must be strings")
+            
+        # Validate label columns
+        for label_col in label_columns:
+            if label_col not in df.columns:
+                raise ValidationError(f"Label column '{label_col}' not found in DataFrame")
+            if not pd.api.types.is_numeric_dtype(df[label_col]):
+                raise ValidationError(f"Label column '{label_col}' must contain only numbers")
+            if not df[label_col].isin([0, 1]).all():
+                raise ValidationError(f"Label column '{label_col}' must contain only binary values (0 or 1)")
+        
+        # Get sum of 1s for each row across label columns
+        label_sums = df[label_columns].sum(axis=1)
+        
+        if not multi_label:
+            # For single-label: check if exactly one 1 per row
+            invalid_rows = label_sums != 1
+            if invalid_rows.any():
+                problematic_rows = df.index[invalid_rows].tolist()
+                raise ValidationError(
+                    f"Single-label classification requires exactly one 1 per row. "
+                    f"Problematic rows: {problematic_rows}"
+                )
+        else:
+            # For multi-label: check if number of 1s per row <= number of labels
+            invalid_rows = label_sums > len(label_columns)
+            if invalid_rows.any():
+                problematic_rows = df.index[invalid_rows].tolist()
+                raise ValidationError(
+                    f"Multi-label classification allows at most {len(label_columns)} labels per row. "
+                    f"Problematic rows: {problematic_rows}"
+                )
 
     def _setup_prompt_configuration(
         self,
@@ -79,39 +135,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if label_definitions is not None:
             self.prompt_engineer.label_definitions = label_definitions
         self.prompt_engineer.set_few_shot_mode(few_shot_mode)
+        # Set multi_label based on the classifier's label type
+        label_type = getattr(self.config, 'label_type', 'single')
+        self.prompt_engineer.multi_label = (label_type == "multiple")
 
-    def _setup_few_shot_learning(
-        self,
-        train_df: pd.DataFrame,
-        text_column: str,
-        label_column: str
-    ) -> None:
-        """Configure few-shot learning with training data."""
-        train_texts = train_df[text_column].tolist()
-        train_labels = train_df[label_column].tolist()
-        
-        label_type = self._infer_label_type(train_labels)
-        self.classes_ = self._extract_unique_classes(train_labels)
-        
-        self.prompt_engineer.set_labels(self.classes_, label_type=label_type)
-        self.prompt_engineer.set_examples(train_texts, train_labels)
-
-    def _infer_label_type(self, labels: List[Any]) -> str:
-        """Infer the type of labels (single or multiple)."""
-        if all(isinstance(label, str) for label in labels):
-            return "single"
-        elif all(isinstance(label, list) for label in labels):
-            return "multiple"
-        raise ValidationError("Inconsistent label format")
-
-    def _extract_unique_classes(self, labels: List[Any]) -> List[str]:
-        """Extract unique class labels."""
-        if all(isinstance(label, str) for label in labels):
-            return list(set(labels))
-        all_labels = []
-        for label_list in labels:
-            all_labels.extend(label_list)
-        return list(set(all_labels))
 
     async def _generate_predictions(self, texts: List[str]) -> List[Union[str, List[str]]]:
         """Generate predictions in batches."""
