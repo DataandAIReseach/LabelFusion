@@ -18,19 +18,31 @@ class PromptWarehouse:
 
     # Take these as examples for learning the value of each feature given an unknown text.
 
-    context_brainstorm_prompt = f"""
-    Given the dataset {{data}}, which includes text samples and ratings for features 
-    ({", ".join(features)}), analyze the content and associated ratings to infer the general topic 
-    the dataset likely represents. Based on this analysis, generate a list of keywords or concepts 
-    that are representative of the topic.
+    context_brainstorm_prompt = """
+    Given the dataset:
+    
+    {examples}
+    
+    Which includes text samples and ratings for features {features}, analyze the content 
+    and associated ratings to infer the general topic the dataset likely represents. 
+    Based on this analysis, generate a list of keywords or concepts that are 
+    representative of the topic.
     """
 
-    context_brainstorm_role_prompt = f"""
-    You are a brainstormer. You are part of a package for classyfying texts with regard to the features {', '.join(data.columns)}.
+    context_brainstorm_role_prompt = """
+    You are a brainstormer. You are part of a package for classyfying texts with regard to the features {features}.
     """
 
-    create_context_prompt = f"""
-    You are tasked with creating a context prompt that will help in understanding the dataset provided. For that sake take the keywords {', '.join(keywords)} as an input and write a context prompt of 3 to 4 sentences for the underlying dataset.
+    create_context_prompt = """
+    You are tasked with creating a context prompt that will help in understanding the dataset provided.
+    
+    Dataset:
+    {data}
+    
+    Features to consider:
+    {features}
+    
+    Write a context prompt of 3 to 4 sentences for the underlying dataset.
     """
 
     procedure_prompt_creator_prompt = """
@@ -45,19 +57,29 @@ class PromptWarehouse:
         5. Use of Evidence – Instruct the user to ground their analysis in specific examples from the input text.
         6. Connection to Theory or Definitions – Request that findings be linked back to theoretical definitions, frameworks, or scholarly concepts.
 
-        Find below the dataset so that you can assume the concept to be classified.
+        Find below the dataset with features {features} so that you can assume the concept to be classified.
 
         {data}
 
         Now create the procedure prompt and confine yourself to two to three sentences
-        
         """
+    
 
-    train_data_intro_prompt = f"""In the following, paragraphs and the corresponding ratings are given for the features {', '.join(data.columns)}.\nThey are formatted in the following way:\n\n    {" rating|".join(data.columns)} rating\n\nTake these as examples for learning the value of each feature given an unknown text.""".strip()
+    train_data_intro_prompt = """
+    The following examples show texts and their classifications for features: {features}
+    Each text is followed by its feature values (1 = present, 0 = absent), separated by '|':
+
+    {examples}
+
+    Each value corresponds to the features in order. For example, if features are [A, B, C],
+    then '1|0|0' means feature A is present, while B and C are absent.
+    """.strip()
 
 
-    answer_format_prompt_single = f"""
+    answer_format_prompt_single = """
         Given the above training data, make a prediction for the following paragraph.
+
+        {paragraph}
 
         The output format shall be:
 
@@ -81,8 +103,10 @@ class PromptWarehouse:
                 1 | 0 | 0 | 0 | 0
         """.strip()
     
-    answer_format_prompt_mult = f"""
+    answer_format_prompt_mult = """
         Given the above training data, make a prediction for the following paragraph.
+
+        {paragraph}
 
         The output format shall be:
 
@@ -123,7 +147,7 @@ class PromptWarehouse:
     Based on the patterns above, describe the role you are taking in this context in one or two sentences:
     """
 
-    
+
 
 
 
