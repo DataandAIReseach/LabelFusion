@@ -14,10 +14,20 @@ from ..prompt_engineer.base import PromptEngineer
 class OpenAIClassifier:
     """Text classifier using OpenAI's GPT models."""
     
-    def __init__(self, config):
-        """Initialize OpenAI classifier."""
+    def __init__(self, config, text_column='text', label_columns=None):
+        """Initialize OpenAI classifier.
+        
+        Args:
+            config: Configuration object containing API keys and parameters
+            text_column: Name of the column containing text data
+            label_columns: List of column names containing labels
+        """
         self.config = config
+        self.text_column = text_column
+        self.label_columns = label_columns
         self.prompt_engineer = PromptEngineer(
+            text_column=text_column,
+            label_columns=label_columns,
             multi_label=False,
             few_shot_mode="few_shot"
         )
@@ -56,6 +66,21 @@ class OpenAIClassifier:
                     raise APIError(f"OpenAI API call failed: {await response.text()}")
                 result = await response.json()
                 return result['choices'][0]['message']['content']
+
+    def predict(
+        self,
+        df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame] = None,
+        text_column: str = 'text',
+        label_columns: Optional[List[str]] = None
+    ) -> ClassificationResult:
+        """Make predictions for the given texts using a synchronous interface."""
+        return asyncio.run(self.predict_async(
+            df=df,
+            train_df=train_df,
+            text_column=text_column,
+            label_columns=label_columns
+        ))
 
     async def predict_async(
         self,
