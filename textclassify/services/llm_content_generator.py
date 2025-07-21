@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 import openai
 from google.generativeai import GenerativeModel
-import deepseek
+from openai import OpenAI  # Updated import for DeepSeek
 from ..core.exceptions import APIError
 
 class BaseLLMContentGenerator(ABC):
@@ -69,18 +69,25 @@ class DeepseekContentGenerator(BaseLLMContentGenerator):
     
     def __init__(self, model_name: str, api_key: Optional[str] = None):
         self.model_name = model_name
-        if api_key:
-            deepseek.api_key = api_key
+        # Initialize DeepSeek client with OpenAI-compatible SDK
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.deepseek.com"
+        )
 
     async def generate_content(self, prompt: str, role_prompt: Optional[str] = None) -> str:
         try:
-            complete_prompt = f"{role_prompt}\n\n{prompt}" if role_prompt else prompt
-            response = await deepseek.Completion.create(
+            messages = []
+            if role_prompt:
+                messages.append({"role": "system", "content": role_prompt})
+            messages.append({"role": "user", "content": prompt})
+            
+            response = await self.client.chat.completions.create(
                 model=self.model_name,
-                prompt=complete_prompt,
+                messages=messages,
                 temperature=0.0
             )
-            return response.choices[0].text
+            return response.choices[0].message.content
         except Exception as e:
             raise APIError(f"Deepseek API call failed: {str(e)}")
 
