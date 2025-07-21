@@ -15,6 +15,20 @@ def main():
     # Load and prepare data
     df = pd.read_csv('data/alldata_1_for_kaggle.csv', encoding='latin1')
     
+    # Drop first column and reorder/rename columns
+    df = df.iloc[:, 1:]  # Drop first column
+    cols = df.columns.tolist()
+    df = df[[cols[1], cols[0]]]  # Swap second and third columns
+    df.columns = ['text', 'label']  # Rename columns
+    
+    # Convert label column to dummy variables and add them to the DataFrame
+    label_dummies = pd.get_dummies(df['label'], prefix='')
+    df = pd.concat([df[['text']], label_dummies], axis=1)  # Keep only 'text' column and add dummies
+    
+    # Get unique labels
+    label_columns = label_dummies.columns.tolist()
+    print(f"Available labels: {label_columns}")
+    
     # Create configuration
     config = Config()
     config.model_type = ModelType.LLM
@@ -29,8 +43,8 @@ def main():
     # Initialize classifier with column specifications
     classifier = OpenAIClassifier(
         config=config,
-        text_column='text',  # Adjust this to match your actual text column name
-        label_columns=['label']  # Adjust this to match your actual label column names
+        text_column='text',
+        label_columns=label_columns  # Use the dummy column names as labels
     )
     
     # Take first 10 rows for training and next 5 for testing
@@ -45,7 +59,8 @@ def main():
         result = classifier.predict(
             df=test_df,
             train_df=train_df,
-            text_column='text'
+            text_column='text',
+            label_columns=label_columns
         )
         
         # Print results
