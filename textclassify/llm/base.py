@@ -58,9 +58,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             label_columns=label_columns
         ))
 
-    def predict_proba(self, texts: List[str]) -> ClassificationResult:
-        """Synchronous wrapper for probability predictions."""
-        return asyncio.run(self.predict_proba_async(texts))
+    # def predict_proba(self, texts: List[str]) -> ClassificationResult:
+    #     """Synchronous wrapper for probability predictions."""
+    #     return asyncio.run(self.predict_proba_async(texts))
 
     async def predict_async(
         self,
@@ -318,7 +318,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
     async def predict_async(self, texts: List[str]) -> List[str]:
         """Predict classifications for multiple texts."""
         # Get prompts from PromptEngineer
-        prompts = self.prompt_engineer.create_prompts(
+        prompts = self.prompt_engineer.engineer_prompts(
             texts=texts,
             is_multi_label=self.is_multi_label
         )
