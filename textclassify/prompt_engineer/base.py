@@ -1,7 +1,7 @@
 import random
 import pandas as pd
 from typing import List, Optional, Dict, Any
-from prompt_warehouse import PromptWarehouse
+from .prompt_warehouse import PromptWarehouse  # Changed to relative import
 from .prompt_collection import PromptCollection
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
