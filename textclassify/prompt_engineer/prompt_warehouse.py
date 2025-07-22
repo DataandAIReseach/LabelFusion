@@ -18,7 +18,7 @@ class PromptWarehouse:
 
     # Take these as examples for learning the value of each feature given an unknown text.
 
-    context_brainstorm_prompt = """
+    brainstorm_context_keywords_prompt = """
     Given the dataset:
     
     {examples}
@@ -35,9 +35,13 @@ class PromptWarehouse:
 
     create_context_prompt = """
     You are tasked with creating a context prompt that will help in understanding the dataset provided.
+
+    Preceeding research has shown that the following keywords are associated with the dataset:
+
+    {keywords}
     
     Dataset:
-    {data}
+    {examples}
     
     Features to consider:
     {features}
@@ -142,7 +146,7 @@ class PromptWarehouse:
     a customer writing a review, etc.
 
     Here are the examples:
-    {data}
+    {examples}
 
     Based on the patterns above, describe the role you are taking in this context in one or two sentences:
     """

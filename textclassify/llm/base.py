@@ -17,6 +17,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
     def __init__(
         self, 
         config,
+        text_column: str = 'text',
+        label_columns: Optional[List[str]] = None,
         multi_label: bool = False,
         few_shot_mode: str = "few_shot"
     ):
@@ -24,6 +26,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         Args:
             config: Configuration object
+            text_column: Name of the column containing text data
+            label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier (default: False)
             few_shot_mode: Mode for few-shot learning (default: "few_shot")
         """
@@ -32,12 +36,19 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self.multi_label = multi_label
         self.few_shot_mode = few_shot_mode
         
+        # Set column specifications
+        self.text_column = text_column
+        self.label_columns = label_columns if label_columns else []
+        self.classes_ = self.label_columns.copy()  # For compatibility with sklearn-style APIs
+        
         # Initialize prompt engineer with configuration
         self.prompt_engineer = PromptEngineer(
+            text_column=self.text_column,
+            label_columns=self.label_columns,
             multi_label=self.multi_label,
-            few_shot_mode=self.few_shot_mode
+            few_shot_mode=self.few_shot_mode,
+            model_name=self.config.parameters["model"]  # Pass model from config.parameters
         )
-        self.classes_: List[str] = []
         self._setup_config()
 
     def _setup_config(self) -> None:
@@ -47,15 +58,17 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
     def predict(
         self,
-        df: pd.DataFrame,
-        text_column: str = "text",
-        label_columns: List[str] = None
+        train_df: Optional[pd.DataFrame] = None,
+        test_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
     ) -> ClassificationResult:
         """Synchronous wrapper for predictions."""
         return asyncio.run(self.predict_async(
-            df=df,
-            text_column=text_column,
-            label_columns=label_columns
+            train_df=train_df,
+            test_df=test_df,
+            context=context,
+            label_definitions=label_definitions
         ))
 
     # def predict_proba(self, texts: List[str]) -> ClassificationResult:
@@ -64,47 +77,52 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
     async def predict_async(
         self,
-        df: pd.DataFrame,
+        test_df: pd.DataFrame,
         train_df: Optional[pd.DataFrame] = None,
-        test_df: Optional[pd.DataFrame] = None,
-        text_column: str = "text",
-        label_columns: List[str] = None,
         context: Optional[str] = None,
         label_definitions: Optional[Dict[str, str]] = None
     ) -> ClassificationResult:
-        """Asynchronously predict labels for texts."""
+        """Asynchronously predict labels for texts.
+        
+        Args:
+            test_df: DataFrame containing texts to classify
+            train_df: Optional DataFrame containing training examples
+            context: Optional context string to use
+            label_definitions: Optional dict mapping labels to definitions
+        """
         try:
-            if label_columns is None:
-                label_columns = getattr(self.config, 'label_columns', ["label"])
-                
+            # Stack DataFrames vertically if training data is provided
+            df = pd.concat([train_df, test_df], axis=0) if train_df is not None else test_df
+            
             # Validate input DataFrame
-            self._validate_prediction_inputs(df, text_column, label_columns)
+            self._validate_prediction_inputs(df, self.text_column, self.label_columns)
             
             self._setup_prompt_configuration(context, label_definitions)
             
             # Engineer prompts and add to DataFrame
             df_with_prompts = await self._engineer_prompts_for_data(
-                df=df,
-                text_column=text_column,
-                label_columns=label_columns
+                train_df=train_df,
+                test_df=test_df,
+                text_column=self.text_column,
+                label_columns=self.label_columns
             )
             
             # Generate predictions using engineered prompts
-            predictions = await self._generate_predictions(df_with_prompts, text_column)
+            all_predictions = await self._generate_predictions(df_with_prompts, self.text_column)
             
-            # Evaluate if test data provided
-            metrics = None
-            if test_df is not None:
-                test_df_with_prompts = await self._engineer_prompts_for_data(
-                    df=test_df,
-                    text_column=text_column,
-                    label_columns=label_columns
-                )
-                metrics = await self._evaluate_test_data(
-                    test_df=test_df_with_prompts,
-                    text_column=text_column,
-                    label_columns=label_columns
-                )
+            # Split predictions back into train and test sets
+            if train_df is not None:
+                train_size = len(train_df)
+                predictions = all_predictions[train_size:]  # Get only test predictions
+            else:
+                predictions = all_predictions
+            
+            # Calculate metrics using test data
+            metrics = await self._evaluate_test_data(
+                test_df=test_df,
+                text_column=self.text_column,
+                label_columns=self.label_columns
+            ) if test_df is not None else None
             
             return self._create_result(predictions=predictions, metrics=metrics)
         except Exception as e:
@@ -135,12 +153,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         for label_col in label_columns:
             if label_col not in df.columns:
                 raise ValidationError(f"Label column '{label_col}' not found in DataFrame")
-            if not pd.api.types.is_numeric_dtype(df[label_col]):
-                raise ValidationError(f"Label column '{label_col}' must contain only numbers")
-            if not df[label_col].isin([0, 1]).all():
-                raise ValidationError(f"Label column '{label_col}' must contain only binary values (0 or 1)")
+            if not pd.api.types.is_bool_dtype(df[label_col]) and not pd.api.types.is_numeric_dtype(df[label_col]):
+                raise ValidationError(f"Label column '{label_col}' must contain only boolean or numeric values")
+            if not df[label_col].isin([0, 1, True, False]).all():
+                raise ValidationError(f"Label column '{label_col}' must contain only binary values (0, 1, True, False)")
         
-        # Get sum of 1s for each row across label columns
+        # Get sum of 1s/True for each row across label columns
         label_sums = df[label_columns].sum(axis=1)
         
         if not self.multi_label:  # Use class attribute
@@ -148,7 +166,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if invalid_rows.any():
                 problematic_rows = df.index[invalid_rows].tolist()
                 raise ValidationError(
-                    f"Single-label classification requires exactly one 1 per row. "
+                    f"Single-label classification requires exactly one 1/True per row. "
                     f"Problematic rows: {problematic_rows}"
                 )
         else:
@@ -315,55 +333,41 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         """Call the LLM API with the given prompt."""
         raise NotImplementedError("Subclasses must implement _call_llm method")
 
-    async def predict_async(self, texts: List[str]) -> List[str]:
-        """Predict classifications for multiple texts."""
-        # Get prompts from PromptEngineer
-        prompts = self.prompt_engineer.engineer_prompts(
-            texts=texts,
-            is_multi_label=self.is_multi_label
-        )
-        
-        # Make API calls
-        responses = await asyncio.gather(
-            *[self._call_llm(prompt.render()) for prompt in prompts],
-            return_exceptions=True
-        )
-        
-        # Parse responses
-        return [
-            self._parse_prediction_response(r) if not isinstance(r, Exception)
-            else self._handle_error(r)
-            for r in responses
-        ]
-
     async def _engineer_prompts_for_data(
         self,
-        df: pd.DataFrame,
-        text_column: str,
-        label_columns: List[str]
+        test_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame] = None,
+        text_column: Optional[str] = None,
+        label_columns: Optional[List[str]] = None
     ) -> pd.DataFrame:
         """Engineer prompts for all texts in DataFrame using PromptEngineer.
-    
+
         Args:
-            df: DataFrame containing texts to classify
-            text_column: Name of column containing text data
-            label_columns: Names of columns containing labels
+            test_df: DataFrame containing texts to classify
+            train_df: Optional DataFrame containing training examples
+            text_column: Optional name of text column (defaults to self.text_column)
+            label_columns: Optional list of label columns (defaults to self.label_columns)
         
         Returns:
             DataFrame with engineered prompts added as new column
         """
-        # Create copy to avoid modifying original
-        df_with_prompts = df.copy()
-    
+        # Use instance variables if not provided
+        text_column = text_column or self.text_column
+        label_columns = label_columns or self.label_columns
+        
+        # Create copy of test data to avoid modifying original
+        df_with_prompts = test_df.copy()
+
         # Engineer prompts using PromptEngineer
         engineered_prompts = await self.prompt_engineer.engineer_prompts(
-            data=df,
+            test_df=test_df,
+            train_df=train_df,
             sample_size=self.batch_size
         )
-    
+
         # Convert prompts to strings and add as new column
         df_with_prompts['engineered_prompt'] = [
             prompt.render() for prompt in engineered_prompts
         ]
-    
+
         return df_with_prompts

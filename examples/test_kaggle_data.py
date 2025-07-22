@@ -33,7 +33,7 @@ def main():
     config = Config()
     config.model_type = ModelType.LLM
     config.parameters = {
-        'model': 'gpt-3.5-turbo',
+        'model': 'o4-mini',
         'temperature': 0.1,
         'max_tokens': 150,
         'batch_size': 5
@@ -57,10 +57,8 @@ def main():
     try:
         # Make predictions
         result = classifier.predict(
-            df=test_df,
             train_df=train_df,
-            text_column='text',
-            label_columns=label_columns
+            test_df=test_df
         )
         
         # Print results

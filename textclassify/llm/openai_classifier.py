@@ -33,7 +33,8 @@ class OpenAIClassifier(BaseLLMClassifier):
         super().__init__(
             config=config,
             multi_label=multi_label,
-            few_shot_mode=few_shot_mode
+            few_shot_mode=few_shot_mode,
+            label_columns=label_columns
         )
         
         # Set up classes and prompt engineer configuration
