@@ -2,8 +2,9 @@ from abc import ABC, abstractmethod
 from typing import Optional
 import openai
 from google.generativeai import GenerativeModel
-from openai import OpenAI  # Updated import for DeepSeek
+from openai import OpenAI
 from ..core.exceptions import APIError
+import os
 
 class BaseLLMContentGenerator(ABC):
     """Abstract base class for LLM content generation."""
@@ -29,20 +30,19 @@ class OpenAIContentGenerator(BaseLLMContentGenerator):
     
     def __init__(self, model_name: str, api_key: Optional[str] = None):
         self.model_name = model_name
-        if api_key:
-            openai.api_key = api_key
+        self.client = OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
 
     async def generate_content(self, prompt: str, role_prompt: Optional[str] = None) -> str:
+        """Generate content for a single prompt."""
         try:
             messages = []
             if role_prompt:
                 messages.append({"role": "system", "content": role_prompt})
             messages.append({"role": "user", "content": prompt})
             
-            response = await openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=self.model_name,
-                messages=messages,
-                temperature=0.0
+                messages=messages
             )
             return response.choices[0].message.content
         except Exception as e:
