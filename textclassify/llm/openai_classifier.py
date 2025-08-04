@@ -51,7 +51,7 @@ class OpenAIClassifier(BaseLLMClassifier):
         # Set OpenAI specific parameters
         self.model = self.config.parameters.get('model', 'gpt-3.5-turbo')
         self.temperature = self.config.parameters.get('temperature', 0.1)
-        self.max_tokens = self.config.parameters.get('max_tokens', 150)
+        self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
         self.api_base = "https://api.openai.com/v1"
         
         # Headers for API requests
@@ -74,7 +74,7 @@ class OpenAIClassifier(BaseLLMClassifier):
                     "model": self.model,
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": self.temperature,
-                    "max_tokens": self.max_tokens
+                    "max_completion_tokens": self.max_completion_tokens
                 }
             ) as response:
                 if response.status != 200:
