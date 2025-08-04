@@ -3,8 +3,11 @@
 import asyncio
 import json
 import re
+import logging
+import time
 from typing import Any, Dict, List, Optional, Union, Tuple, Iterator
 import pandas as pd
+from tqdm import tqdm
 
 from ..core.base import AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType
@@ -20,7 +23,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         text_column: str = 'text',
         label_columns: Optional[List[str]] = None,
         multi_label: bool = False,
-        few_shot_mode: str = "few_shot"
+        few_shot_mode: str = "few_shot",
+        verbose: bool = True
     ):
         """Initialize the LLM classifier.
         
@@ -30,16 +34,30 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier (default: False)
             few_shot_mode: Mode for few-shot learning (default: "few_shot")
+            verbose: Whether to show detailed progress (default: True)
         """
         super().__init__(config)
         self.config.model_type = ModelType.LLM
         self.multi_label = multi_label
         self.few_shot_mode = few_shot_mode
+        self.verbose = verbose
+        
+        # Setup logging
+        if self.verbose:
+            logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+            self.logger = logging.getLogger(self.__class__.__name__)
         
         # Set column specifications
         self.text_column = text_column
         self.label_columns = label_columns if label_columns else []
         self.classes_ = self.label_columns.copy()  # For compatibility with sklearn-style APIs
+        
+        if self.verbose:
+            self.logger.info(f"Initializing {self.__class__.__name__}")
+            self.logger.info(f"Text column: {self.text_column}")
+            self.logger.info(f"Label columns: {self.label_columns}")
+            self.logger.info(f"Multi-label: {self.multi_label}")
+            self.logger.info(f"Few-shot mode: {self.few_shot_mode}")
         
         # Initialize prompt engineer with configuration
         self.prompt_engineer = PromptEngineer(
@@ -49,12 +67,19 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             few_shot_mode=self.few_shot_mode,
             model_name=self.config.parameters["model"]  # Pass model from config.parameters
         )
+        
+        if self.verbose:
+            self.logger.info(f"PromptEngineer initialized with model: {self.config.parameters['model']}")
+        
         self._setup_config()
 
     def _setup_config(self) -> None:
         """Initialize configuration parameters."""
         self.batch_size = self.config.parameters.get('batch_size', 32)
         self.threshold = self.config.parameters.get('threshold', 0.5)
+        
+        if self.verbose:
+            self.logger.info(f"Configuration setup - Batch size: {self.batch_size}, Threshold: {self.threshold}")
 
     def predict(
         self,
@@ -71,10 +96,6 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             label_definitions=label_definitions
         ))
 
-    # def predict_proba(self, texts: List[str]) -> ClassificationResult:
-    #     """Synchronous wrapper for probability predictions."""
-    #     return asyncio.run(self.predict_proba_async(texts))
-
     async def predict_async(
         self,
         test_df: pd.DataFrame,
@@ -82,24 +103,55 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         context: Optional[str] = None,
         label_definitions: Optional[Dict[str, str]] = None
     ) -> ClassificationResult:
-        """Asynchronously predict labels for texts.
+        """Asynchronously predict labels for texts with detailed progress tracking."""
         
-        Args:
-            test_df: DataFrame containing texts to classify
-            train_df: Optional DataFrame containing training examples
-            context: Optional context string to use
-            label_definitions: Optional dict mapping labels to definitions
-        """
+        start_time = time.time()
+        
         try:
+            if self.verbose:
+                self.logger.info("="*80)
+                self.logger.info("STARTING PREDICTION PROCESS")
+                self.logger.info("="*80)
+                self.logger.info(f"Test data shape: {test_df.shape}")
+                if train_df is not None:
+                    self.logger.info(f"Training data shape: {train_df.shape}")
+                else:
+                    self.logger.info("No training data provided")
+            
+            # Step 1: Data preparation and validation
+            if self.verbose:
+                self.logger.info("\nSTEP 1: Data Preparation and Validation")
+                print("Validating input data...")
+            
             # Stack DataFrames vertically if training data is provided
             df = pd.concat([train_df, test_df], axis=0) if train_df is not None else test_df
+            
+            if self.verbose:
+                self.logger.info(f"Combined dataset shape: {df.shape}")
             
             # Validate input DataFrame
             self._validate_prediction_inputs(df, self.text_column, self.label_columns)
             
+            if self.verbose:
+                self.logger.info("Data validation completed successfully")
+                print("Data validation passed")
+            
+            # Step 2: Prompt configuration setup
+            if self.verbose:
+                self.logger.info("\nSTEP 2: Prompt Configuration Setup")
+                print("Setting up prompt configuration...")
+            
             self._setup_prompt_configuration(context, label_definitions)
             
-            # Engineer prompts and add to DataFrame
+            if self.verbose:
+                self.logger.info("Prompt configuration completed")
+                print("Prompt configuration ready")
+            
+            # Step 3: Prompt engineering
+            if self.verbose:
+                self.logger.info("\nSTEP 3: Engineering Prompts")
+                print("Engineering prompts for classification...")
+            
             df_with_prompts = await self._engineer_prompts_for_data(
                 train_df=train_df,
                 test_df=test_df,
@@ -107,26 +159,72 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 label_columns=self.label_columns
             )
             
-            # Generate predictions using engineered prompts
+            if self.verbose:
+                self.logger.info(f"Prompts engineered for {len(df_with_prompts)} samples")
+                print(f"{len(df_with_prompts)} prompts ready for processing")
+            
+            # Step 4: Generate predictions
+            if self.verbose:
+                self.logger.info("\nSTEP 4: Generating Predictions")
+                print("Generating predictions using LLM...")
+            
             all_predictions = await self._generate_predictions(df_with_prompts, self.text_column)
+            
+            if self.verbose:
+                self.logger.info(f"Generated {len(all_predictions)} predictions")
+                print(f"{len(all_predictions)} predictions generated")
+            
+            # Step 5: Process results
+            if self.verbose:
+                self.logger.info("\nSTEP 5: Processing Results")
+                print("Processing and organizing results...")
             
             # Split predictions back into train and test sets
             if train_df is not None:
                 train_size = len(train_df)
                 predictions = all_predictions[train_size:]  # Get only test predictions
+                if self.verbose:
+                    self.logger.info(f"Extracted {len(predictions)} test predictions from {len(all_predictions)} total")
             else:
                 predictions = all_predictions
             
-            # Calculate metrics using test data
+            # Step 6: Calculate metrics
+            if self.verbose:
+                self.logger.info("\nSTEP 6: Calculating Metrics")
+                print("Calculating performance metrics...")
+            
             metrics = await self._evaluate_test_data(
                 test_df=test_df,
                 text_column=self.text_column,
                 label_columns=self.label_columns
             ) if test_df is not None else None
             
+            if self.verbose and metrics:
+                self.logger.info("Metrics calculated successfully")
+                for metric_name, metric_value in metrics.items():
+                    self.logger.info(f"  {metric_name}: {metric_value:.4f}")
+                    print(f"{metric_name}: {metric_value:.4f}")
+            
+            # Final results
+            end_time = time.time()
+            total_time = end_time - start_time
+            
+            if self.verbose:
+                self.logger.info("\nPREDICTION PROCESS COMPLETED")
+                self.logger.info(f"Total processing time: {total_time:.2f} seconds")
+                self.logger.info(f"Average time per sample: {total_time/len(test_df):.3f} seconds")
+                self.logger.info("="*80)
+                
+                print(f"\nProcess completed in {total_time:.2f} seconds")
+                print(f"Average: {total_time/len(test_df):.3f} seconds per sample")
+            
             return self._create_result(predictions=predictions, metrics=metrics)
+            
         except Exception as e:
-            raise PredictionError(f"Prediction failed: {str(e)}", self.config.model_name)
+            if self.verbose:
+                self.logger.error(f"PREDICTION FAILED: {str(e)}")
+                print(f"Error: {str(e)}")
+            raise PredictionError(f"Prediction failed: {str(e)}", self.config.parameters.get("model", "unknown"))
 
     def _validate_prediction_inputs(
         self, 
@@ -134,23 +232,43 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         text_column: str,
         label_columns: List[str]
     ) -> None:
-        """Validate prediction inputs."""
+        """Validate prediction inputs with detailed logging."""
+        
+        if self.verbose:
+            self.logger.info("Validating input data structure...")
+            print("Validating DataFrame structure...")
+        
         # Validate DataFrame
         if not isinstance(df, pd.DataFrame):
             raise ValidationError("Input must be a pandas DataFrame")
         if df.empty:
             raise ValidationError("DataFrame is empty")
+        
+        if self.verbose:
+            self.logger.info(f"DataFrame validation passed - Shape: {df.shape}")
             
         # Validate text column
+        if self.verbose:
+            self.logger.info(f"Validating text column: '{text_column}'")
+            
         if text_column not in df.columns:
             raise ValidationError(f"Text column '{text_column}' not found in DataFrame")
         if not df[text_column].dtype == 'object':
             raise ValidationError(f"Text column '{text_column}' must be of type string/object")
         if not df[text_column].apply(lambda x: isinstance(x, str)).all():
             raise ValidationError(f"All entries in text column '{text_column}' must be strings")
+        
+        if self.verbose:
+            self.logger.info(f"Text column validation passed")
             
         # Validate label columns
-        for label_col in label_columns:
+        if self.verbose:
+            self.logger.info(f"Validating {len(label_columns)} label columns...")
+            
+        for i, label_col in enumerate(label_columns):
+            if self.verbose:
+                self.logger.debug(f"Validating label column {i+1}/{len(label_columns)}: '{label_col}'")
+                
             if label_col not in df.columns:
                 raise ValidationError(f"Label column '{label_col}' not found in DataFrame")
             if not pd.api.types.is_bool_dtype(df[label_col]) and not pd.api.types.is_numeric_dtype(df[label_col]):
@@ -158,10 +276,16 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if not df[label_col].isin([0, 1, True, False]).all():
                 raise ValidationError(f"Label column '{label_col}' must contain only binary values (0, 1, True, False)")
         
-        # Get sum of 1s/True for each row across label columns
+        if self.verbose:
+            self.logger.info(f"All {len(label_columns)} label columns validated")
+        
+        # Validate label consistency
+        if self.verbose:
+            self.logger.info("Validating label consistency for classification type...")
+            
         label_sums = df[label_columns].sum(axis=1)
         
-        if not self.multi_label:  # Use class attribute
+        if not self.multi_label:
             invalid_rows = label_sums != 1
             if invalid_rows.any():
                 problematic_rows = df.index[invalid_rows].tolist()
@@ -169,6 +293,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                     f"Single-label classification requires exactly one 1/True per row. "
                     f"Problematic rows: {problematic_rows}"
                 )
+            if self.verbose:
+                self.logger.info("Single-label consistency validated")
         else:
             invalid_rows = label_sums > len(label_columns)
             if invalid_rows.any():
@@ -177,6 +303,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                     f"Multi-label classification allows at most {len(label_columns)} labels per row. "
                     f"Problematic rows: {problematic_rows}"
                 )
+            if self.verbose:
+                self.logger.info("Multi-label consistency validated")
 
     def _setup_prompt_configuration(
         self,
@@ -197,17 +325,37 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         label_type = getattr(self.config, 'label_type', 'single')
         self.prompt_engineer.multi_label = (label_type == "multiple")
 
-
     async def _generate_predictions(
         self,
         df: pd.DataFrame,
         text_column: str
     ) -> List[Union[str, List[str]]]:
-        """Generate predictions in batches."""
+        """Generate predictions in batches with progress tracking."""
         predictions = []
-        for batch_df in self._get_batches(df, text_column):
+        total_batches = (len(df) + self.batch_size - 1) // self.batch_size
+        
+        if self.verbose:
+            self.logger.info(f"Processing {len(df)} samples in {total_batches} batches of size {self.batch_size}")
+            print(f"Processing in {total_batches} batches...")
+        
+        # Use tqdm for progress bar if verbose mode is enabled
+        batch_iterator = range(0, len(df), self.batch_size)
+        if self.verbose:
+            batch_iterator = tqdm(batch_iterator, desc="Processing batches", total=total_batches)
+        
+        for i, batch_start in enumerate(batch_iterator):
+            batch_df = df.iloc[batch_start:batch_start + self.batch_size]
+            
+            if self.verbose and not isinstance(batch_iterator, tqdm):
+                self.logger.info(f"Processing batch {i+1}/{total_batches} ({len(batch_df)} samples)")
+                print(f"Batch {i+1}/{total_batches} processing...")
+            
             batch_predictions = await self._process_batch(batch_df, text_column)
             predictions.extend(batch_predictions)
+            
+            if self.verbose and not isinstance(batch_iterator, tqdm):
+                self.logger.info(f"Batch {i+1} completed ({len(batch_predictions)} predictions)")
+        
         return predictions
 
     def _get_batches(
@@ -224,13 +372,32 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         batch_df: pd.DataFrame,
         text_column: str
     ) -> List[Union[str, List[str]]]:
-        """Process a batch of texts for prediction."""
+        """Process a batch of texts for prediction with detailed logging."""
+        if self.verbose:
+            self.logger.debug(f"Processing batch with {len(batch_df)} texts")
+        
         texts = batch_df[text_column].tolist()
-        prompts = [self.prompt_engineer.build_prompt(text) for text in texts]
+        
+        # Check if prompts are already engineered
+        if 'engineered_prompt' in batch_df.columns:
+            prompts = batch_df['engineered_prompt'].tolist()
+        else:
+            prompts = [self.prompt_engineer.build_prompt(text) for text in texts]
+        
+        if self.verbose:
+            self.logger.debug(f"Generated {len(prompts)} prompts for LLM calls")
+        
         responses = await asyncio.gather(
             *[self._call_llm(prompt) for prompt in prompts],
             return_exceptions=True
         )
+        
+        successful_responses = sum(1 for r in responses if not isinstance(r, Exception))
+        failed_responses = len(responses) - successful_responses
+        
+        if self.verbose and failed_responses > 0:
+            self.logger.warning(f"WARNING: {failed_responses} out of {len(responses)} LLM calls failed")
+        
         return [
             self._parse_prediction_response(r) if not isinstance(r, Exception)
             else self._handle_error(r)
@@ -327,7 +494,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
     def _handle_error(self, error: Exception) -> Union[str, List[str]]:
         """Handle prediction errors."""
-        raise PredictionError(f"LLM call failed: {str(error)}", self.config.model_name)
+        raise PredictionError(f"LLM call failed: {str(error)}", self.config.parameters.get("model", "unknown"))
 
     async def _call_llm(self, prompt: str) -> str:
         """Call the LLM API with the given prompt."""
@@ -340,23 +507,23 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         text_column: Optional[str] = None,
         label_columns: Optional[List[str]] = None
     ) -> pd.DataFrame:
-        """Engineer prompts for all texts in DataFrame using PromptEngineer.
-
-        Args:
-            test_df: DataFrame containing texts to classify
-            train_df: Optional DataFrame containing training examples
-            text_column: Optional name of text column (defaults to self.text_column)
-            label_columns: Optional list of label columns (defaults to self.label_columns)
+        """Engineer prompts for all texts in DataFrame with progress tracking."""
         
-        Returns:
-            DataFrame with engineered prompts added as new column
-        """
+        if self.verbose:
+            self.logger.info("Starting prompt engineering process...")
+            print("Starting prompt engineering...")
+        
         # Use instance variables if not provided
         text_column = text_column or self.text_column
         label_columns = label_columns or self.label_columns
         
         # Create copy of test data to avoid modifying original
         df_with_prompts = test_df.copy()
+
+        if self.verbose:
+            self.logger.info(f"Engineering prompts for {len(test_df)} test samples")
+            if train_df is not None:
+                self.logger.info(f"Using {len(train_df)} training samples for few-shot learning")
 
         # Engineer prompts using PromptEngineer
         engineered_prompts = await self.prompt_engineer.engineer_prompts(
@@ -365,9 +532,37 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             sample_size=self.batch_size
         )
 
+        if self.verbose:
+            self.logger.info(f"Successfully engineered {len(engineered_prompts)} prompts")
+            print(f"{len(engineered_prompts)} prompts engineered")
+
         # Convert prompts to strings and add as new column
-        df_with_prompts['engineered_prompt'] = [
-            prompt.render() for prompt in engineered_prompts
-        ]
+        if self.verbose:
+            print("Rendering prompts...")
+            
+        rendered_prompts = []
+        for i, prompt in enumerate(engineered_prompts):
+            if self.verbose and i % 10 == 0:  # Log every 10th prompt
+                self.logger.debug(f"Rendering prompt {i+1}/{len(engineered_prompts)}")
+            rendered_prompts.append(prompt.render())
+        
+        df_with_prompts['engineered_prompt'] = rendered_prompts
+
+        if self.verbose:
+            self.logger.info("All prompts rendered and added to DataFrame")
+            print("Prompt engineering completed")
 
         return df_with_prompts
+
+    def _create_result(
+        self,
+        predictions: List[Union[str, List[str]]],
+        metrics: Optional[Dict[str, float]] = None
+    ) -> ClassificationResult:
+        """Create a ClassificationResult object."""
+        return ClassificationResult(
+            predictions=predictions,
+            metrics=metrics or {},
+            model_name=self.config.parameters.get("model", "unknown"),
+            classification_type=ClassificationType.MULTI_LABEL if self.multi_label else ClassificationType.SINGLE_LABEL
+        )

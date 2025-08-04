@@ -13,18 +13,17 @@ load_dotenv()
 
 def main():
     # Load and prepare data
-    df = pd.read_csv('data/alldata_1_for_kaggle.csv', encoding='latin1')
+    df = pd.read_csv('data/ecommerceDataset.csv', encoding='latin1')
     
     # Drop first column and reorder/rename columns
-    df = df.iloc[:, 1:]  # Drop first column
     cols = df.columns.tolist()
     df = df[[cols[1], cols[0]]]  # Swap second and third columns
     df.columns = ['text', 'label']  # Rename columns
     
     # Convert label column to dummy variables and add them to the DataFrame
     label_dummies = pd.get_dummies(df['label'], prefix='')
-    df = pd.concat([df[['text']], label_dummies], axis=1)  # Keep only 'text' column and add dummies
-    
+    df = pd.concat([df[['text']], label_dummies], axis=1)  # Keep only 'Text' column and add dummies
+
     # Get unique labels
     label_columns = label_dummies.columns.tolist()
     print(f"Available labels: {label_columns}")
