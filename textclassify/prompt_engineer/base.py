@@ -271,7 +271,7 @@ class PromptEngineer:
             
         # Format prompt with examples
         formatted_examples = "\n".join([
-            f"Text: {ex['text']}\nLabels: {ex['labels']}"
+            f"Text: {ex['text']}\nLabels: {' | '.join(str(ex['labels'][col]) for col in self.label_columns)}"
             for ex in examples
         ])
         
@@ -321,7 +321,7 @@ class PromptEngineer:
         
         # Format prompt with examples
         formatted_examples = "\n".join([
-            f"Text: {ex['text']}\nLabels: {ex['labels']}"
+            f"Text: {ex['text']}\nLabels: {' | '.join(str(ex['labels'][col]) for col in self.label_columns)}"
             for ex in examples
         ])
         
@@ -383,7 +383,7 @@ class PromptEngineer:
         
         # Format prompt with examples
         formatted_examples = "\n".join([
-            f"Text: {ex['text']}\nLabels: {ex['labels']}"
+            f"Text: {ex['text']}\nLabels: {' | '.join(str(ex['labels'][col]) for col in self.label_columns)}"
             for ex in examples
         ])
         
@@ -637,7 +637,7 @@ class PromptEngineer:
     
         # Format prompt with examples
         formatted_examples = "\n".join([
-            f"Text: {ex['text']}\nLabels: {ex['labels']}"
+            f"Text: {ex['text']}\nLabels: {' | '.join(str(ex['labels'][col]) for col in self.label_columns)}"
             for ex in examples
         ])
     
