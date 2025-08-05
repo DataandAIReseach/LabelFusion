@@ -183,34 +183,25 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 self.logger.info("\nSTEP 4: Generating Predictions")
                 print("Generating predictions using LLM...")
             
-            all_predictions = await self._generate_predictions(df_with_prompts, self.text_column)
+            predictions = await self._generate_predictions(df_with_prompts, self.text_column)
             
             if self.verbose:
-                self.logger.info(f"Generated {len(all_predictions)} predictions")
-                print(f"{len(all_predictions)} predictions generated")
+                self.logger.info(f"Generated {len(predictions)} predictions")
+                print(f"{len(predictions)} predictions generated")
             
             # Step 5: Process results
             if self.verbose:
                 self.logger.info("\nSTEP 5: Processing Results")
                 print("Processing and organizing results...")
             
-            # Split predictions back into train and test sets
-            if train_df is not None:
-                train_size = len(train_df)
-                predictions = all_predictions[train_size:]  # Get only test predictions
-                if self.verbose:
-                    self.logger.info(f"Extracted {len(predictions)} test predictions from {len(all_predictions)} total")
-            else:
-                predictions = all_predictions
-            
             # Step 6: Calculate metrics
             if self.verbose:
                 self.logger.info("\nSTEP 6: Calculating Metrics")
                 print("Calculating performance metrics...")
             
-            metrics = await self._evaluate_test_data(
+            metrics = self._evaluate_test_data(
                 test_df=test_df,
-                text_column=self.text_column,
+                predictions=predictions,
                 label_columns=self.label_columns
             ) if test_df is not None else None
             
@@ -611,18 +602,18 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         return binary_vector
 
-    async def _evaluate_test_data(
+    def _evaluate_test_data(
         self,
         test_df: pd.DataFrame,
-        text_column: str,
+        predictions: List[List[int]],
         label_columns: List[str]
     ) -> Optional[Dict[str, float]]:
-        """Evaluate model performance on test data."""
-        if test_df is None:
+        """Evaluate model performance on test data using provided predictions."""
+        if test_df is None or not predictions:
             return None
             
-        predictions = await self._generate_predictions(test_df, text_column)
-        true_labels = test_df[label_columns].values.tolist()
+        # Convert true labels to binary vector format (same as predictions)
+        true_labels = test_df[label_columns].values.astype(int).tolist()
         return self._calculate_metrics(predictions, true_labels)
 
     def _calculate_metrics(
@@ -654,15 +645,15 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
     def _calculate_multi_label_metrics(
         self,
-        predictions: List[List[str]],
-        true_labels: List[List[str]]
+        predictions: List[List[int]],
+        true_labels: List[List[int]]
     ) -> Dict[str, float]:
-        """Calculate metrics for multi-label classification."""
+        """Calculate metrics for multi-label classification using binary vectors."""
         metrics = {'precision': [], 'recall': [], 'f1': []}
         
         for pred, true in zip(predictions, true_labels):
-            pred_set = set(pred)
-            true_set = set(true)
+            pred_set = set(i for i, val in enumerate(pred) if val == 1)
+            true_set = set(i for i, val in enumerate(true) if val == 1)
             
             if not (pred_set or true_set):
                 continue
@@ -751,10 +742,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
     def _create_result(
         self,
-        predictions: List[Union[str, List[str]]],
+        predictions: List[List[int]],
         metrics: Optional[Dict[str, float]] = None
     ) -> ClassificationResult:
-        """Create a ClassificationResult object."""
+        """Create a ClassificationResult object with binary vector predictions."""
         return ClassificationResult(
             predictions=predictions,
             metrics=metrics or {},
