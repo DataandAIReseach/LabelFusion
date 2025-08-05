@@ -71,7 +71,20 @@ class OpenAIClassifier(BaseLLMClassifier):
                 temperature=self.temperature,
                 max_completion_tokens=self.max_completion_tokens
             )
-            return response.choices[0].message.content
+            
+            # Extract the response content
+            content = response.choices[0].message.content
+            
+            # Handle empty or None responses
+            if content is None:
+                raise APIError("OpenAI returned None response content")
+            
+            content = content.strip()
+            if not content:
+                raise APIError("OpenAI returned empty response content")
+            
+            return content
+            
         except Exception as e:
             raise APIError(f"OpenAI API call failed: {str(e)}")
 
