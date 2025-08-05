@@ -66,7 +66,8 @@ class PromptEngineer:
         train_df: pd.DataFrame,
         sample_size: int = 20,
         custom_prompts: Optional[Dict[str, str]] = None,
-        custom_role_prompt: Optional[str] = None
+        custom_role_prompt: Optional[str] = None,
+        custom_context: Optional[str] = None
     ) -> List[Prompt]:
         """Engineer prompts for test data using training examples.
         
@@ -76,6 +77,7 @@ class PromptEngineer:
             sample_size: Number of examples for prompt generation
             custom_prompts: Optional dict of custom prompts
             custom_role_prompt: Optional custom role prompt
+            custom_context: Optional pre-existing context to use instead of generating one
             
         Returns:
             List[Prompt]: List of engineered prompts for each test text
@@ -109,23 +111,28 @@ class PromptEngineer:
             )
         )
         
-        # Generate context
-        context = await self.llm_generator.generate_content(
-            self.fill_context_prompt(
-                train_df=train_df,
-                sample_size=sample_size,
-                custom_prompt=custom_prompts.get('context') if custom_prompts else None,
-                include_role=False,
-                keywords_content=context_keywords
+        # Use custom context if provided, otherwise generate context
+        if custom_context:
+            context = custom_context
+        else:
+            context = await self.llm_generator.generate_content(
+                self.fill_context_prompt(
+                    train_df=train_df,
+                    sample_size=sample_size,
+                    custom_prompt=custom_prompts.get('context') if custom_prompts else None,
+                    include_role=False,
+                    keywords_content=context_keywords
+                )
             )
-        )
         init_p.add_part("context", context)
 
-        procedure_prompt = self.fill_procedure_prompt_creator_prompt(
+        procedure_prompt = await self.llm_generator.generate_content(
+            self.fill_procedure_prompt_creator_prompt(
                     train_df=train_df,
                     sample_size=sample_size,
                     custom_prompt=custom_prompts.get('procedure') if custom_prompts else None,
                     include_role=False
+            )
         )
 
         init_p.add_part("procedure_prompt", procedure_prompt)
