@@ -19,7 +19,7 @@ class PromptEngineer:
         text_column: str,
         label_columns: List[str],
         multi_label: bool,
-        few_shot_mode: str = "few_shot",
+        few_shot_mode = "few_shot",  # Changed type hint to be more flexible
         provider: str = "openai",
         model_name: str = "gpt-4"  # Default model name
     ):
@@ -29,14 +29,22 @@ class PromptEngineer:
             text_column: Name of the column containing text
             label_columns: Names of the columns containing labels
             multi_label: Whether this is a multi-label (True) or single-label (False) classification
-            few_shot_mode: Mode for few-shot learning (default: "few_shot")
+            few_shot_mode: Mode for few-shot learning (default: "few_shot") - can be string or int
             provider: LLM provider name (default: "openai")
             model_name: Name of the model to use
         """
         self.text_column = text_column
         self.label_columns = label_columns
         self.multi_label = multi_label
-        self.few_shot_mode = few_shot_mode
+        # Validate and set few_shot_mode
+        if isinstance(few_shot_mode, str):
+            assert few_shot_mode in ("zero_shot", "one_shot", "few_shot", "full_coverage")
+            self.few_shot_mode = few_shot_mode
+        elif isinstance(few_shot_mode, int):
+            assert few_shot_mode >= 0, "Number of examples must be non-negative"
+            self.few_shot_mode = few_shot_mode
+        else:
+            raise ValueError("few_shot_mode must be a string or integer")
         self.model_name = model_name  # Store model_name as an instance variable
         
         # Get API key from environment
@@ -55,9 +63,21 @@ class PromptEngineer:
         self.role_prompt = None
         self.data: Optional[pd.DataFrame] = None
     
-    def set_few_shot_mode(self, mode: str):
-        assert mode in ("zero_shot", "one_shot", "few_shot", "full_coverage")
-        self.few_shot_mode = mode
+    def set_few_shot_mode(self, mode):
+        """Set the few-shot mode for training examples.
+        
+        Args:
+            mode: Can be a string ("zero_shot", "one_shot", "few_shot", "full_coverage") 
+                  or an integer specifying exact number of examples
+        """
+        if isinstance(mode, str):
+            assert mode in ("zero_shot", "one_shot", "few_shot", "full_coverage")
+            self.few_shot_mode = mode
+        elif isinstance(mode, int):
+            assert mode >= 0, "Number of examples must be non-negative"
+            self.few_shot_mode = mode
+        else:
+            raise ValueError("Mode must be a string or integer")
 
 
     async def engineer_prompts(
@@ -608,12 +628,17 @@ class PromptEngineer:
             raise ValueError("No data available for training data")
 
         # Determine number of examples based on few-shot mode
-        num_examples = {
-            "zero_shot": 0,
-            "one_shot": 1,
-            "few_shot": 5,
-            "full_coverage": len(train_df)
-        }[self.few_shot_mode]
+        if isinstance(self.few_shot_mode, int):
+            # Direct numeric specification
+            num_examples = self.few_shot_mode
+        else:
+            # String-based mode
+            num_examples = {
+                "zero_shot": 0,
+                "one_shot": 1,
+                "few_shot": 5,
+                "full_coverage": len(train_df)
+            }[self.few_shot_mode]
 
         if num_examples == 0:
             return ""  # No examples for zero-shot
