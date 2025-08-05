@@ -23,14 +23,14 @@ class PromptWarehouse:
     
     {examples}
     
-    Which includes text samples and ratings for features {features}, analyze the content 
+    Which includes text samples and ratings for labels {labels}, analyze the content 
     and associated ratings to infer the general topic the dataset likely represents. 
     Based on this analysis, generate a list of keywords or concepts that are 
     representative of the topic.
     """
 
     context_brainstorm_role_prompt = """
-    You are a brainstormer. You are part of a package for classyfying texts with regard to the features {features}.
+    You are a brainstormer. You are part of a package for classyfying texts with regard to the labels {labels}.
     """
 
     create_context_prompt = """
@@ -43,8 +43,8 @@ class PromptWarehouse:
     Dataset:
     {examples}
     
-    Features to consider:
-    {features}
+    Labels to consider:
+    {labels}
     
     Write a context prompt of 3 to 4 sentences for the underlying dataset.
     """
@@ -61,22 +61,25 @@ class PromptWarehouse:
         5. Use of Evidence – Instruct the user to ground their analysis in specific examples from the input text.
         6. Connection to Theory or Definitions – Request that findings be linked back to theoretical definitions, frameworks, or scholarly concepts.
 
-        Find below the dataset with features {features} so that you can assume the concept to be classified.
+        Find below the dataset with labels {labels} so that you can assume the concept to be classified.
 
         {data}
 
-        Now create the procedure prompt and confine yourself to two to three sentences
-        """
+        Now create the procedure prompt and confine yourself to two to three sentences. The procedure prompt should be concise yet comprehensive, ensuring that it provides clear guidance on how to approach the analysis while allowing for depth and critical engagement with the text.
+
+        Specifically, give a short definition for each label in the dataset and state. 
+        
+        Afterwards state that it is a """
     
 
     train_data_intro_prompt = """
-    The following examples show texts and their classifications for features: {features}
-    Each text is followed by its feature values (1 = present, 0 = absent), separated by '|':
+    The following examples show texts and their classifications for labels: {labels}
+    Each text is followed by its label values (1 = present, 0 = absent), separated by '|':
 
     {examples}
 
-    Each value corresponds to the features in order. For example, if features are [A, B, C],
-    then '1|0|0' means feature A is present, while B and C are absent.
+    Each value corresponds to the labels in order. For example, if labels are [A, B, C],
+    then '1|0|0' means label A is present, while B and C are absent.
     """.strip()
 
 
