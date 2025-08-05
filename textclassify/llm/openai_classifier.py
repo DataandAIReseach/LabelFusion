@@ -3,7 +3,6 @@
 import asyncio
 from typing import Dict, List, Optional, Union
 import pandas as pd
-from openai import OpenAI
 
 from ..core.types import ClassificationResult
 from ..core.exceptions import APIError, ConfigurationError, PredictionError
@@ -44,47 +43,33 @@ class OpenAIClassifier(BaseLLMClassifier):
         if label_columns:
             self.prompt_engineer.label_columns = label_columns
         
-        # Validate OpenAI configuration
-        if not self.config.api_key:
-            raise ConfigurationError("OpenAI API key is required")
-        
-        # Set OpenAI specific parameters
+        # Set OpenAI specific parameters (these could be passed to the service layer if needed)
         self.model = self.config.parameters.get('model', 'gpt-3.5-turbo')
         self.temperature = self.config.parameters.get('temperature', 1)
         self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
         
-        # Initialize OpenAI client
-        self.client = OpenAI(api_key=self.config.api_key)
+        # No need to create separate client - use the service layer from BaseLLMClassifier
     
     async def _call_llm(self, prompt: str) -> str:
-        """Call OpenAI API with the given prompt.
+        """Call OpenAI API with the given prompt using the service layer.
         
-        This is the only method that needs to be implemented from BaseLLMClassifier.
-        All other functionality (prompt engineering, batch processing, etc.) is inherited.
+        This uses the llm_generator from BaseLLMClassifier which handles
+        API key management and provides a consistent interface.
         """
         try:
-            messages = [{"role": "user", "content": prompt}]
-            
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=self.temperature,
-                max_completion_tokens=self.max_completion_tokens
-            )
-            
-            # Extract the response content
-            content = response.choices[0].message.content
+            # Use the service layer instead of direct API calls
+            response = await self.llm_generator.generate_content(prompt)
             
             # Handle empty or None responses
-            if content is None:
-                raise APIError("OpenAI returned None response content")
+            if response is None:
+                raise APIError("LLM service returned None response")
             
-            content = content.strip()
-            if not content:
-                raise APIError("OpenAI returned empty response content")
+            response = response.strip()
+            if not response:
+                raise APIError("LLM service returned empty response")
             
-            return content
+            return response
             
         except Exception as e:
-            raise APIError(f"OpenAI API call failed: {str(e)}")
+            raise APIError(f"LLM service call failed: {str(e)}")
 
