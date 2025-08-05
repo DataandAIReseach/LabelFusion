@@ -344,8 +344,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self,
         df: pd.DataFrame,
         text_column: str
-    ) -> List[Union[str, List[str]]]:
-        """Generate predictions in batches with progress tracking."""
+    ) -> List[List[int]]:
+        """Generate predictions in batches with progress tracking.
+        
+        Returns:
+            List[List[int]]: List of binary vectors representing predictions
+        """
         predictions = []
         total_batches = (len(df) + self.batch_size - 1) // self.batch_size
         
@@ -386,8 +390,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self,
         batch_df: pd.DataFrame,
         text_column: str
-    ) -> List[Union[str, List[str]]]:
-        """Process a batch of texts for prediction with detailed logging."""
+    ) -> List[List[int]]:
+        """Process a batch of texts for prediction with detailed logging.
+        
+        Returns:
+            List[List[int]]: List of binary vectors representing predictions
+        """
         if self.verbose:
             self.logger.debug(f"Processing batch with {len(batch_df)} texts")
         
@@ -419,16 +427,20 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             for r in responses
         ]
 
-    def _parse_prediction_response(self, response: str) -> Union[str, List[str]]:
-        """Parse the LLM response for predictions."""
+    def _parse_prediction_response(self, response: str) -> List[int]:
+        """Parse the LLM response for predictions.
+        
+        Returns:
+            List[int]: Binary vector representation of predictions
+        """
         if not response:
             if self.verbose:
                 self.logger.warning("Received empty response from LLM")
             # Return default values for empty responses
             if self.multi_label:
-                return []
+                return [0] * len(self.classes_) if self.classes_ else [0]
             else:
-                return self.classes_[0] if self.classes_ else "unknown"
+                return [1] + [0] * (len(self.classes_) - 1) if self.classes_ else [1]
         
         response = response.strip()
         if not response:
@@ -436,33 +448,73 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 self.logger.warning("Received whitespace-only response from LLM")
             # Return default values for empty responses
             if self.multi_label:
-                return []
+                return [0] * len(self.classes_) if self.classes_ else [0]
             else:
-                return self.classes_[0] if self.classes_ else "unknown"
+                return [1] + [0] * (len(self.classes_) - 1) if self.classes_ else [1]
         
         if self.multi_label:
             return self._parse_multiple_labels(response)
         else:
             return self._parse_single_label(response)
 
-    def _parse_single_label(self, response: str) -> str:
-        """Parse response for single-label classification."""
+    def _parse_single_label(self, response: str) -> List[int]:
+        """Parse response for single-label classification.
+        
+        Returns:
+            List[int]: Binary vector with exactly one 1 and rest 0s
+        """
         if not response:
             if self.verbose:
                 self.logger.warning("Empty response in single-label parsing")
-            return self.classes_[0] if self.classes_ else "unknown"
+            # Return first class as default (1 at index 0, rest 0)
+            return [1] + [0] * (len(self.classes_) - 1) if self.classes_ else [1]
         
+        response = response.strip()
+        
+        # Check if response is in binary format like '1 | 0 | 0 | 0'
+        if '|' in response:
+            binary_parts = [part.strip() for part in response.split('|')]
+            # Check if this looks like a binary format (all parts are '0' or '1')
+            if (len(binary_parts) == len(self.classes_) and 
+                all(part in ['0', '1'] for part in binary_parts)):
+                # Convert to integer list
+                binary_vector = [int(part) for part in binary_parts]
+                # Ensure exactly one '1' for single-label
+                if sum(binary_vector) == 1:
+                    return binary_vector
+                elif sum(binary_vector) == 0:
+                    if self.verbose:
+                        self.logger.warning(f"No '1' found in binary response: '{response}', using default")
+                    return [1] + [0] * (len(self.classes_) - 1)
+                else:
+                    if self.verbose:
+                        self.logger.warning(f"Multiple '1's found in single-label response: '{response}', using first")
+                    # Keep only the first '1'
+                    first_one_idx = binary_vector.index(1)
+                    result = [0] * len(binary_vector)
+                    result[first_one_idx] = 1
+                    return result
+            elif self.verbose and len(binary_parts) == len(self.classes_):
+                self.logger.warning(f"Response length matches classes but contains non-binary values: {binary_parts}")
+            elif self.verbose:
+                self.logger.warning(f"Response length ({len(binary_parts)}) doesn't match classes count ({len(self.classes_)})")
+        
+        # Fallback: try to match class names and convert to binary vector
         response_lower = response.lower()
         
         # Try to find exact matches first
-        for class_name in self.classes_:
+        for i, class_name in enumerate(self.classes_):
             if class_name.lower() == response_lower:
-                return class_name
+                result = [0] * len(self.classes_)
+                result[i] = 1
+                return result
         
         # Try to find partial matches
-        for class_name in self.classes_:
+        for i, class_name in enumerate(self.classes_):
             if class_name.lower() in response_lower:
-                return class_name
+                result = [0] * len(self.classes_)
+                result[i] = 1
+                return result
         
         # Check for common response patterns
         if any(word in response_lower for word in ['unknown', 'unclear', 'cannot', "can't", 'unable']):
@@ -471,37 +523,61 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         # Default fallback
         if self.verbose:
-            self.logger.warning(f"No class found in response: '{response}', using default: {self.classes_[0] if self.classes_ else 'unknown'}")
+            self.logger.warning(f"No class found in response: '{response}', using default (first class)")
         
-        return self.classes_[0] if self.classes_ else "unknown"
+        return [1] + [0] * (len(self.classes_) - 1) if self.classes_ else [1]
 
-    def _parse_multiple_labels(self, response: str) -> List[str]:
-        """Parse response for multi-label classification."""
+    def _parse_multiple_labels(self, response: str) -> List[int]:
+        """Parse response for multi-label classification.
+        
+        Returns:
+            List[int]: Binary vector where 1s indicate predicted classes
+        """
         if not response:
             if self.verbose:
                 self.logger.warning("Empty response in multi-label parsing")
-            return []
+            return [0] * len(self.classes_) if self.classes_ else [0]
         
+        response = response.strip()
         response_upper = response.upper()
         
         # Handle explicit "NONE" responses
         if response_upper in ["NONE", "EMPTY", "NULL", "NO LABELS", "NOTHING"]:
-            return []
+            return [0] * len(self.classes_)
         
         # Handle uncertainty responses
         if any(word in response_upper for word in ['UNKNOWN', 'UNCLEAR', 'CANNOT', "CAN'T", 'UNABLE']):
             if self.verbose:
                 self.logger.warning(f"LLM indicated uncertainty in response: {response}")
-            return []
+            return [0] * len(self.classes_)
         
+        # Check if response is in binary format like '1 | 0 | 1 | 0'
+        if '|' in response:
+            binary_parts = [part.strip() for part in response.split('|')]
+            # Check if this looks like a binary format (all parts are '0' or '1')
+            if (len(binary_parts) == len(self.classes_) and 
+                all(part in ['0', '1'] for part in binary_parts)):
+                # Convert to integer list and return
+                return [int(part) for part in binary_parts]
+            else:
+                if self.verbose and len(binary_parts) == len(self.classes_):
+                    self.logger.warning(f"Binary response length matches but contains non-binary values: {binary_parts}")
+                elif self.verbose:
+                    self.logger.warning(f"Binary response length ({len(binary_parts)}) doesn't match classes count ({len(self.classes_)})")
+        
+        # Fallback: parse text-based responses and convert to binary vector
         predicted_classes = []
         
-        # Split by common separators
+        # Split by common separators for text-based responses (excluding '|' since we handled it above)
         parts = []
-        for separator in [',', ';', '|', '\n', 'and']:
+        for separator in [',', ';', '\n', 'and']:
             if separator in response:
                 parts = response.split(separator)
                 break
+        
+        # If no separators found but contains '|', treat as text with '|' separator
+        if not parts and '|' in response:
+            parts = response.split('|')
         
         if not parts:
             parts = [response]  # Treat as single item
@@ -512,23 +588,28 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 continue
                 
             # Try exact matches first
-            for class_name in self.classes_:
+            for i, class_name in enumerate(self.classes_):
                 if class_name.lower() == part.lower():
-                    if class_name not in predicted_classes:
-                        predicted_classes.append(class_name)
+                    if i not in predicted_classes:
+                        predicted_classes.append(i)
                     break
             else:
                 # Try partial matches
-                for class_name in self.classes_:
+                for i, class_name in enumerate(self.classes_):
                     if class_name.lower() in part.lower():
-                        if class_name not in predicted_classes:
-                            predicted_classes.append(class_name)
+                        if i not in predicted_classes:
+                            predicted_classes.append(i)
                         break
+        
+        # Convert predicted class indices to binary vector
+        binary_vector = [0] * len(self.classes_)
+        for idx in predicted_classes:
+            binary_vector[idx] = 1
         
         if not predicted_classes and self.verbose:
             self.logger.warning(f"No classes found in multi-label response: '{response}'")
         
-        return predicted_classes
+        return binary_vector
 
     async def _evaluate_test_data(
         self,
@@ -546,22 +627,30 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
     def _calculate_metrics(
         self,
-        predictions: List[Union[str, List[str]]],
-        true_labels: List[Union[str, List[str]]]
+        predictions: List[List[int]],
+        true_labels: List[List[int]]
     ) -> Dict[str, float]:
-        """Calculate evaluation metrics."""
-        if all(isinstance(label, str) for label in true_labels):
+        """Calculate evaluation metrics for binary vector predictions."""
+        if not self.multi_label:
             return self._calculate_single_label_metrics(predictions, true_labels)
         return self._calculate_multi_label_metrics(predictions, true_labels)
 
     def _calculate_single_label_metrics(
         self,
-        predictions: List[str],
-        true_labels: List[str]
+        predictions: List[List[int]],
+        true_labels: List[List[int]]
     ) -> Dict[str, float]:
-        """Calculate metrics for single-label classification."""
-        correct = sum(1 for p, t in zip(predictions, true_labels) if p == t)
-        return {'accuracy': correct / len(true_labels)}
+        """Calculate metrics for single-label classification using binary vectors."""
+        correct = 0
+        total = len(predictions)
+        
+        for pred, true in zip(predictions, true_labels):
+            # For single-label, check if the prediction vector matches the true vector
+            if pred == true:
+                correct += 1
+        
+        accuracy = correct / total if total > 0 else 0.0
+        return {'accuracy': accuracy}
 
     def _calculate_multi_label_metrics(
         self,
@@ -591,16 +680,16 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             for k, v in metrics.items()
         }
 
-    def _handle_error(self, error: Exception) -> Union[str, List[str]]:
-        """Handle prediction errors by returning default values instead of raising exceptions."""
+    def _handle_error(self, error: Exception) -> List[int]:
+        """Handle prediction errors by returning default binary vectors instead of raising exceptions."""
         if self.verbose:
             self.logger.error(f"LLM call failed: {str(error)}")
         
-        # Return default values instead of raising exceptions to allow processing to continue
+        # Return default binary vectors instead of raising exceptions to allow processing to continue
         if self.multi_label:
-            return []
+            return [0] * len(self.classes_) if self.classes_ else [0]
         else:
-            return self.classes_[0] if self.classes_ else "unknown"
+            return [1] + [0] * (len(self.classes_) - 1) if self.classes_ else [1]
 
     async def _call_llm(self, prompt: str) -> str:
         """Call the LLM API with the given prompt."""

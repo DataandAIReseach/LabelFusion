@@ -46,9 +46,11 @@ def main():
         label_columns=label_columns  # Use the dummy column names as labels
     )
     
-    # Take first 10 rows for training and next 5 for testing
-    train_df = df.iloc[:10]
-    test_df = df.iloc[10:15]
+    # Take random 10 rows for training and random 5 for testing
+    # First shuffle the dataframe to ensure randomness
+    df_shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
+    train_df = df_shuffled.iloc[:10]
+    test_df = df_shuffled.iloc[10:15]
     
     print(f"Training set size: {len(train_df)}")
     print(f"Test set size: {len(test_df)}")

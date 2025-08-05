@@ -741,3 +741,33 @@ class PromptEngineer:
             return f"{self.role_prompt}\n\n{prompt_text}"
         else:
             return prompt_text
+
+    def build_prompt(self, text: str) -> str:
+        """Build a simple classification prompt for a single text.
+        
+        This is a simplified method that creates a basic classification prompt
+        without the full engineering process.
+        
+        Args:
+            text: The text to classify
+            
+        Returns:
+            str: The formatted prompt for classification
+        """
+        # Create a simple classification prompt
+        labels_str = ", ".join(self.label_columns)
+        
+        if self.multi_label:
+            prompt = f"""Classify the following text into one or more of these categories: {labels_str}
+
+Text: {text}
+
+Please respond with the relevant category names separated by commas, or "none" if no categories apply."""
+        else:
+            prompt = f"""Classify the following text into one of these categories: {labels_str}
+
+Text: {text}
+
+Please respond with only the most relevant category name."""
+        
+        return prompt
