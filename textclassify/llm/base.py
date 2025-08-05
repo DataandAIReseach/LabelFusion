@@ -421,29 +421,113 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
     def _parse_prediction_response(self, response: str) -> Union[str, List[str]]:
         """Parse the LLM response for predictions."""
+        if not response:
+            if self.verbose:
+                self.logger.warning("Received empty response from LLM")
+            # Return default values for empty responses
+            if self.multi_label:
+                return []
+            else:
+                return self.classes_[0] if self.classes_ else "unknown"
+        
         response = response.strip()
-        if self.prompt_engineer.label_type == "single":
+        if not response:
+            if self.verbose:
+                self.logger.warning("Received whitespace-only response from LLM")
+            # Return default values for empty responses
+            if self.multi_label:
+                return []
+            else:
+                return self.classes_[0] if self.classes_ else "unknown"
+        
+        if self.multi_label:
+            return self._parse_multiple_labels(response)
+        else:
             return self._parse_single_label(response)
-        return self._parse_multiple_labels(response)
 
     def _parse_single_label(self, response: str) -> str:
         """Parse response for single-label classification."""
+        if not response:
+            if self.verbose:
+                self.logger.warning("Empty response in single-label parsing")
+            return self.classes_[0] if self.classes_ else "unknown"
+        
+        response_lower = response.lower()
+        
+        # Try to find exact matches first
         for class_name in self.classes_:
-            if class_name.lower() in response.lower():
+            if class_name.lower() == response_lower:
                 return class_name
+        
+        # Try to find partial matches
+        for class_name in self.classes_:
+            if class_name.lower() in response_lower:
+                return class_name
+        
+        # Check for common response patterns
+        if any(word in response_lower for word in ['unknown', 'unclear', 'cannot', "can't", 'unable']):
+            if self.verbose:
+                self.logger.warning(f"LLM indicated uncertainty in response: {response}")
+        
+        # Default fallback
+        if self.verbose:
+            self.logger.warning(f"No class found in response: '{response}', using default: {self.classes_[0] if self.classes_ else 'unknown'}")
+        
         return self.classes_[0] if self.classes_ else "unknown"
 
     def _parse_multiple_labels(self, response: str) -> List[str]:
         """Parse response for multi-label classification."""
-        if response.upper() == "NONE":
+        if not response:
+            if self.verbose:
+                self.logger.warning("Empty response in multi-label parsing")
             return []
+        
+        response_upper = response.upper()
+        
+        # Handle explicit "NONE" responses
+        if response_upper in ["NONE", "EMPTY", "NULL", "NO LABELS", "NOTHING"]:
+            return []
+        
+        # Handle uncertainty responses
+        if any(word in response_upper for word in ['UNKNOWN', 'UNCLEAR', 'CANNOT', "CAN'T", 'UNABLE']):
+            if self.verbose:
+                self.logger.warning(f"LLM indicated uncertainty in response: {response}")
+            return []
+        
         predicted_classes = []
-        for part in response.split(','):
+        
+        # Split by common separators
+        parts = []
+        for separator in [',', ';', '|', '\n', 'and']:
+            if separator in response:
+                parts = response.split(separator)
+                break
+        
+        if not parts:
+            parts = [response]  # Treat as single item
+        
+        for part in parts:
             part = part.strip()
+            if not part:
+                continue
+                
+            # Try exact matches first
             for class_name in self.classes_:
-                if class_name.lower() in part.lower():
-                    predicted_classes.append(class_name)
+                if class_name.lower() == part.lower():
+                    if class_name not in predicted_classes:
+                        predicted_classes.append(class_name)
                     break
+            else:
+                # Try partial matches
+                for class_name in self.classes_:
+                    if class_name.lower() in part.lower():
+                        if class_name not in predicted_classes:
+                            predicted_classes.append(class_name)
+                        break
+        
+        if not predicted_classes and self.verbose:
+            self.logger.warning(f"No classes found in multi-label response: '{response}'")
+        
         return predicted_classes
 
     async def _evaluate_test_data(
@@ -508,8 +592,15 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         }
 
     def _handle_error(self, error: Exception) -> Union[str, List[str]]:
-        """Handle prediction errors."""
-        raise PredictionError(f"LLM call failed: {str(error)}", self.config.parameters.get("model", "unknown"))
+        """Handle prediction errors by returning default values instead of raising exceptions."""
+        if self.verbose:
+            self.logger.error(f"LLM call failed: {str(error)}")
+        
+        # Return default values instead of raising exceptions to allow processing to continue
+        if self.multi_label:
+            return []
+        else:
+            return self.classes_[0] if self.classes_ else "unknown"
 
     async def _call_llm(self, prompt: str) -> str:
         """Call the LLM API with the given prompt."""
