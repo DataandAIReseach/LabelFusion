@@ -1,9 +1,9 @@
 """OpenAI-based text classifier."""
 
 import asyncio
-import aiohttp
 from typing import Dict, List, Optional, Union
 import pandas as pd
+from openai import OpenAI
 
 from ..core.types import ClassificationResult
 from ..core.exceptions import APIError, ConfigurationError, PredictionError
@@ -50,15 +50,11 @@ class OpenAIClassifier(BaseLLMClassifier):
         
         # Set OpenAI specific parameters
         self.model = self.config.parameters.get('model', 'gpt-3.5-turbo')
-        self.temperature = self.config.parameters.get('temperature', 0.1)
+        self.temperature = self.config.parameters.get('temperature', 1)
         self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
-        self.api_base = "https://api.openai.com/v1"
         
-        # Headers for API requests
-        self.headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json"
-        }
+        # Initialize OpenAI client
+        self.client = OpenAI(api_key=self.config.api_key)
     
     async def _call_llm(self, prompt: str) -> str:
         """Call OpenAI API with the given prompt.
@@ -66,19 +62,16 @@ class OpenAIClassifier(BaseLLMClassifier):
         This is the only method that needs to be implemented from BaseLLMClassifier.
         All other functionality (prompt engineering, batch processing, etc.) is inherited.
         """
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{self.api_base}/chat/completions",
-                headers=self.headers,
-                json={
-                    "model": self.model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": self.temperature,
-                    "max_completion_tokens": self.max_completion_tokens
-                }
-            ) as response:
-                if response.status != 200:
-                    raise APIError(f"OpenAI API call failed: {await response.text()}")
-                result = await response.json()
-                return result['choices'][0]['message']['content']
+        try:
+            messages = [{"role": "user", "content": prompt}]
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_completion_tokens=self.max_completion_tokens
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            raise APIError(f"OpenAI API call failed: {str(e)}")
 

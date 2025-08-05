@@ -239,15 +239,18 @@ class PromptEngineer:
         sample_size: int = 20,
         custom_prompt: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
-        include_role: bool = True
+        include_role: bool = True,
+        include_multilabel_info: bool = True
     ) -> str:
         """Fill a role prompt creator prompt using sampled data with text-label pairs.
         
         Args:
+            train_df: DataFrame containing training examples
             sample_size: Number of examples to use for role creation (default: 20)
             custom_prompt: Optional custom prompt to use instead of default
             custom_role_prompt: Optional custom role prompt to use instead of default
             include_role: Whether to include the role prompt (default: True)
+            include_multilabel_info: Whether to include multilabel classification info (default: True)
             
         Returns:
             str: Role prompt creator content
@@ -278,7 +281,29 @@ class PromptEngineer:
             for ex in examples
         ])
         
-        prompt_text = prompt_template.format(examples=formatted_examples)
+        # Add multilabel information if requested
+        multilabel_info = ""
+        if include_multilabel_info:
+            classification_type = "multi-label" if self.multi_label else "single-label"
+            multilabel_info = f"\n\nClassification Type: This is a {classification_type} classification task."
+            if self.multi_label:
+                multilabel_info += " Multiple labels can be assigned to each text."
+            else:
+                multilabel_info += " Only one label should be assigned to each text."
+        
+        # Format the template
+        try:
+            if include_multilabel_info and "{multilabel_info}" in prompt_template:
+                prompt_text = prompt_template.format(
+                    examples=formatted_examples,
+                    multilabel_info=multilabel_info
+                )
+            else:
+                prompt_text = prompt_template.format(examples=formatted_examples)
+                if include_multilabel_info:
+                    prompt_text += multilabel_info
+        except KeyError as e:
+            raise ValueError(f"Prompt template contains unknown placeholder: {e}")
         
         if include_role and custom_role_prompt:
             return f"{custom_role_prompt}\n\n{prompt_text}"
