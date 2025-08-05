@@ -67,7 +67,8 @@ class PromptEngineer:
         sample_size: int = 20,
         custom_prompts: Optional[Dict[str, str]] = None,
         custom_role_prompt: Optional[str] = None,
-        custom_context: Optional[str] = None
+        custom_context: Optional[str] = None,
+        procedure_additions: Optional[str] = None
     ) -> List[Prompt]:
         """Engineer prompts for test data using training examples.
         
@@ -78,6 +79,7 @@ class PromptEngineer:
             custom_prompts: Optional dict of custom prompts
             custom_role_prompt: Optional custom role prompt
             custom_context: Optional pre-existing context to use instead of generating one
+            procedure_additions: Optional additional content for procedure prompt (e.g., theory, background)
             
         Returns:
             List[Prompt]: List of engineered prompts for each test text
@@ -131,7 +133,8 @@ class PromptEngineer:
                     train_df=train_df,
                     sample_size=sample_size,
                     custom_prompt=custom_prompts.get('procedure') if custom_prompts else None,
-                    include_role=False
+                    include_role=False,
+                    procedure_additions=procedure_additions
             )
         )
 
@@ -218,14 +221,14 @@ class PromptEngineer:
         # Add role prompt if requested
         if include_role:
             role_prompt = custom_role_prompt or PromptWarehouse.context_brainstorm_role_prompt.format(
-                features=", ".join(self.label_columns)
+                labels=", ".join(self.label_columns)
         )
         prompts.append(role_prompt)
     
         # Add main prompt
         main_prompt = custom_prompt or PromptWarehouse.brainstorm_context_keywords_prompt.format(
             examples=examples,
-            features=", ".join(self.label_columns)
+            labels=", ".join(self.label_columns)
         )
         prompts.append(main_prompt)
         
@@ -366,10 +369,10 @@ class PromptEngineer:
         else:
             prompt_template = PromptWarehouse.create_context_prompt
         
-        # Format prompt with examples and features
+        # Format prompt with examples and labels
         prompt_text = prompt_template.format(
             examples=formatted_examples,
-            features=", ".join(self.label_columns),
+            labels=", ".join(self.label_columns),
             keywords=keywords_content or ""
         )
         
@@ -388,7 +391,8 @@ class PromptEngineer:
         custom_prompt: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
         include_role: bool = True,
-        context_content: Optional[str] = None
+        context_content: Optional[str] = None,
+        procedure_additions: Optional[str] = None
     ) -> str:
         """Fill a procedure prompt creator prompt using sampled data.
         
@@ -398,6 +402,7 @@ class PromptEngineer:
             custom_role_prompt: Optional custom role prompt to use instead of default
             include_role: Whether to include the role prompt (default: True)
             context_content: Optional context to include in the prompt
+            procedure_additions: Optional additional content (e.g., theory, background) to include
             
         Returns:
             str: Procedure prompt creator content
@@ -430,8 +435,12 @@ class PromptEngineer:
         
         prompt_text = prompt_template.format(
             data=formatted_examples,
-            features=", ".join(self.label_columns)
+            labels=", ".join(self.label_columns)
         )
+        
+        # Add procedure additions if provided
+        if procedure_additions:
+            prompt_text = f"{prompt_text}\n\nAdditional Context/Theory:\n{procedure_additions}\n\nIncorporate this additional information into your procedure prompt where appropriate."
         
         if include_role and custom_role_prompt:
             return f"{custom_role_prompt}\n\n{prompt_text}"
@@ -491,7 +500,7 @@ class PromptEngineer:
         try:
             prompt_text = prompt_template.format(
                 examples=examples_text,
-                features=", ".join(self.label_columns)
+                labels=", ".join(self.label_columns)
             )
         except KeyError as e:
             raise ValueError(f"Prompt template contains unknown placeholder: {e}")
@@ -641,7 +650,8 @@ class PromptEngineer:
         custom_prompt: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
         include_role: bool = True,
-        context_content: Optional[str] = None
+        context_content: Optional[str] = None,
+        procedure_additions: Optional[str] = None
     ) -> str:
         """Fill a procedure prompt creator prompt using sampled data.
     
@@ -652,6 +662,7 @@ class PromptEngineer:
             custom_role_prompt: Optional custom role prompt
             include_role: Whether to include the role prompt
             context_content: Optional context to include in the prompt
+            procedure_additions: Optional additional content (e.g., theory, background) to include
     
         Returns:
             str: Procedure prompt creator content
@@ -689,10 +700,14 @@ class PromptEngineer:
         try:
             prompt_text = prompt_template.format(
                 data=formatted_examples,
-                features=", ".join(self.label_columns)
+                labels=", ".join(self.label_columns)
             )
         except KeyError as e:
             raise ValueError(f"Prompt template contains unknown placeholder: {e}")
+    
+        # Add procedure additions if provided
+        if procedure_additions:
+            prompt_text = f"{prompt_text}\n\nAdditional Context/Theory:\n{procedure_additions}\n\nIncorporate this additional information into your procedure prompt where appropriate."
     
         # Add role prompt if requested
         if include_role and custom_role_prompt:
