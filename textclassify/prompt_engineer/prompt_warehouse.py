@@ -52,24 +52,15 @@ class PromptWarehouse:
     procedure_prompt_creator_prompt = """
         You are about to write a procedure prompt designed to guide the analysis of a text using a specific theoretical or conceptual lens.
 
-        A well-structured procedure prompt must include the following main components:
-
-        1. Input Specification – Clearly state what kind of text or data the user or model will receive.
-        2. Primary Task Instruction – Define what the user is expected to do with the input.
-        3. Theoretical or Analytical Focus – Indicate the specific lens, concept, or framework through which the input should be analyzed.
-        4. Depth of Analysis Required – Specify the level of detail, reasoning, or argumentation expected.
-        5. Use of Evidence – Instruct the user to ground their analysis in specific examples from the input text.
-        6. Connection to Theory or Definitions – Request that findings be linked back to theoretical definitions, frameworks, or scholarly concepts.
 
         Find below the dataset with labels {labels} so that you can assume the concept to be classified.
 
         {data}
 
-        Now create the procedure prompt and confine yourself to two to three sentences. The procedure prompt should be concise yet comprehensive, ensuring that it provides clear guidance on how to approach the analysis while allowing for depth and critical engagement with the text.
+        Specifically, give a short definition for each label in the dataset and state again which values the specific labels can have.
 
-        Specifically, give a short definition for each label in the dataset and state. 
-        
-        Afterwards state that it is a """
+        You can assume the label definitions also with behalf of the data sample from above.
+   """
     
 
     train_data_intro_prompt = """
