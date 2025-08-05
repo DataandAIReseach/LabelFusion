@@ -13,6 +13,8 @@ from ..core.base import AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType
 from ..core.exceptions import PredictionError, ValidationError, APIError
 from ..prompt_engineer.base import PromptEngineer
+from ..services.llm_content_generator import create_llm_generator
+from ..config.api_keys import APIKeyManager
 
 class BaseLLMClassifier(AsyncBaseClassifier):
     """Base class for all LLM-based text classifiers."""
@@ -68,8 +70,21 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             model_name=self.config.parameters["model"]  # Pass model from config.parameters
         )
         
+        # Initialize LLM generator
+        key_manager = APIKeyManager()
+        api_key = key_manager.get_key("openai")  # Default to openai for now
+        if not api_key:
+            raise ValueError("No API key found for openai")
+            
+        self.llm_generator = create_llm_generator(
+            provider="openai",
+            model_name=self.config.parameters["model"],
+            api_key=api_key
+        )
+        
         if self.verbose:
             self.logger.info(f"PromptEngineer initialized with model: {self.config.parameters['model']}")
+            self.logger.info(f"LLM generator initialized with provider: openai")
         
         self._setup_config()
 
@@ -386,7 +401,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         if self.verbose:
             self.logger.debug(f"Generated {len(prompts)} prompts for LLM calls")
-        
+
         responses = await asyncio.gather(
             *[self._call_llm(prompt) for prompt in prompts],
             return_exceptions=True

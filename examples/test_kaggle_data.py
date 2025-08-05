@@ -33,7 +33,7 @@ def main():
     config.model_type = ModelType.LLM
     config.parameters = {
         'model': 'o4-mini',
-        'temperature': 0.1,
+        'temperature': 1,
         'max_tokens': 150,
         'batch_size': 5
     }
