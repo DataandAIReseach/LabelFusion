@@ -72,19 +72,35 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         # Initialize LLM generator
         key_manager = APIKeyManager()
-        api_key = key_manager.get_key("openai")  # Default to openai for now
-        if not api_key:
-            raise ValueError("No API key found for openai")
+        
+        # Determine provider from config or default to openai
+        provider = getattr(self.config, 'provider', 'openai')
+        
+        # Get appropriate API key based on provider
+        if provider == 'gemini':
+            api_key = key_manager.get_key("gemini") or key_manager.get_key("google")
+            if not api_key:
+                raise ValueError("No API key found for gemini. Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.")
+        elif provider == 'deepseek':
+            api_key = key_manager.get_key("deepseek")
+            if not api_key:
+                raise ValueError("No API key found for deepseek")
+        else:  # default to openai
+            provider = 'openai'
+            api_key = key_manager.get_key("openai")
+            if not api_key:
+                raise ValueError("No API key found for openai")
             
         self.llm_generator = create_llm_generator(
-            provider="openai",
+            provider=provider,
             model_name=self.config.parameters["model"],
             api_key=api_key
         )
         
         if self.verbose:
             self.logger.info(f"PromptEngineer initialized with model: {self.config.parameters['model']}")
-            self.logger.info(f"LLM generator initialized with provider: openai")
+            self.logger.info(f"LLM generator initialized with provider: {provider}")
+            self.logger.info(f"Using API key for: {provider}")
         
         self._setup_config()
 

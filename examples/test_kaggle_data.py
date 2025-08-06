@@ -1,10 +1,11 @@
-"""Simple test for OpenAI text classification."""
+"""Simple test for Gemini text classification."""
 
 import os
 import pandas as pd
 from dotenv import load_dotenv
 import asyncio
-from textclassify.llm.openai_classifier import OpenAIClassifier
+from textclassify.llm.gemini_classifier import GeminiClassifier
+# from textclassify.llm.openai_classifier import OpenAIClassifier  # OpenAI alternative
 from textclassify.config.settings import Config
 from textclassify.core.types import ModelType
 
@@ -32,19 +33,32 @@ def main():
     config = Config()
     config.model_type = ModelType.LLM
     config.parameters = {
-        'model': 'o4-mini',
+        'model': 'gemini-1.5-flash',  # Gemini model
         'temperature': 1,
         'max_tokens': 150,
-        'batch_size': 5
+        'batch_size': 5,
     }
-    config.api_key = os.getenv('OPENAI_API_KEY')
+    # OpenAI configuration (commented out)
+    # config.parameters = {
+    #     'model': 'o4-mini',
+    #     'temperature': 1,
+    #     'max_tokens': 150,
+    #     'batch_size': 5,
+    # }
+    # config.api_key = os.getenv('OPENAI_API_KEY')
     
     # Initialize classifier with column specifications
-    classifier = OpenAIClassifier(
+    classifier = GeminiClassifier(
         config=config,
         text_column='text',
         label_columns=label_columns  # Use the dummy column names as labels
     )
+    # OpenAI alternative (commented out)
+    # classifier = OpenAIClassifier(
+    #     config=config,
+    #     text_column='text',
+    #     label_columns=label_columns  # Use the dummy column names as labels
+    # )
     
     # Take random 10 rows for training and random 5 for testing
     # First shuffle the dataframe to ensure randomness

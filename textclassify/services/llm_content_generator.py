@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 import openai
-from google.generativeai import GenerativeModel
 from openai import OpenAI
 from ..core.exceptions import APIError
 import os
@@ -52,15 +51,40 @@ class GeminiContentGenerator(BaseLLMContentGenerator):
     """Content generator using Google's Gemini API."""
     
     def __init__(self, model_name: str, api_key: Optional[str] = None):
-        self.model = GenerativeModel(model_name)
-        if api_key:
-            self.model.configure(api_key=api_key)
+        import google.generativeai as genai
+        
+        # Get API key from parameter or environment variable
+        api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("Gemini API key is required. Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.")
+        
+        # Configure Gemini API
+        genai.configure(api_key=api_key)
+        
+        # Initialize the model
+        self.model = genai.GenerativeModel(model_name)
+        self.model_name = model_name
 
     async def generate_content(self, prompt: str, role_prompt: Optional[str] = None) -> str:
         try:
+            # Combine role prompt and main prompt if role prompt is provided
             complete_prompt = f"{role_prompt}\n\n{prompt}" if role_prompt else prompt
-            response = await self.model.generate_content_async(complete_prompt)
-            return response.text
+            
+            # Generate content - Gemini's generate_content is synchronous, so we need to run it in executor
+            import asyncio
+            import concurrent.futures
+            
+            def _generate_sync():
+                response = self.model.generate_content(complete_prompt)
+                return response.text
+            
+            # Run the synchronous call in a thread executor to avoid blocking
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                result = await loop.run_in_executor(executor, _generate_sync)
+            
+            return result.strip() if result else ""
+            
         except Exception as e:
             raise APIError(f"Gemini API call failed: {str(e)}")
 
