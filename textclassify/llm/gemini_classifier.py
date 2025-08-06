@@ -86,10 +86,9 @@ class GeminiClassifier(BaseLLMClassifier):
             "provider": "gemini",
             "model": self.model,
             "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
+            "max_completion_tokens": self.max_completion_tokens,
             "top_p": self.top_p,
-            "top_k": self.top_k,
-            "api_base": self.api_base
+            "top_k": self.top_k
         })
         return info
 

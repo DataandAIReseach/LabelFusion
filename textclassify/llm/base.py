@@ -26,7 +26,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         label_columns: Optional[List[str]] = None,
         multi_label: bool = False,
         few_shot_mode: str = "few_shot",
-        verbose: bool = True
+        verbose: bool = True,
+        provider: Optional[str] = None
     ):
         """Initialize the LLM classifier.
         
@@ -37,12 +38,18 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             multi_label: Whether this is a multi-label classifier (default: False)
             few_shot_mode: Mode for few-shot learning (default: "few_shot")
             verbose: Whether to show detailed progress (default: True)
+            provider: LLM provider to use ('openai', 'gemini', 'deepseek', etc.)
         """
         super().__init__(config)
         self.config.model_type = ModelType.LLM
         self.multi_label = multi_label
         self.few_shot_mode = few_shot_mode
         self.verbose = verbose
+        
+        # Set provider - use parameter if provided, otherwise get from config, default to openai
+        self.provider = provider or getattr(self.config, 'provider', 'openai')
+        # Also set it on config for consistency
+        self.config.provider = self.provider
         
         # Setup logging
         if self.verbose:
@@ -67,40 +74,37 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             label_columns=self.label_columns,
             multi_label=self.multi_label,
             few_shot_mode=self.few_shot_mode,
-            model_name=self.config.parameters["model"]  # Pass model from config.parameters
+            model_name=self.config.parameters["model"],  # Pass model from config.parameters
+            provider=self.provider  # Pass provider for correct instance handling
         )
         
         # Initialize LLM generator
         key_manager = APIKeyManager()
         
-        # Determine provider from config or default to openai
-        provider = getattr(self.config, 'provider', 'openai')
-        
         # Get appropriate API key based on provider
-        if provider == 'gemini':
+        if self.provider == 'gemini':
             api_key = key_manager.get_key("gemini") or key_manager.get_key("google")
             if not api_key:
                 raise ValueError("No API key found for gemini. Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.")
-        elif provider == 'deepseek':
+        elif self.provider == 'deepseek':
             api_key = key_manager.get_key("deepseek")
             if not api_key:
                 raise ValueError("No API key found for deepseek")
         else:  # default to openai
-            provider = 'openai'
             api_key = key_manager.get_key("openai")
             if not api_key:
                 raise ValueError("No API key found for openai")
             
         self.llm_generator = create_llm_generator(
-            provider=provider,
+            provider=self.provider,
             model_name=self.config.parameters["model"],
             api_key=api_key
         )
         
         if self.verbose:
             self.logger.info(f"PromptEngineer initialized with model: {self.config.parameters['model']}")
-            self.logger.info(f"LLM generator initialized with provider: {provider}")
-            self.logger.info(f"Using API key for: {provider}")
+            self.logger.info(f"LLM generator initialized with provider: {self.provider}")
+            self.logger.info(f"Using API key for: {self.provider}")
         
         self._setup_config()
 
