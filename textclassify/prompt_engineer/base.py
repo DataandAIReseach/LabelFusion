@@ -92,7 +92,12 @@ class PromptEngineer:
     ) -> List[Prompt]:
         """Engineer prompts for test data using training examples.
         
-        Args:
+        Args:    OpenAI alternative (commented out)
+    classifier = OpenAIClassifier(
+        config=config,
+        text_column='text',
+        label_columns=label_columns  # Use the dummy column names as labels
+    )
             test_df: DataFrame containing texts to classify
             train_df: DataFrame containing training examples
             sample_size: Number of examples for prompt generation
