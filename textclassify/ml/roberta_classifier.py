@@ -16,18 +16,21 @@ from .preprocessing import TextPreprocessor, clean_text, normalize_text
 warnings.filterwarnings("ignore", category=UserWarning)
 
 try:
+    # Use Auto* classes which are more flexible and recommended in newer transformers versions
     from transformers import (
-        RobertaTokenizer, 
-        RobertaForSequenceClassification,
-        RobertaModel,
-        AdamW,
+        AutoTokenizer,
+        AutoModelForSequenceClassification,
+        AutoModel,
         get_linear_schedule_with_warmup
     )
+    from torch.optim import AdamW
     from sklearn.preprocessing import MultiLabelBinarizer, LabelEncoder
     from sklearn.metrics import accuracy_score, f1_score
     TRANSFORMERS_AVAILABLE = True
-except ImportError:
+except ImportError as e:
+    print(f"Import error: {e}")
     TRANSFORMERS_AVAILABLE = False
+
 
 
 class TextDataset(Dataset):
@@ -132,10 +135,10 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         # Initialize tokenizer and model
         try:
-            self.tokenizer = RobertaTokenizer.from_pretrained(self.model_name)
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             
             if self.classification_type == ClassificationType.MULTI_CLASS:
-                self.model = RobertaForSequenceClassification.from_pretrained(
+                self.model = AutoModelForSequenceClassification.from_pretrained(
                     self.model_name,
                     num_labels=self.num_labels
                 )
@@ -146,7 +149,7 @@ class RoBERTaClassifier(BaseMLClassifier):
             self.model.to(self.device)
             
         except Exception as e:
-            raise ModelTrainingError(f"Failed to initialize RoBERTa model: {str(e)}", self.config.model_name)
+            raise ModelTrainingError(f"Failed to initialize RoBERTa model: {str(e)}", self.model_name)
         
         # Create dataset and dataloader
         dataset = TextDataset(processed_texts, encoded_labels, self.tokenizer, self.max_length)
@@ -211,7 +214,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.validate_input(texts)
         
         if not self.is_trained:
-            raise PredictionError("Model must be trained before prediction", self.config.model_name)
+            raise PredictionError("Model must be trained before prediction", self.model_name)
         
         # Preprocess texts
         processed_texts = []
@@ -264,7 +267,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.validate_input(texts)
         
         if not self.is_trained:
-            raise PredictionError("Model must be trained before prediction", self.config.model_name)
+            raise PredictionError("Model must be trained before prediction", self.model_name)
         
         # Preprocess texts
         processed_texts = []
@@ -341,21 +344,27 @@ class RoBERTaClassifier(BaseMLClassifier):
     
     def _create_multilabel_model(self):
         """Create a custom model for multi-label classification."""
-        class RobertaMultiLabel(nn.Module):
+        class MultiLabelModel(nn.Module):
             def __init__(self, model_name, num_labels):
                 super().__init__()
-                self.roberta = RobertaModel.from_pretrained(model_name)
+                # Use AutoModelForSequenceClassification as base and modify the classifier
+                self.base_model = AutoModelForSequenceClassification.from_pretrained(
+                    model_name, 
+                    num_labels=num_labels
+                )
+                # Replace the classifier for multi-label
+                self.base_model.classifier = nn.Linear(self.base_model.config.hidden_size, num_labels)
                 self.dropout = nn.Dropout(0.1)
-                self.classifier = nn.Linear(self.roberta.config.hidden_size, num_labels)
             
             def forward(self, input_ids, attention_mask):
-                outputs = self.roberta(input_ids=input_ids, attention_mask=attention_mask)
+                # Get outputs from the base model (without classification head)
+                outputs = self.base_model.roberta(input_ids=input_ids, attention_mask=attention_mask)
                 pooled_output = outputs.pooler_output
                 pooled_output = self.dropout(pooled_output)
-                logits = self.classifier(pooled_output)
+                logits = self.base_model.classifier(pooled_output)
                 return type('obj', (object,), {'logits': logits})()
         
-        return RobertaMultiLabel(self.model_name, self.num_labels)
+        return MultiLabelModel(self.model_name, self.num_labels)
     
     def _compute_multilabel_loss(self, logits, labels):
         """Compute loss for multi-label classification."""
