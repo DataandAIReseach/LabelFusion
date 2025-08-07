@@ -7,9 +7,9 @@ import asyncio
 from textclassify.llm.deepseek_classifier import DeepSeekClassifier
 from textclassify.llm.gemini_classifier import GeminiClassifier  # Gemini alternative
 from textclassify.llm.openai_classifier import OpenAIClassifier  # OpenAI alternative
-from textclassify.ml.roberta_classifier import RobertaClassifier  # Traditional ML classifier
+from textclassify.ml.roberta_classifier import RoBERTaClassifier  # Traditional ML classifier
 from textclassify.config.settings import Config
-from textclassify.core.types import ModelType, TrainingData, ModelConfig
+from textclassify.core.types import ModelType, TrainingData, ModelConfig, ClassificationType
 
 # Load environment variables
 load_dotenv()
@@ -22,7 +22,7 @@ def test_ml_classifier(train_df, test_df, label_columns):
     
     # Create ML configuration
     config = Config()
-    config.model_type = ModelType.ML
+    config.model_type = ModelType.TRADITIONAL_ML
     config.parameters = {
         'model_name': 'roberta-base',
         'max_length': 512,
@@ -36,35 +36,31 @@ def test_ml_classifier(train_df, test_df, label_columns):
     training_data = TrainingData(
         texts=train_df['text'].tolist(),
         labels=train_df[label_columns].values.tolist(),
-        label_names=label_columns
+        classification_type=ClassificationType.MULTI_LABEL
     )
     
     # Create model configuration
     model_config = ModelConfig(
         model_name='roberta-base',
-        num_labels=len(label_columns),
-        max_length=512
+        model_type=ModelType.TRADITIONAL_ML,
+        parameters={
+            'num_labels': len(label_columns),
+            'max_length': 512
+        }
     )
     
     # Initialize ML classifier
-    ml_classifier = RobertaClassifier(
-        config=config,
-        text_column='text',
-        label_columns=label_columns,
-        multi_label=True  # Assuming multi-label classification
-    )
+    ml_classifier = RoBERTaClassifier(config=config)
     
     try:
         # Train the classifier
         print("Training RoBERTa classifier...")
-        ml_classifier.train(training_data, model_config)
+        ml_classifier.fit(training_data)
         
-        # Make predictions
+        # Make predictions on test texts
         print("Making predictions...")
-        result = ml_classifier.predict(
-            train_df=train_df,
-            test_df=test_df
-        )
+        test_texts = test_df['text'].tolist()
+        result = ml_classifier.predict(test_texts)
         
         # Print results
         print("\nML Classifier Results:")
