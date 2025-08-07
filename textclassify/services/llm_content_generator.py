@@ -106,7 +106,8 @@ class DeepseekContentGenerator(BaseLLMContentGenerator):
                 messages.append({"role": "system", "content": role_prompt})
             messages.append({"role": "user", "content": prompt})
             
-            response = await self.client.chat.completions.create(
+            # DeepSeek's OpenAI-compatible API is synchronous like OpenAI
+            response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
                 temperature=0.0
