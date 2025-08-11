@@ -16,11 +16,10 @@ from .preprocessing import TextPreprocessor, clean_text, normalize_text
 warnings.filterwarnings("ignore", category=UserWarning)
 
 try:
-    # Use Auto* classes which are more flexible and recommended in newer transformers versions
+    # Use Auto* classes which are the recommended approach for modern transformers
     from transformers import (
         AutoTokenizer,
         AutoModelForSequenceClassification,
-        AutoModel,
         get_linear_schedule_with_warmup
     )
     from torch.optim import AdamW
@@ -36,11 +35,12 @@ except ImportError as e:
 class TextDataset(Dataset):
     """Dataset class for text classification."""
     
-    def __init__(self, texts, labels, tokenizer, max_length=512):
+    def __init__(self, texts, labels, tokenizer, max_length=512, classification_type=None):
         self.texts = texts
         self.labels = labels
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.classification_type = classification_type
     
     def __len__(self):
         return len(self.texts)
@@ -56,10 +56,18 @@ class TextDataset(Dataset):
             return_tensors='pt'
         )
         
+        # Use appropriate data type based on classification type
+        if self.classification_type == ClassificationType.MULTI_LABEL:
+            # Multi-label needs float for BCEWithLogitsLoss
+            label_tensor = torch.tensor(self.labels[idx], dtype=torch.float)
+        else:
+            # Multi-class needs long for CrossEntropyLoss
+            label_tensor = torch.tensor(self.labels[idx], dtype=torch.long)
+        
         return {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
-            'labels': torch.tensor(self.labels[idx], dtype=torch.long)
+            'labels': label_tensor
         }
 
 
@@ -135,16 +143,18 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         # Initialize tokenizer and model
         try:
+            # Validate that this is actually a RoBERTa model
+            if not any(roberta_variant in self.model_name.lower() for roberta_variant in ['roberta', 'distilroberta']):
+                raise ValueError(f"RoBERTaClassifier only supports RoBERTa models. Got: {self.model_name}")
+            
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             
-            if self.classification_type == ClassificationType.MULTI_CLASS:
-                self.model = AutoModelForSequenceClassification.from_pretrained(
-                    self.model_name,
-                    num_labels=self.num_labels
-                )
-            else:
-                # For multi-label, we need a custom model
-                self.model = self._create_multilabel_model()
+            # Use AutoModelForSequenceClassification for both multi-class and multi-label
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                self.model_name,
+                num_labels=self.num_labels,
+                problem_type="multi_label_classification" if self.classification_type == ClassificationType.MULTI_LABEL else "single_label_classification"
+            )
             
             self.model.to(self.device)
             
@@ -152,7 +162,7 @@ class RoBERTaClassifier(BaseMLClassifier):
             raise ModelTrainingError(f"Failed to initialize RoBERTa model: {str(e)}", self.model_name)
         
         # Create dataset and dataloader
-        dataset = TextDataset(processed_texts, encoded_labels, self.tokenizer, self.max_length)
+        dataset = TextDataset(processed_texts, encoded_labels, self.tokenizer, self.max_length, self.classification_type)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         
         # Setup optimizer and scheduler
@@ -180,13 +190,8 @@ class RoBERTaClassifier(BaseMLClassifier):
                 # Forward pass
                 optimizer.zero_grad()
                 
-                if self.classification_type == ClassificationType.MULTI_CLASS:
-                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-                    loss = outputs.loss
-                else:
-                    # Multi-label classification
-                    outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
-                    loss = self._compute_multilabel_loss(outputs.logits, labels.float())
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+                loss = outputs.loss
                 
                 # Backward pass
                 loss.backward()
@@ -225,8 +230,11 @@ class RoBERTaClassifier(BaseMLClassifier):
             processed_texts.append(preprocessed if preprocessed else text)
         
         # Create dataset and dataloader
-        dummy_labels = [0] * len(processed_texts)  # Dummy labels for prediction
-        dataset = TextDataset(processed_texts, dummy_labels, self.tokenizer, self.max_length)
+        if self.classification_type == ClassificationType.MULTI_LABEL:
+            dummy_labels = [[0] * self.num_labels] * len(processed_texts)  # Multi-label dummy labels
+        else:
+            dummy_labels = [0] * len(processed_texts)  # Multi-class dummy labels
+        dataset = TextDataset(processed_texts, dummy_labels, self.tokenizer, self.max_length, self.classification_type)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         
         # Prediction
@@ -278,8 +286,11 @@ class RoBERTaClassifier(BaseMLClassifier):
             processed_texts.append(preprocessed if preprocessed else text)
         
         # Create dataset and dataloader
-        dummy_labels = [0] * len(processed_texts)
-        dataset = TextDataset(processed_texts, dummy_labels, self.tokenizer, self.max_length)
+        if self.classification_type == ClassificationType.MULTI_LABEL:
+            dummy_labels = [[0] * self.num_labels] * len(processed_texts)  # Multi-label dummy labels
+        else:
+            dummy_labels = [0] * len(processed_texts)  # Multi-class dummy labels
+        dataset = TextDataset(processed_texts, dummy_labels, self.tokenizer, self.max_length, self.classification_type)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         
         # Prediction with probabilities
@@ -341,34 +352,6 @@ class RoBERTaClassifier(BaseMLClassifier):
             probabilities=all_probabilities,
             confidence_scores=all_confidence_scores
         )
-    
-    def _create_multilabel_model(self):
-        """Create a custom model for multi-label classification."""
-        class MultiLabelModel(nn.Module):
-            def __init__(self, model_name, num_labels):
-                super().__init__()
-                # Use AutoModelForSequenceClassification as base and modify the classifier
-                self.base_model = AutoModelForSequenceClassification.from_pretrained(
-                    model_name, 
-                    num_labels=num_labels
-                )
-                # Replace the classifier for multi-label
-                self.base_model.classifier = nn.Linear(self.base_model.config.hidden_size, num_labels)
-                self.dropout = nn.Dropout(0.1)
-            
-            def forward(self, input_ids, attention_mask):
-                # Get outputs from the base model (without classification head)
-                outputs = self.base_model.roberta(input_ids=input_ids, attention_mask=attention_mask)
-                pooled_output = outputs.pooler_output
-                pooled_output = self.dropout(pooled_output)
-                logits = self.base_model.classifier(pooled_output)
-                return type('obj', (object,), {'logits': logits})()
-        
-        return MultiLabelModel(self.model_name, self.num_labels)
-    
-    def _compute_multilabel_loss(self, logits, labels):
-        """Compute loss for multi-label classification."""
-        return nn.BCEWithLogitsLoss()(logits, labels)
     
     @property
     def model_info(self) -> Dict[str, Any]:
