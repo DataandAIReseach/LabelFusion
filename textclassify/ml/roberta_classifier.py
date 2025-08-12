@@ -116,8 +116,6 @@ class RoBERTaClassifier(BaseMLClassifier):
         Args:
             training_data: Training data containing texts and labels
         """
-        self._validate_training_data(training_data)
-        
         self.classification_type = training_data.classification_type
         
         # Preprocess texts
