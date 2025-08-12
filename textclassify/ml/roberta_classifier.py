@@ -216,14 +216,15 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         self.is_trained = True
     
-    def predict(self, texts: List[str]) -> ClassificationResult:
+    def predict(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Predict labels for texts.
         
         Args:
             texts: List of texts to classify
+            true_labels: Optional true labels in binary format for evaluation metrics
             
         Returns:
-            ClassificationResult with predictions
+            ClassificationResult with predictions and optional metrics
         """
         self.validate_input(texts)
         
@@ -278,7 +279,115 @@ class RoBERTaClassifier(BaseMLClassifier):
                         active_labels = [self.classes_[i] for i, is_active in enumerate(pred_array) if is_active]
                         all_predictions.append(active_labels)
         
-        return self._create_result(predictions=all_predictions)
+        # Calculate metrics if true labels are provided
+        return self._create_result(
+            predictions=all_predictions, 
+            true_labels=true_labels if true_labels is not None else None
+        )
+    
+    def _create_result(
+        self,
+        predictions: List[Union[str, List[str]]],
+        probabilities: Optional[List[Dict[str, float]]] = None,
+        confidence_scores: Optional[List[float]] = None,
+        processing_time: Optional[float] = None,
+        true_labels: Optional[List[List[int]]] = None,
+        **metadata
+    ) -> ClassificationResult:
+        """Create a ClassificationResult with metrics calculation if true labels provided.
+        
+        Args:
+            predictions: Predicted labels
+            probabilities: Class probabilities (optional)
+            confidence_scores: Confidence scores (optional)
+            processing_time: Time taken for processing (optional)
+            true_labels: True labels in binary format for evaluation metrics (optional)
+            **metadata: Additional metadata
+            
+        Returns:
+            ClassificationResult with populated metadata and optional metrics
+        """
+        # Calculate metrics if true labels are provided
+        if true_labels is not None:
+            # Convert predictions back to binary format for metric calculation
+            predicted_labels = []
+            for pred in predictions:
+                if isinstance(pred, str):
+                    # Multi-class: convert class name back to one-hot
+                    pred_vector = [0] * len(self.classes_)
+                    if pred in self.classes_:
+                        pred_idx = self.classes_.index(pred)
+                        pred_vector[pred_idx] = 1
+                    predicted_labels.append(pred_vector)
+                else:
+                    # Multi-label: convert class names back to binary
+                    pred_vector = [0] * len(self.classes_)
+                    for class_name in pred:
+                        if class_name in self.classes_:
+                            pred_idx = self.classes_.index(class_name)
+                            pred_vector[pred_idx] = 1
+                    predicted_labels.append(pred_vector)
+            
+            # Calculate metrics
+            import numpy as np
+            from sklearn.metrics import accuracy_score, classification_report, hamming_loss, precision_recall_fscore_support
+            
+            true_labels_array = np.array(true_labels)
+            predicted_labels_array = np.array(predicted_labels)
+            
+            metrics = {}
+            
+            if self.classification_type == ClassificationType.MULTI_CLASS:
+                # Multi-class metrics
+                true_indices = np.argmax(true_labels_array, axis=1)
+                pred_indices = np.argmax(predicted_labels_array, axis=1)
+                
+                accuracy = accuracy_score(true_indices, pred_indices)
+                precision, recall, f1, support = precision_recall_fscore_support(
+                    true_indices, pred_indices, average='weighted', zero_division=0
+                )
+                
+                metrics.update({
+                    'accuracy': float(accuracy),
+                    'precision_weighted': float(precision),
+                    'recall_weighted': float(recall),
+                    'f1_weighted': float(f1),
+                    'classification_report': classification_report(
+                        true_indices, pred_indices, target_names=self.classes_, output_dict=True
+                    )
+                })
+            else:
+                # Multi-label metrics
+                exact_match_accuracy = accuracy_score(true_labels_array, predicted_labels_array)
+                hamming = hamming_loss(true_labels_array, predicted_labels_array)
+                
+                # Per-label metrics
+                precision, recall, f1, support = precision_recall_fscore_support(
+                    true_labels_array, predicted_labels_array, average='weighted', zero_division=0
+                )
+                
+                metrics.update({
+                    'exact_match_accuracy': float(exact_match_accuracy),
+                    'hamming_loss': float(hamming),
+                    'precision_weighted': float(precision),
+                    'recall_weighted': float(recall),
+                    'f1_weighted': float(f1),
+                    'classification_report': classification_report(
+                        true_labels_array, predicted_labels_array, target_names=self.classes_, output_dict=True
+                    )
+                })
+            
+            # Add metrics to metadata
+            metadata['metrics'] = metrics
+        
+        # Call parent _create_result with all the metadata
+        return super()._create_result(
+            predictions=predictions,
+            probabilities=probabilities,
+            confidence_scores=confidence_scores,
+            processing_time=processing_time,
+            **metadata
+        )
     
     def predict_proba(self, texts: List[str]) -> ClassificationResult:
         """Predict class probabilities for texts.
