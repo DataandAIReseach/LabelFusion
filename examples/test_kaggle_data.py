@@ -50,17 +50,35 @@ def test_ml_classifier(train_df, test_df, label_columns):
         print("Training RoBERTa classifier...")
         ml_classifier.fit(training_data)
         
-        # Make predictions on test texts
-        print("Making predictions...")
+        # Make predictions and calculate metrics
+        print("Making predictions and calculating metrics...")
         test_texts = test_df['text'].tolist()
-        result = ml_classifier.predict(test_texts)
+        true_labels = test_df[label_columns].values.tolist()
+        
+        # Use predict method with true labels to get predictions with metrics
+        result = ml_classifier.predict(test_texts, true_labels)
+        
+        # Print metrics from result object
+        metrics = result.metadata.get('metrics', {})
+        if ml_classifier.classification_type == ClassificationType.MULTI_CLASS:
+            print(f"\nMulti-class Accuracy: {metrics.get('accuracy', 'N/A'):.4f}")
+            print(f"Weighted Precision: {metrics.get('precision_weighted', 'N/A'):.4f}")
+            print(f"Weighted Recall: {metrics.get('recall_weighted', 'N/A'):.4f}")
+            print(f"Weighted F1-Score: {metrics.get('f1_weighted', 'N/A'):.4f}")
+        else:
+            print(f"\nMulti-label Exact Match Accuracy: {metrics.get('exact_match_accuracy', 'N/A'):.4f}")
+            print(f"Hamming Loss: {metrics.get('hamming_loss', 'N/A'):.4f}")
+            print(f"Weighted Precision: {metrics.get('precision_weighted', 'N/A'):.4f}")
+            print(f"Weighted Recall: {metrics.get('recall_weighted', 'N/A'):.4f}")
+            print(f"Weighted F1-Score: {metrics.get('f1_weighted', 'N/A'):.4f}")
         
         # Print results
         print("\nML Classifier Results:")
         print("-" * 60)
-        for idx, (text, pred) in enumerate(zip(test_df['text'], result.predictions)):
+        for idx, (text, pred, true_label) in enumerate(zip(test_df['text'], result.predictions, true_labels)):
             print(f"\nTest {idx + 1}:")
             print(f"Text: {text[:100]}...")
+            print(f"True Label: {[label_columns[i] for i, val in enumerate(true_label) if val == 1]}")
             print(f"Prediction: {pred}")
             
         return result
