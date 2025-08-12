@@ -36,7 +36,7 @@ def test_ml_classifier(train_df, test_df, label_columns):
     training_data = TrainingData(
         texts=train_df['text'].tolist(),
         labels=train_df[label_columns].values.tolist(),
-        classification_type=ClassificationType.MULTI_LABEL
+        classification_type=ClassificationType.MULTI_CLASS
     )
     
     # Create model configuration

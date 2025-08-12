@@ -4,6 +4,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    np = None
+    NUMPY_AVAILABLE = False
+
 
 class ClassificationType(Enum):
     """Type of classification task."""
@@ -83,11 +90,67 @@ class TrainingData:
         
         # Validate label format based on classification type
         if self.classification_type == ClassificationType.MULTI_CLASS:
-            if not all(isinstance(label, str) for label in self.labels):
-                raise ValueError("Multi-class labels must be strings")
+            # Check if labels are string format or binary encoded format
+            first_label = self.labels[0]
+            
+            if isinstance(first_label, str):
+                # String format: all labels should be strings
+                if not all(isinstance(label, str) for label in self.labels):
+                    raise ValueError("Multi-class labels must all be strings when using string format")
+            elif isinstance(first_label, (list, tuple)) or (NUMPY_AVAILABLE and isinstance(first_label, np.ndarray)):
+                # Binary encoded format: validate one-hot encoding
+                self._validate_binary_encoded_labels(is_multi_class=True)
+            else:
+                raise ValueError("Multi-class labels must be strings or binary encoded vectors")
+                
         elif self.classification_type == ClassificationType.MULTI_LABEL:
-            if not all(isinstance(label, list) for label in self.labels):
-                raise ValueError("Multi-label labels must be lists of strings")
+            # Check if labels are list of strings format or binary encoded format
+            first_label = self.labels[0]
+            
+            if isinstance(first_label, list) and all(isinstance(item, str) for item in first_label):
+                # List of strings format: all labels should be lists of strings
+                if not all(isinstance(label, list) and all(isinstance(item, str) for item in label) for label in self.labels):
+                    raise ValueError("Multi-label labels must all be lists of strings when using string format")
+            elif isinstance(first_label, (list, tuple)) or (NUMPY_AVAILABLE and isinstance(first_label, np.ndarray)):
+                # Binary encoded format: validate multi-hot encoding
+                self._validate_binary_encoded_labels(is_multi_class=False)
+            else:
+                raise ValueError("Multi-label labels must be lists of strings or binary encoded vectors")
+    
+    def _validate_binary_encoded_labels(self, is_multi_class: bool):
+        """Validate binary encoded labels for consistency."""
+        if not self.labels:
+            return
+            
+        # Get the expected length from the first label
+        first_label = self.labels[0]
+        if NUMPY_AVAILABLE and isinstance(first_label, np.ndarray):
+            expected_length = len(first_label)
+        else:
+            expected_length = len(first_label)
+        
+        for i, label in enumerate(self.labels):
+            # Check if it's a valid vector type
+            if not (isinstance(label, (list, tuple)) or (NUMPY_AVAILABLE and isinstance(label, np.ndarray))):
+                raise ValueError(f"Label at index {i} must be a list, tuple, or numpy array for binary encoding")
+            
+            # Check vector length consistency
+            if len(label) != expected_length:
+                raise ValueError(f"Label at index {i} has length {len(label)}, expected {expected_length}")
+            
+            # Check if all values are integers (0 or 1)
+            for j, value in enumerate(label):
+                if not isinstance(value, (int, float)) or value not in [0, 1]:
+                    raise ValueError(f"Label at index {i}, position {j} must be 0 or 1, got {value}")
+            
+            # Multi-class specific validation: exactly one value should be 1
+            if is_multi_class:
+                ones_count = sum(1 for x in label if x == 1)
+                if ones_count != 1:
+                    raise ValueError(f"Multi-class label at index {i} must have exactly one value equal to 1, found {ones_count}")
+            
+            # Multi-label specific validation: at least one value should be 1 (optional, can be all zeros)
+            # No additional validation needed for multi-label as multiple 1s are allowed
 
 
 @dataclass
