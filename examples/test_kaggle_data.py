@@ -21,32 +21,25 @@ def test_ml_classifier(train_df, test_df, label_columns):
     print("="*80)
     
     # Create ML configuration
-    config = Config()
-    config.model_type = ModelType.TRADITIONAL_ML
-    config.parameters = {
-        'model_name': 'roberta-base',
-        'max_length': 512,
-        'learning_rate': 2e-5,
-        'epochs': 3,
-        'batch_size': 8,
-        'warmup_steps': 100
-    }
+    config = ModelConfig(
+        model_name='roberta-base',
+        model_type=ModelType.TRADITIONAL_ML,
+        parameters={
+            'model_name': 'roberta-base',
+            'max_length': 512,
+            'learning_rate': 2e-5,
+            'epochs': 3,
+            'batch_size': 8,
+            'warmup_steps': 100,
+            'label_columns': label_columns  # Add label names for proper class mapping
+        }
+    )
     
     # Create training data for ML classifier
     training_data = TrainingData(
         texts=train_df['text'].tolist(),
         labels=train_df[label_columns].values.tolist(),
         classification_type=ClassificationType.MULTI_CLASS
-    )
-    
-    # Create model configuration
-    model_config = ModelConfig(
-        model_name='roberta-base',
-        model_type=ModelType.TRADITIONAL_ML,
-        parameters={
-            'num_labels': len(label_columns),
-            'max_length': 512
-        }
     )
     
     # Initialize ML classifier

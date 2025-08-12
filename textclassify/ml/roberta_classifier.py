@@ -61,8 +61,13 @@ class TextDataset(Dataset):
             # Multi-label needs float for BCEWithLogitsLoss
             label_tensor = torch.tensor(self.labels[idx], dtype=torch.float)
         else:
-            # Multi-class needs long for CrossEntropyLoss
-            label_tensor = torch.tensor(self.labels[idx], dtype=torch.long)
+            # Multi-class: convert one-hot encoded vector to class index
+            # e.g., [0, 1, 0] -> 1 (index of the 1)
+            if isinstance(self.labels[idx], list):
+                class_idx = self.labels[idx].index(1)  # Find index of the 1 in one-hot vector
+            else:
+                class_idx = int(np.argmax(self.labels[idx]))  # For numpy arrays
+            label_tensor = torch.tensor(class_idx, dtype=torch.long)
         
         return {
             'input_ids': encoding['input_ids'].flatten(),
@@ -126,18 +131,24 @@ class RoBERTaClassifier(BaseMLClassifier):
             preprocessed = self.preprocessor.preprocess_text(normalized)
             processed_texts.append(preprocessed if preprocessed else text)  # Fallback to original if empty
         
-        # Prepare labels
-        if self.classification_type == ClassificationType.MULTI_CLASS:
-            self.label_encoder = LabelEncoder()
-            encoded_labels = self.label_encoder.fit_transform(training_data.labels)
-            self.classes_ = self.label_encoder.classes_.tolist()
-            self.num_labels = len(self.classes_)
+        # Prepare labels - labels are already in binary format from validation
+        encoded_labels = training_data.labels
+        
+        # Determine number of labels from the first label vector
+        first_label = training_data.labels[0]
+        self.num_labels = len(first_label)
+        
+        # Get class names from configuration if available, otherwise create dummy names
+        if hasattr(self.config, 'parameters') and 'label_columns' in self.config.parameters:
+            self.classes_ = self.config.parameters['label_columns']
         else:
-            # Multi-label classification
-            self.label_encoder = MultiLabelBinarizer()
-            encoded_labels = self.label_encoder.fit_transform(training_data.labels)
-            self.classes_ = self.label_encoder.classes_.tolist()
-            self.num_labels = len(self.classes_)
+            if self.classification_type == ClassificationType.MULTI_CLASS:
+                self.classes_ = [f"class_{i}" for i in range(self.num_labels)]
+            else:
+                self.classes_ = [f"label_{i}" for i in range(self.num_labels)]
+        
+        # No label encoder needed since labels are already in binary format
+        self.label_encoder = None
         
         # Initialize tokenizer and model
         try:
@@ -249,15 +260,23 @@ class RoBERTaClassifier(BaseMLClassifier):
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
                     predictions = torch.argmax(logits, dim=-1)
-                    batch_predictions = self.label_encoder.inverse_transform(predictions.cpu().numpy())
-                    all_predictions.extend(batch_predictions)
+                    
+                    # Convert predictions to class names using self.classes_
+                    for pred_idx in predictions.cpu().numpy():
+                        if pred_idx < len(self.classes_):
+                            all_predictions.append(self.classes_[pred_idx])
+                        else:
+                            all_predictions.append(f"class_{pred_idx}")  # Fallback
                 else:
                     # Multi-label classification
                     probabilities = torch.sigmoid(logits)
                     threshold = self.config.parameters.get('threshold', 0.5)
                     predictions = (probabilities > threshold).cpu().numpy()
-                    batch_predictions = self.label_encoder.inverse_transform(predictions)
-                    all_predictions.extend(batch_predictions.tolist())
+                    
+                    # Convert predictions to class names using self.classes_
+                    for pred_array in predictions:
+                        active_labels = [self.classes_[i] for i, is_active in enumerate(pred_array) if is_active]
+                        all_predictions.append(active_labels)
         
         return self._create_result(predictions=all_predictions)
     
@@ -308,12 +327,16 @@ class RoBERTaClassifier(BaseMLClassifier):
                 if self.classification_type == ClassificationType.MULTI_CLASS:
                     probabilities = torch.softmax(logits, dim=-1)
                     predictions = torch.argmax(probabilities, dim=-1)
-                    
-                    batch_predictions = self.label_encoder.inverse_transform(predictions.cpu().numpy())
                     batch_probabilities = probabilities.cpu().numpy()
                     
-                    for i, pred in enumerate(batch_predictions):
-                        all_predictions.append(pred)
+                    # Convert predictions to class names using self.classes_
+                    for i, pred_idx in enumerate(predictions.cpu().numpy()):
+                        if pred_idx < len(self.classes_):
+                            pred_name = self.classes_[pred_idx]
+                        else:
+                            pred_name = f"class_{pred_idx}"  # Fallback
+                        
+                        all_predictions.append(pred_name)
                         
                         # Create probability dictionary
                         prob_dict = {
@@ -321,19 +344,19 @@ class RoBERTaClassifier(BaseMLClassifier):
                             for j, class_name in enumerate(self.classes_)
                         }
                         all_probabilities.append(prob_dict)
-                        all_confidence_scores.append(float(batch_probabilities[i][predictions[i]]))
+                        all_confidence_scores.append(float(batch_probabilities[i][pred_idx]))
                 
                 else:
                     # Multi-label classification
                     probabilities = torch.sigmoid(logits)
                     threshold = self.config.parameters.get('threshold', 0.5)
                     predictions = (probabilities > threshold).cpu().numpy()
-                    
-                    batch_predictions = self.label_encoder.inverse_transform(predictions)
                     batch_probabilities = probabilities.cpu().numpy()
                     
-                    for i, pred in enumerate(batch_predictions):
-                        all_predictions.append(pred.tolist())
+                    # Convert predictions to class names using self.classes_
+                    for i, pred_array in enumerate(predictions):
+                        active_labels = [self.classes_[j] for j, is_active in enumerate(pred_array) if is_active]
+                        all_predictions.append(active_labels)
                         
                         # Create probability dictionary
                         prob_dict = {
