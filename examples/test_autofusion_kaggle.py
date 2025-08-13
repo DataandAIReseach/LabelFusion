@@ -45,7 +45,7 @@ def prepare_kaggle_data():
     
     # Use more data for AutoFusion test (20 for training, 10 for testing)
     train_df = df_shuffled.iloc[:20]
-    test_df = df_shuffled.iloc[20:30]
+    test_df = df_shuffled.iloc[20:25]
     
     print(f"   ✅ Training set: {len(train_df)} samples")
     print(f"   ✅ Test set: {len(test_df)} samples")
@@ -92,9 +92,9 @@ def test_autofusion_with_kaggle():
         # Train the classifier
         print("\n🎯 Training AutoFusion classifier...")
         print("   This will automatically:")
-        print("   1. Train RoBERTa ML model")
+        print("   1. Set up RoBERTa ML model")
         print("   2. Set up DeepSeek LLM model") 
-        print("   3. Create and train fusion ensemble")
+        print("   3. Train fusion ensemble (including ML training)")
         
         classifier.fit(train_df)
         
