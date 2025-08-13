@@ -189,18 +189,24 @@ class FusionEnsemble(BaseEnsemble):
         self.classes_ = self.ml_model.classes_
         self.num_labels = len(self.classes_)
         
-        # Optional: Get LLM predictions on training set (for analysis/comparison)
-        # Note: We don't use these for training to avoid data leakage
-        print("Getting LLM predictions on training set (for reference)...")
-        train_llm_scores = self._get_llm_scores(train_texts, data_split="training")
-        
         # Step 3: Get ML predictions on validation set
         print("Getting ML predictions on validation set...")
-        ml_val_result = self.ml_model.predict(val_texts)
+        ml_val_result = self.ml_model.predict(texts=val_texts,
+                                              true_labels=val_labels)
         
+
+
+
         # Step 4: Get LLM predictions on validation set
         print("Getting LLM predictions on validation set...")
-        val_llm_scores = self._get_llm_scores(val_texts, data_split="validation")
+        import pandas as pd
+        
+        # Create DataFrames for LLM model
+        train_df = pd.DataFrame({'text': train_texts, 'label': train_labels})
+        val_df = pd.DataFrame({'text': val_texts, 'label': val_labels})
+        
+        val_llm_result = self.llm_model.predict(train_df=train_df,
+                                                test_df=val_df)
         
         # Step 5: Create fusion wrapper
         print("Creating fusion wrapper...")
@@ -214,11 +220,11 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 6: Train fusion MLP on validation set predictions
         print("Training fusion MLP on validation predictions...")
-        self._train_fusion_mlp_on_val(val_texts, val_labels, val_llm_scores)
+        self._train_fusion_mlp_on_val(val_texts, val_labels, val_llm_result)
         
-        # Step 7: Calibrate LLM scores
-        print("Calibrating LLM scores...")
-        self._calibrate_llm_scores(val_llm_scores, val_labels)
+        # Step 7: Store LLM result for later use (no calibration needed)
+        print("Storing LLM validation results...")
+        self.val_llm_result = val_llm_result
         
         # Step 8: Evaluate on test set
         print("Evaluating ensemble on test set...")
@@ -232,21 +238,27 @@ class FusionEnsemble(BaseEnsemble):
         print("✅ Fusion ensemble training completed!")
     
     def _train_fusion_mlp_on_val(self, val_texts: List[str], val_labels: List[List[int]], 
-                                val_llm_scores: np.ndarray):
+                                val_llm_result):
         """Train the fusion MLP using validation set predictions."""
+        # Use LLM predictions directly - no conversion needed
+        
         # Split validation set into train/val for fusion MLP training
-        fusion_train_texts, fusion_val_texts, fusion_train_labels, fusion_val_labels, \
-        fusion_train_llm_scores, fusion_val_llm_scores = train_test_split(
-            val_texts, val_labels, val_llm_scores,
+        fusion_train_texts, fusion_val_texts, fusion_train_labels, fusion_val_labels = train_test_split(
+            val_texts, val_labels,
             test_size=0.3, random_state=42, stratify=None
         )
+        
+        # Split LLM results accordingly
+        split_idx = len(fusion_train_texts)
+        fusion_train_llm_predictions = val_llm_result.predictions[:split_idx]
+        fusion_val_llm_predictions = val_llm_result.predictions[split_idx:]
         
         print(f"   🔧 Fusion training: {len(fusion_train_texts)} samples")
         print(f"   🔧 Fusion validation: {len(fusion_val_texts)} samples")
         
-        # Create data loaders
-        train_dataset = self._create_fusion_dataset(fusion_train_texts, fusion_train_labels, fusion_train_llm_scores)
-        val_dataset = self._create_fusion_dataset(fusion_val_texts, fusion_val_labels, fusion_val_llm_scores)
+        # Create data loaders using LLM predictions directly
+        train_dataset = self._create_fusion_dataset(fusion_train_texts, fusion_train_labels, fusion_train_llm_predictions)
+        val_dataset = self._create_fusion_dataset(fusion_val_texts, fusion_val_labels, fusion_val_llm_predictions)
         
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
@@ -324,60 +336,9 @@ class FusionEnsemble(BaseEnsemble):
             
             self.fusion_wrapper.train()  # Back to training mode
     
-    def _get_llm_scores(self, texts: List[str], data_split: str = "unknown") -> np.ndarray:
-        """Get LLM scores using existing LLM model.
-        
-        Args:
-            texts: List of texts to get predictions for
-            data_split: Which data split this is ("training", "validation", "test", "inference")
-                       Used for logging and caching purposes
-        
-        Returns:
-            numpy array of LLM scores/predictions
-        """
-        # Cache key based on texts and data split
-        cache_key = hash(tuple(texts + [data_split]))
-        
-        if cache_key in self.llm_scores_cache:
-            print(f"   📋 Using cached LLM scores for {data_split} set ({len(texts)} samples)")
-            return self.llm_scores_cache[cache_key]
-        
-        print(f"   🧠 Generating LLM predictions for {data_split} set ({len(texts)} samples)...")
-        
-        # Use existing LLM model to get predictions
-        # Convert LLM predictions to scores format
-        llm_result = self.llm_model.predict(texts)
-        
-        # Convert LLM predictions to binary scores
-        scores = np.zeros((len(texts), self.num_labels))
-        
-        for i, prediction in enumerate(llm_result.predictions):
-            if isinstance(prediction, str):
-                # Multi-class: single prediction
-                if prediction in self.classes_:
-                    class_idx = self.classes_.index(prediction)
-                    scores[i, class_idx] = 1.0
-            else:
-                # Multi-label: list of predictions
-                for pred_class in prediction:
-                    if pred_class in self.classes_:
-                        class_idx = self.classes_.index(pred_class)
-                        scores[i, class_idx] = 1.0
-        
-        # Use confidence scores if available
-        if llm_result.confidence_scores:
-            for i, confidence in enumerate(llm_result.confidence_scores):
-                scores[i] *= confidence
-        
-        # Cache the results
-        self.llm_scores_cache[cache_key] = scores
-        print(f"   ✅ Generated and cached LLM scores for {data_split} set")
-        
-        return scores
-    
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
-                              llm_scores: np.ndarray):
-        """Create dataset for fusion training."""
+                              llm_predictions: List):
+        """Create dataset for fusion training using LLM predictions directly."""
         # Tokenize texts using ML model's tokenizer
         tokenized = []
         for text in texts:
@@ -393,51 +354,38 @@ class FusionEnsemble(BaseEnsemble):
                 'attention_mask': encoding['attention_mask'].squeeze()
             })
         
+        # Convert LLM predictions to tensor format (one-hot encoding)
+        llm_tensor = torch.zeros(len(llm_predictions), self.num_labels)
+        for i, prediction in enumerate(llm_predictions):
+            if isinstance(prediction, str):
+                # Multi-class: single prediction
+                if prediction in self.classes_:
+                    class_idx = self.classes_.index(prediction)
+                    llm_tensor[i, class_idx] = 1.0
+            else:
+                # Multi-label: list of predictions
+                for pred_class in prediction:
+                    if pred_class in self.classes_:
+                        class_idx = self.classes_.index(pred_class)
+                        llm_tensor[i, class_idx] = 1.0
+        
         # Create tensor dataset
         input_ids = torch.stack([item['input_ids'] for item in tokenized])
         attention_mask = torch.stack([item['attention_mask'] for item in tokenized])
-        llm_scores_tensor = torch.FloatTensor(llm_scores)
         labels_tensor = torch.FloatTensor(labels)
         
-        return torch.utils.data.TensorDataset(input_ids, attention_mask, llm_scores_tensor, labels_tensor)
-    
-    def _calibrate_llm_scores(self, val_llm_scores: np.ndarray, val_labels: List[List[int]]):
-        """Calibrate LLM scores using validation data."""
-        if self.classification_type == ClassificationType.MULTI_CLASS:
-            # Use temperature scaling for multi-class
-            from sklearn.linear_model import LogisticRegression
-            val_labels_indices = np.argmax(val_labels, axis=1)
-            self.calibrator = LogisticRegression()
-            self.calibrator.fit(val_llm_scores, val_labels_indices)
-        else:
-            # Use isotonic regression for multi-label
-            self.calibrator = {}
-            for i in range(self.num_labels):
-                iso_reg = IsotonicRegression(out_of_bounds='clip')
-                iso_reg.fit(val_llm_scores[:, i], np.array(val_labels)[:, i])
-                self.calibrator[i] = iso_reg
+        return torch.utils.data.TensorDataset(input_ids, attention_mask, llm_tensor, labels_tensor)
     
     def predict(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Predict using fusion ensemble."""
         if not self.is_trained:
             raise EnsembleError("Fusion ensemble must be trained before prediction")
         
-        # Determine data split based on whether true_labels are provided
-        data_split = "test" if true_labels is not None else "inference"
+        # Get LLM predictions directly
+        llm_result = self.llm_model.predict(texts)
         
-        # Get LLM scores
-        llm_scores = self._get_llm_scores(texts, data_split=data_split)
-        
-        # Calibrate LLM scores
-        if self.calibrator:
-            if self.classification_type == ClassificationType.MULTI_CLASS:
-                llm_scores = self.calibrator.predict_proba(llm_scores)
-            else:
-                for i in range(self.num_labels):
-                    llm_scores[:, i] = self.calibrator[i].transform(llm_scores[:, i])
-        
-        # Create dataset
-        dataset = self._create_fusion_dataset(texts, [[0] * self.num_labels] * len(texts), llm_scores)
+        # Create dataset using LLM predictions directly
+        dataset = self._create_fusion_dataset(texts, [[0] * self.num_labels] * len(texts), llm_result.predictions)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         
         # Generate predictions
