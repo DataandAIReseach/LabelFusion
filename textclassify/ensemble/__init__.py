@@ -4,11 +4,17 @@ from .base import BaseEnsemble
 from .voting import VotingEnsemble
 from .weighted import WeightedEnsemble
 from .routing import ClassRoutingEnsemble
+from .fusion import FusionEnsemble, FusionMLP, FusionWrapper
+from .auto_fusion import AutoFusionClassifier
 
 __all__ = [
     "BaseEnsemble",
     "VotingEnsemble",
     "WeightedEnsemble",
     "ClassRoutingEnsemble",
+    "FusionEnsemble",
+    "FusionMLP",
+    "FusionWrapper",
+    "AutoFusionClassifier",
 ]
 
