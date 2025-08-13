@@ -181,10 +181,13 @@ class ModelConfig:
 class EnsembleConfig:
     """Configuration for ensemble methods."""
     
-    models: List[ModelConfig]
-    ensemble_method: str  # "voting", "weighted", "routing"
+    ensemble_method: str  # "voting", "weighted", "routing", "fusion"
+    models: Optional[List] = None  # List of model instances or configs
     
-    # Method-specific parameters
+    # General parameters
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    
+    # Method-specific parameters  
     weights: Optional[List[float]] = None  # For weighted ensemble
     routing_rules: Optional[Dict[str, str]] = None  # For class routing
     

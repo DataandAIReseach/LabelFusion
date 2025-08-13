@@ -38,6 +38,24 @@ from .ensemble.voting import VotingEnsemble
 from .ensemble.weighted import WeightedEnsemble
 from .ensemble.routing import ClassRoutingEnsemble
 
+# AutoFusion - Simple automated fusion classifier
+try:
+    from .ensemble.auto_fusion import AutoFusionClassifier
+    _HAS_AUTO_FUSION = True
+except ImportError:
+    _HAS_AUTO_FUSION = False
+    AutoFusionClassifier = None
+
+# Advanced Fusion Ensemble (requires all dependencies)
+try:
+    from .ensemble.fusion import FusionEnsemble, FusionMLP, FusionWrapper
+    _HAS_FUSION = True
+except ImportError:
+    _HAS_FUSION = False
+    FusionEnsemble = None
+    FusionMLP = None
+    FusionWrapper = None
+
 # Configuration
 from .config.settings import Config
 from .config.api_keys import APIKeyManager
@@ -77,6 +95,16 @@ __all__ = [
     # Version
     "__version__",
 ]
+
+# Add optional exports based on available dependencies
+if _HAS_ML:
+    __all__.append("RoBERTaClassifier")
+
+if _HAS_AUTO_FUSION:
+    __all__.append("AutoFusionClassifier")
+
+if _HAS_FUSION:
+    __all__.extend(["FusionEnsemble", "FusionMLP", "FusionWrapper"])
 
 # Add ML classifiers to exports if available
 if _HAS_ML:

@@ -1,0 +1,58 @@
+# Fusion Ensemble Configuration File
+# This file defines the configuration for training LLM+ML fusion models
+
+# Data configuration
+data:
+  file_path: "data/train.csv"          # Path to training data CSV
+  text_column: "text"                  # Column name containing text data
+  label_columns: ["label"]             # Column names for labels
+  multi_label: false                   # Set to true for multi-label classification
+
+# Model configurations
+models:
+  # Traditional ML model (RoBERTa)
+  ml:
+    model_name: "roberta-base"         # HuggingFace model name
+    max_length: 512                    # Maximum sequence length
+    learning_rate: 2e-5                # Learning rate for RoBERTa
+    num_epochs: 3                      # Epochs for RoBERTa training
+    batch_size: 16                     # Batch size for RoBERTa
+
+  # LLM model configuration
+  llm:
+    provider: "deepseek"               # LLM provider: deepseek, openai, gemini
+    model: "deepseek-chat"             # Model name
+    temperature: 0.1                   # Temperature for generation
+    max_completion_tokens: 150         # Maximum tokens in response
+    
+    # Provider-specific parameters
+    top_p: 1.0                         # For DeepSeek/OpenAI
+    frequency_penalty: 0.0             # For DeepSeek/OpenAI
+    presence_penalty: 0.0              # For DeepSeek/OpenAI
+    top_k: 40                          # For Gemini
+
+# Fusion ensemble configuration
+fusion:
+  hidden_dims: [64, 32]               # Hidden layer dimensions for fusion MLP
+  ml_learning_rate: 1e-5              # Learning rate for ML backbone (fine-tuning)
+  fusion_learning_rate: 1e-3          # Learning rate for fusion MLP (higher)
+  num_epochs: 10                      # Epochs for fusion training
+  batch_size: 16                      # Batch size for fusion training
+
+# Output configuration
+output_dir: "fusion_output"           # Directory to save trained models and results
+
+# Training configuration
+training:
+  validation_split: 0.2               # Fraction of data for validation
+  calibration: true                   # Enable LLM score calibration
+  threshold_tuning: true              # Enable threshold tuning for multi-label
+  early_stopping: false              # Enable early stopping
+  patience: 3                         # Early stopping patience
+
+# Evaluation configuration
+evaluation:
+  metrics: ["accuracy", "f1", "precision", "recall"]  # Metrics to compute
+  save_predictions: true              # Save predictions to file
+  save_confusion_matrix: true         # Save confusion matrix plot
+  calibration_plots: true             # Generate calibration plots
