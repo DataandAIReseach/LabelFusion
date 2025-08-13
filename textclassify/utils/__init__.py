@@ -4,6 +4,16 @@ from .logging import setup_logging, get_logger
 from .metrics import ClassificationMetrics, evaluate_predictions
 from .data import DataLoader, split_data, balance_data
 
+# Fusion utilities (optional import due to matplotlib dependency)
+try:
+    from .fusion_utils import (
+        FusionUtils, prepare_fusion_data, validate_fusion_data, 
+        load_fusion_model, evaluate_fusion_model
+    )
+    FUSION_UTILS_AVAILABLE = True
+except ImportError:
+    FUSION_UTILS_AVAILABLE = False
+
 __all__ = [
     "setup_logging",
     "get_logger",
@@ -13,4 +23,13 @@ __all__ = [
     "split_data",
     "balance_data",
 ]
+
+if FUSION_UTILS_AVAILABLE:
+    __all__.extend([
+        "FusionUtils",
+        "prepare_fusion_data",
+        "validate_fusion_data", 
+        "load_fusion_model",
+        "evaluate_fusion_model"
+    ])
 
