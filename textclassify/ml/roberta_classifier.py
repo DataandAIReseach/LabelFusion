@@ -353,7 +353,11 @@ class RoBERTaClassifier(BaseMLClassifier):
                     'recall_weighted': float(recall),
                     'f1_weighted': float(f1),
                     'classification_report': classification_report(
-                        true_indices, pred_indices, target_names=self.classes_, output_dict=True
+                        true_indices, pred_indices, 
+                        labels=list(range(len(self.classes_))),
+                        target_names=self.classes_, 
+                        output_dict=True,
+                        zero_division=0
                     )
                 })
             else:
@@ -373,7 +377,10 @@ class RoBERTaClassifier(BaseMLClassifier):
                     'recall_weighted': float(recall),
                     'f1_weighted': float(f1),
                     'classification_report': classification_report(
-                        true_labels_array, predicted_labels_array, target_names=self.classes_, output_dict=True
+                        true_labels_array, predicted_labels_array, 
+                        target_names=self.classes_, 
+                        output_dict=True,
+                        zero_division=0
                     )
                 })
             
