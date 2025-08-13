@@ -119,17 +119,11 @@ class AutoFusionClassifier(BaseClassifier):
         processed_training_data = self._prepare_training_data(training_data)
         print(f"   ✅ Processed {len(processed_training_data.texts)} samples")
         
-        # Step 2: Create and train ML model
+        # Step 2: Create ML model (but don't train yet - fusion will handle training)
         print("\n2️⃣  Setting up ML model...")
         self.ml_model = self._create_ml_model()
         print(f"   🔧 Created {self.ml_model_name} classifier")
-        
-        if not self.ml_model.is_trained:
-            print("   🏋️  Training ML model...")
-            self.ml_model.fit(processed_training_data)
-            print("   ✅ ML model trained successfully")
-        else:
-            print("   ✅ ML model already trained")
+        print("   📝 ML training will be handled by fusion ensemble")
         
         # Step 3: Create LLM model
         print("\n3️⃣  Setting up LLM model...")
@@ -142,7 +136,11 @@ class AutoFusionClassifier(BaseClassifier):
         print("   🔗 Fusion ensemble created")
         
         print("\n5️⃣  Training fusion ensemble...")
-        print("   (This may take a while as LLM scores are generated...)")
+        print("   This will automatically:")
+        print("   - Train the ML model if needed")
+        print("   - Generate LLM predictions on training data")
+        print("   - Train fusion MLP to combine ML + LLM predictions")
+        print("   (This may take a while...)")
         try:
             self.fusion_ensemble.fit(processed_training_data)
             print("   ✅ Fusion training completed successfully!")
