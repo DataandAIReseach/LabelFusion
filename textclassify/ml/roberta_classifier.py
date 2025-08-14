@@ -262,22 +262,25 @@ class RoBERTaClassifier(BaseMLClassifier):
                 if self.classification_type == ClassificationType.MULTI_CLASS:
                     predictions = torch.argmax(logits, dim=-1)
                     
-                    # Convert predictions to class names using self.classes_
+                    # Convert predictions to binary vectors (one-hot encoding)
                     for pred_idx in predictions.cpu().numpy():
-                        if pred_idx < len(self.classes_):
-                            all_predictions.append(self.classes_[pred_idx])
+                        binary_vector = [0] * self.num_labels
+                        if pred_idx < self.num_labels:
+                            binary_vector[pred_idx] = 1
                         else:
-                            all_predictions.append(f"class_{pred_idx}")  # Fallback
+                            # Fallback: activate first class if prediction is out of bounds
+                            binary_vector[0] = 1
+                        all_predictions.append(binary_vector)
                 else:
                     # Multi-label classification
                     probabilities = torch.sigmoid(logits)
                     threshold = self.config.parameters.get('threshold', 0.5)
                     predictions = (probabilities > threshold).cpu().numpy()
                     
-                    # Convert predictions to class names using self.classes_
+                    # Convert predictions to binary vectors
                     for pred_array in predictions:
-                        active_labels = [self.classes_[i] for i, is_active in enumerate(pred_array) if is_active]
-                        all_predictions.append(active_labels)
+                        binary_vector = pred_array.astype(int).tolist()
+                        all_predictions.append(binary_vector)
         
         # Calculate metrics if true labels are provided
         return self._create_result(
