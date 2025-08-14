@@ -3,6 +3,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
+import pandas as pd
 from typing import Dict, List, Union, Optional, Tuple
 from sklearn.model_selection import train_test_split
 from sklearn.isotonic import IsotonicRegression
@@ -131,6 +132,15 @@ class FusionEnsemble(BaseEnsemble):
         self.calibrator = None
         self.test_performance = {}  # Store test set performance
         
+        # Determine classification type from ensemble config or infer from models
+        if 'classification_type' in ensemble_config.parameters:
+            self.classification_type = ensemble_config.parameters['classification_type']
+        elif 'multi_label' in ensemble_config.parameters:
+            self.classification_type = ClassificationType.MULTI_LABEL if ensemble_config.parameters['multi_label'] else ClassificationType.MULTI_CLASS
+        else:
+            # Will be determined when models are added or during fit
+            self.classification_type = None
+        
         # Device
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -146,21 +156,52 @@ class FusionEnsemble(BaseEnsemble):
         self.models.append(llm_model)
         self.model_names.append("llm_model")
     
-    def fit(self, training_data: TrainingData) -> None:
+    def fit(self, df: Union[TrainingData, pd.DataFrame, Dict]) -> None:
         """Train the fusion ensemble with proper train/val/test split.
         
         Args:
-            training_data: Training data containing texts and labels
+            df: Training data in various formats (DataFrame, TrainingData, or Dict)
         """
         if self.ml_model is None or self.llm_model is None:
             raise EnsembleError("Both ML and LLM models must be added before training")
         
-        self.classification_type = training_data.classification_type
+        # Determine classification type if not already set
+        if self.classification_type is None:
+            if hasattr(self.ml_model, 'multi_label'):
+                self.classification_type = ClassificationType.MULTI_LABEL if self.ml_model.multi_label else ClassificationType.MULTI_CLASS
+            elif hasattr(self.llm_model, 'multi_label'):
+                self.classification_type = ClassificationType.MULTI_LABEL if self.llm_model.multi_label else ClassificationType.MULTI_CLASS
+            else:
+                # Default to multi-class
+                self.classification_type = ClassificationType.MULTI_CLASS
+        
+        # Convert input to standard format
+        if isinstance(df, TrainingData):
+            texts = df.texts
+            labels = df.labels
+        elif isinstance(df, pd.DataFrame):
+            # Extract texts and labels from DataFrame
+            # Assume 'text' column for texts, rest are label columns
+            text_column = 'text'  # Could be configurable
+            if text_column not in df.columns:
+                raise EnsembleError(f"Text column '{text_column}' not found in DataFrame")
+            
+            texts = df[text_column].tolist()
+            label_columns = [col for col in df.columns if col != text_column]
+            labels = df[label_columns].values.tolist()
+        elif isinstance(df, dict):
+            texts = df['texts']
+            labels = df['labels']
+        else:
+            raise EnsembleError(f"Unsupported training data format: {type(df)}")
+        
+        print(f"Classification type: {self.classification_type}")
+        print(f"Training data: {len(texts)} samples")
         
         # Step 1: Split data into train/val/test (60/20/20)
         print("Splitting data into train/validation/test sets...")
         train_texts, temp_texts, train_labels, temp_labels = train_test_split(
-            training_data.texts, training_data.labels,
+            texts, labels,
             test_size=0.4, random_state=42, stratify=None
         )
         
@@ -199,7 +240,6 @@ class FusionEnsemble(BaseEnsemble):
 
         # Step 4: Get LLM predictions on validation set
         print("Getting LLM predictions on validation set...")
-        import pandas as pd
         
         # Create DataFrames for LLM model
         train_df = pd.DataFrame({'text': train_texts, 'label': train_labels})
