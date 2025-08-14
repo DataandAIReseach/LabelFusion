@@ -114,41 +114,38 @@ class AutoFusionClassifier(BaseClassifier):
         print("\n🚀 Starting Automatic Fusion Training...")
         print("="*50)
         
-        # Step 1: Prepare training data
-        print("1️⃣  Preparing training data...")
-        processed_training_data = self._prepare_training_data(training_data)
-        print(f"   ✅ Processed {len(processed_training_data.texts)} samples")
-        
-        # Step 2: Create ML model (but don't train yet - fusion will handle training)
-        print("\n2️⃣  Setting up ML model...")
+        # Step 1: Create ML model (but don't train yet - fusion will handle training)
+        print("1️⃣  Setting up ML model...")
         self.ml_model = self._create_ml_model()
         print(f"   🔧 Created {self.ml_model_name} classifier")
         print("   📝 ML training will be handled by fusion ensemble")
         
-        # Step 3: Create LLM model
-        print("\n3️⃣  Setting up LLM model...")
+        # Step 2: Create LLM model
+        print("\n2️⃣  Setting up LLM model...")
         self.llm_model = self._create_llm_model()
         print(f"   🧠 Created {self.llm_provider} classifier")
         
-        # Step 4: Create and train fusion ensemble
-        print("\n4️⃣  Creating fusion ensemble...")
+        # Step 3: Create and train fusion ensemble
+        print("\n3️⃣  Creating fusion ensemble...")
         self.fusion_ensemble = self._create_fusion_ensemble()
         print("   🔗 Fusion ensemble created")
         
-        print("\n5️⃣  Training fusion ensemble...")
+        print("\n4️⃣  Training fusion ensemble...")
         print("   This will automatically:")
+        print("   - Process and validate training data format")
         print("   - Train the ML model if needed")
         print("   - Generate LLM predictions on training data")
         print("   - Train fusion MLP to combine ML + LLM predictions")
         print("   (This may take a while...)")
         try:
-            self.fusion_ensemble.fit(processed_training_data)
+            # Pass raw training data directly to fusion ensemble
+            self.fusion_ensemble.fit(training_data)
             print("   ✅ Fusion training completed successfully!")
         except Exception as e:
             raise ModelTrainingError(f"Fusion training failed: {str(e)}", self.config.model_name)
         
         # Step 5: Save everything
-        print("\n6️⃣  Saving trained models...")
+        print("\n5️⃣  Saving trained models...")
         self._save_models()
         print(f"   💾 Models saved to {self.output_dir}")
         
