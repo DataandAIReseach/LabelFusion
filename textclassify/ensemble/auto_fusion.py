@@ -389,7 +389,8 @@ class AutoFusionClassifier(BaseClassifier):
                 'ml_lr': self.user_config.get('fusion_ml_lr', 1e-5),
                 'fusion_lr': self.user_config.get('fusion_lr', 1e-3),
                 'num_epochs': self.user_config.get('fusion_epochs', 10),
-                'batch_size': self.user_config.get('batch_size', 16)
+                'batch_size': self.user_config.get('batch_size', 16),
+                'classification_type': self.classification_type  # Pass classification type
             }
         )
         
