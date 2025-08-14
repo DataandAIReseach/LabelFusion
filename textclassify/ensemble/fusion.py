@@ -533,3 +533,257 @@ class FusionEnsemble(BaseEnsemble):
     def _combine_predictions_with_probabilities(self, model_results: List[ClassificationResult], texts: List[str]) -> tuple:
         """Not used in fusion ensemble - predictions are generated directly."""
         raise NotImplementedError("Fusion ensemble generates predictions directly")
+
+    def _create_result(
+        self,
+        predictions: List[Union[str, List[str]]],
+        probabilities: Optional[List[Dict[str, float]]] = None,
+        confidence_scores: Optional[List[float]] = None,
+        true_labels: Optional[List[List[int]]] = None
+    ) -> ClassificationResult:
+        """Create ClassificationResult with metrics calculation if true labels provided."""
+        
+        # Convert predictions to binary vector format for metrics calculation
+        binary_predictions = []
+        for pred in predictions:
+            if isinstance(pred, str):
+                # Single-label: convert class name to binary vector
+                binary_vector = [0] * self.num_labels
+                if pred in self.classes_:
+                    class_idx = self.classes_.index(pred)
+                    binary_vector[class_idx] = 1
+                binary_predictions.append(binary_vector)
+            elif isinstance(pred, list) and all(isinstance(x, str) for x in pred):
+                # Multi-label: convert class names to binary vector
+                binary_vector = [0] * self.num_labels
+                for class_name in pred:
+                    if class_name in self.classes_:
+                        class_idx = self.classes_.index(class_name)
+                        binary_vector[class_idx] = 1
+                binary_predictions.append(binary_vector)
+            elif isinstance(pred, list) and all(isinstance(x, (int, float)) for x in pred):
+                # Already in binary vector format
+                binary_predictions.append([int(x) for x in pred])
+            else:
+                # Fallback: create zero vector
+                binary_predictions.append([0] * self.num_labels)
+        
+        # Calculate metrics if true labels are provided
+        metrics = None
+        if true_labels is not None:
+            metrics = self._calculate_metrics(binary_predictions, true_labels)
+        
+        # Create base result using inherited method
+        result = super()._create_result(
+            predictions=predictions,
+            probabilities=probabilities,
+            confidence_scores=confidence_scores,
+            true_labels=true_labels
+        )
+        
+        # Add metrics to metadata if calculated
+        if metrics:
+            if result.metadata is None:
+                result.metadata = {}
+            result.metadata['metrics'] = metrics
+        
+        return result
+
+    def _calculate_metrics(
+        self,
+        predictions: List[List[int]],
+        true_labels: List[List[int]]
+    ) -> Dict[str, float]:
+        """Calculate evaluation metrics for binary vector predictions."""
+        if self.classification_type == ClassificationType.MULTI_LABEL:
+            return self._calculate_multi_label_metrics(predictions, true_labels)
+        return self._calculate_single_label_metrics(predictions, true_labels)
+
+    def _calculate_single_label_metrics(
+        self,
+        predictions: List[List[int]],
+        true_labels: List[List[int]]
+    ) -> Dict[str, float]:
+        """Calculate metrics for single-label classification using binary vectors."""
+        if not predictions or not true_labels:
+            return {'accuracy': 0.0, 'precision': 0.0, 'recall': 0.0, 'f1': 0.0, 'auc': 0.0}
+        
+        # Convert binary vectors to class indices for sklearn compatibility
+        pred_classes = [pred.index(1) if 1 in pred else 0 for pred in predictions]
+        true_classes = [true.index(1) if 1 in true else 0 for true in true_labels]
+        
+        # Calculate basic accuracy
+        correct = sum(1 for pred, true in zip(pred_classes, true_classes) if pred == true)
+        total = len(predictions)
+        accuracy = correct / total if total > 0 else 0.0
+        
+        # For single-label classification with more than 2 classes, use macro averaging
+        num_classes = len(self.classes_) if self.classes_ else max(max(pred_classes, default=0), max(true_classes, default=0)) + 1
+        
+        if num_classes <= 2:
+            # Binary classification metrics
+            from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
+            try:
+                precision = precision_score(true_classes, pred_classes, average='binary', zero_division=0)
+                recall = recall_score(true_classes, pred_classes, average='binary', zero_division=0)
+                f1 = f1_score(true_classes, pred_classes, average='binary', zero_division=0)
+                
+                # For AUC, we need probability scores, but we only have binary predictions
+                # Use the prediction confidence as a proxy (1.0 for predicted class, 0.0 for others)
+                try:
+                    auc = roc_auc_score(true_classes, pred_classes)
+                except ValueError:
+                    # If all predictions are the same class, AUC is undefined
+                    auc = 0.5
+            except ImportError:
+                # Fallback if sklearn is not available
+                precision, recall, f1, auc = self._calculate_metrics_manual(pred_classes, true_classes, num_classes)
+        else:
+            # Multi-class classification metrics
+            from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
+            try:
+                precision = precision_score(true_classes, pred_classes, average='macro', zero_division=0)
+                recall = recall_score(true_classes, pred_classes, average='macro', zero_division=0)
+                f1 = f1_score(true_classes, pred_classes, average='macro', zero_division=0)
+                
+                # For multi-class AUC, convert to one-hot and use ovr strategy
+                try:
+                    from sklearn.preprocessing import label_binarize
+                    true_binary = label_binarize(true_classes, classes=list(range(num_classes)))
+                    pred_binary = label_binarize(pred_classes, classes=list(range(num_classes)))
+                    auc = roc_auc_score(true_binary, pred_binary, average='macro', multi_class='ovr')
+                except (ValueError, ImportError):
+                    auc = 0.5
+            except ImportError:
+                # Fallback if sklearn is not available
+                precision, recall, f1, auc = self._calculate_metrics_manual(pred_classes, true_classes, num_classes)
+        
+        return {
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'f1': f1,
+            'auc': auc
+        }
+    
+    def _calculate_metrics_manual(self, pred_classes: List[int], true_classes: List[int], num_classes: int) -> tuple:
+        """Manual calculation of metrics when sklearn is not available."""
+        # Calculate per-class metrics
+        class_metrics = []
+        
+        for class_idx in range(num_classes):
+            # True positives, false positives, false negatives for this class
+            tp = sum(1 for pred, true in zip(pred_classes, true_classes) if pred == class_idx and true == class_idx)
+            fp = sum(1 for pred, true in zip(pred_classes, true_classes) if pred == class_idx and true != class_idx)
+            fn = sum(1 for pred, true in zip(pred_classes, true_classes) if pred != class_idx and true == class_idx)
+            
+            # Calculate precision, recall, f1 for this class
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+            
+            class_metrics.append((precision, recall, f1))
+        
+        # Macro average
+        if class_metrics:
+            avg_precision = sum(m[0] for m in class_metrics) / len(class_metrics)
+            avg_recall = sum(m[1] for m in class_metrics) / len(class_metrics)
+            avg_f1 = sum(m[2] for m in class_metrics) / len(class_metrics)
+        else:
+            avg_precision = avg_recall = avg_f1 = 0.0
+        
+        # Simple AUC approximation (not perfect but better than nothing)
+        auc = 0.5  # Default for when we can't calculate properly
+        
+        return avg_precision, avg_recall, avg_f1, auc
+
+    def _calculate_multi_label_metrics(
+        self,
+        predictions: List[List[int]],
+        true_labels: List[List[int]]
+    ) -> Dict[str, float]:
+        """Calculate metrics for multi-label classification using binary vectors."""
+        if not predictions or not true_labels:
+            return {'precision': 0.0, 'recall': 0.0, 'f1': 0.0, 'accuracy': 0.0, 'hamming_loss': 1.0}
+        
+        # Sample-wise metrics
+        sample_precisions = []
+        sample_recalls = []
+        sample_f1s = []
+        exact_matches = 0
+        hamming_distance = 0
+        total_predictions = 0
+        
+        for pred, true in zip(predictions, true_labels):
+            pred_set = set(i for i, val in enumerate(pred) if val == 1)
+            true_set = set(i for i, val in enumerate(true) if val == 1)
+            
+            # Sample-wise precision, recall, F1
+            if pred_set:
+                precision = len(pred_set & true_set) / len(pred_set)
+            else:
+                precision = 1.0 if not true_set else 0.0
+            
+            if true_set:
+                recall = len(pred_set & true_set) / len(true_set)
+            else:
+                recall = 1.0 if not pred_set else 0.0
+            
+            if precision + recall > 0:
+                f1 = 2 * precision * recall / (precision + recall)
+            else:
+                f1 = 0.0
+            
+            sample_precisions.append(precision)
+            sample_recalls.append(recall)
+            sample_f1s.append(f1)
+            
+            # Exact match (subset accuracy)
+            if pred_set == true_set:
+                exact_matches += 1
+            
+            # Hamming loss components
+            for i in range(len(pred)):
+                total_predictions += 1
+                if pred[i] != true[i]:
+                    hamming_distance += 1
+        
+        # Calculate averages
+        avg_precision = sum(sample_precisions) / len(sample_precisions) if sample_precisions else 0.0
+        avg_recall = sum(sample_recalls) / len(sample_recalls) if sample_recalls else 0.0
+        avg_f1 = sum(sample_f1s) / len(sample_f1s) if sample_f1s else 0.0
+        
+        # Subset accuracy (exact match ratio)
+        subset_accuracy = exact_matches / len(predictions) if predictions else 0.0
+        
+        # Hamming loss
+        hamming_loss = hamming_distance / total_predictions if total_predictions > 0 else 0.0
+        
+        # Label-wise metrics (micro-averaged)
+        try:
+            from sklearn.metrics import precision_score, recall_score, f1_score
+            
+            # Flatten for micro-averaging
+            y_true_flat = [label for true in true_labels for label in true]
+            y_pred_flat = [label for pred in predictions for label in pred]
+            
+            micro_precision = precision_score(y_true_flat, y_pred_flat, average='micro', zero_division=0)
+            micro_recall = recall_score(y_true_flat, y_pred_flat, average='micro', zero_division=0)
+            micro_f1 = f1_score(y_true_flat, y_pred_flat, average='micro', zero_division=0)
+            
+        except ImportError:
+            # Fallback when sklearn is not available
+            micro_precision = avg_precision
+            micro_recall = avg_recall
+            micro_f1 = avg_f1
+        
+        return {
+            'precision': avg_precision,
+            'recall': avg_recall,
+            'f1': avg_f1,
+            'subset_accuracy': subset_accuracy,
+            'hamming_loss': hamming_loss,
+            'micro_precision': micro_precision,
+            'micro_recall': micro_recall,
+            'micro_f1': micro_f1
+        }
