@@ -131,15 +131,28 @@ class BaseMLClassifier(BaseClassifier):
         
         # Validate label format based on classification type
         if training_data.classification_type == ClassificationType.MULTI_CLASS:
-            if not all(isinstance(label, str) for label in training_data.labels):
-                raise ValidationError("Multi-class labels must be strings")
-        else:
+            # Multi-class now uses binary/one-hot encoding format
             if not all(isinstance(label, list) for label in training_data.labels):
-                raise ValidationError("Multi-label labels must be lists of strings")
+                raise ValidationError("Multi-class labels must be lists of integers (one-hot encoded)")
             
-            # Check for empty label lists
-            if any(not label for label in training_data.labels):
-                raise ValidationError("Multi-label training requires at least one label per text")
+            # Check that each label has exactly one 1 (one-hot encoding)
+            for i, label in enumerate(training_data.labels):
+                if not all(isinstance(x, int) and x in [0, 1] for x in label):
+                    raise ValidationError(f"Multi-class labels must contain only 0s and 1s. Error at index {i}")
+                if sum(label) != 1:
+                    raise ValidationError(f"Multi-class labels must have exactly one 1 (one-hot encoding). Error at index {i}")
+        else:
+            # Multi-label uses binary encoding format
+            if not all(isinstance(label, list) for label in training_data.labels):
+                raise ValidationError("Multi-label labels must be lists of integers (binary encoded)")
+            
+            # Check that each label contains only 0s and 1s
+            for i, label in enumerate(training_data.labels):
+                if not all(isinstance(x, int) and x in [0, 1] for x in label):
+                    raise ValidationError(f"Multi-label labels must contain only 0s and 1s. Error at index {i}")
+            
+            # Allow empty label lists for multi-label (all zeros)
+            # This is valid in multi-label classification
     
     @property
     def model_info(self) -> Dict[str, Any]:
