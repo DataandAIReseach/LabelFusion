@@ -120,10 +120,15 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self,
         train_df: Optional[pd.DataFrame] = None,
         test_df: Optional[pd.DataFrame] = None,
+        texts: Optional[List[str]] = None,
         context: Optional[str] = None,
         label_definitions: Optional[Dict[str, str]] = None
     ) -> ClassificationResult:
         """Synchronous wrapper for predictions."""
+        # Handle texts parameter by converting to DataFrame
+        if texts is not None and test_df is None:
+            test_df = pd.DataFrame({'text': texts})
+        
         return asyncio.run(self.predict_async(
             train_df=train_df,
             test_df=test_df,
@@ -164,12 +169,14 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if self.verbose:
                 self.logger.info(f"Combined dataset shape: {df.shape}")
             
-            # Validate input DataFrame
-            self._validate_prediction_inputs(df, self.text_column, self.label_columns)
+            # Process DataFrames through data preparation pipeline
+            prepared_train_df, prepared_test_df = self._prepare_dataframe_for_prediction(
+                train_df, test_df, self.text_column, self.label_columns
+            )
             
             if self.verbose:
-                self.logger.info("Data validation completed successfully")
-                print("Data validation passed")
+                self.logger.info("Data preparation and validation completed successfully")
+                print("Data preparation and validation passed")
             
             # Step 2: Prompt configuration setup
             if self.verbose:
@@ -188,8 +195,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 print("Engineering prompts for classification...")
             
             df_with_prompts = await self._engineer_prompts_for_data(
-                train_df=train_df,
-                test_df=test_df,
+                train_df=prepared_train_df,
+                test_df=prepared_test_df,
                 text_column=self.text_column,
                 label_columns=self.label_columns
             )
@@ -220,10 +227,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 print("Calculating performance metrics...")
             
             metrics = self._evaluate_test_data(
-                test_df=test_df,
+                test_df=prepared_test_df,
                 predictions=predictions,
                 label_columns=self.label_columns
-            ) if test_df is not None else None
+            ) if prepared_test_df is not None else None
             
             if self.verbose and metrics:
                 self.logger.info("Metrics calculated successfully")
@@ -238,11 +245,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if self.verbose:
                 self.logger.info("\nPREDICTION PROCESS COMPLETED")
                 self.logger.info(f"Total processing time: {total_time:.2f} seconds")
-                self.logger.info(f"Average time per sample: {total_time/len(test_df):.3f} seconds")
+                self.logger.info(f"Average time per sample: {total_time/len(prepared_test_df):.3f} seconds")
                 self.logger.info("="*80)
                 
                 print(f"\nProcess completed in {total_time:.2f} seconds")
-                print(f"Average: {total_time/len(test_df):.3f} seconds per sample")
+                print(f"Average: {total_time/len(prepared_test_df):.3f} seconds per sample")
             
             return self._create_result(predictions=predictions, metrics=metrics)
             
@@ -251,6 +258,162 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 self.logger.error(f"PREDICTION FAILED: {str(e)}")
                 print(f"Error: {str(e)}")
             raise PredictionError(f"Prediction failed: {str(e)}", self.config.parameters.get("model", "unknown"))
+    
+    def _prepare_dataframe_for_prediction(self, train_df: Optional[pd.DataFrame], 
+                                        test_df: pd.DataFrame, text_column: str, 
+                                        label_columns: List[str]) -> Tuple[Optional[pd.DataFrame], pd.DataFrame]:
+        """Prepare DataFrames for prediction through a complete data pipeline.
+        
+        This method consolidates all data preparation steps for both train and test data:
+        1. Format conversion (list labels to columns)
+        2. Column renaming (class_X to actual names)
+        3. Validation
+        
+        Args:
+            train_df: Optional training DataFrame
+            test_df: Test DataFrame
+            text_column: Name of the text column
+            label_columns: Expected label column names
+            
+        Returns:
+            Tuple of (prepared_train_df, prepared_test_df)
+            
+        Raises:
+            ValidationError: If data doesn't meet requirements
+        """
+        if self.verbose:
+            self.logger.info("Starting DataFrame preparation pipeline...")
+        
+        prepared_train_df = None
+        
+        # Process training DataFrame if provided
+        if train_df is not None:
+            if self.verbose:
+                self.logger.info(f"Processing training data: {train_df.shape}")
+            
+            # Step 1: Auto-convert DataFrame format if needed
+            train_converted = self._auto_convert_dataframe_format(train_df, text_column, label_columns)
+            
+            # Step 2: Rename columns if needed after conversion
+            train_renamed = self._rename_converted_columns(train_converted, label_columns)
+            
+            # Step 3: Clean up - remove the original 'label' column if it exists
+            if 'label' in train_renamed.columns:
+                train_renamed = train_renamed.drop('label', axis=1)
+                if self.verbose:
+                    self.logger.info("Removed original 'label' column from training data after conversion")
+            
+            # Step 4: Validate the training data
+            self._validate_prediction_inputs(train_renamed, text_column, label_columns)
+            prepared_train_df = train_renamed
+        
+        # Process test DataFrame
+        if self.verbose:
+            self.logger.info(f"Processing test data: {test_df.shape}")
+        
+        # Step 1: Auto-convert DataFrame format if needed
+        test_converted = self._auto_convert_dataframe_format(test_df, text_column, label_columns)
+        
+        # Step 2: Rename columns if needed after conversion
+        test_renamed = self._rename_converted_columns(test_converted, label_columns)
+        
+        # Step 3: Clean up - remove the original 'label' column if it exists
+        if 'label' in test_renamed.columns:
+            test_renamed = test_renamed.drop('label', axis=1)
+            if self.verbose:
+                self.logger.info("Removed original 'label' column from test data after conversion")
+        
+        # Step 4: Validate the test data
+        self._validate_prediction_inputs(test_renamed, text_column, label_columns)
+        prepared_test_df = test_renamed
+        
+        if self.verbose:
+            self.logger.info("DataFrame preparation pipeline completed successfully")
+            if prepared_train_df is not None:
+                self.logger.info(f"Prepared training data: {prepared_train_df.shape}")
+            self.logger.info(f"Prepared test data: {prepared_test_df.shape}")
+        
+        return prepared_train_df, prepared_test_df
+
+    def convert_list_labels_to_columns(self, df: pd.DataFrame, label_column: str = 'label') -> pd.DataFrame:
+        """Convert list-based labels to separate binary columns.
+        
+        Args:
+            df: DataFrame with list-based labels
+            label_column: Name of the column containing list labels
+            
+        Returns:
+            DataFrame with separate binary columns for each class
+        """
+        if label_column not in df.columns:
+            return df
+        
+        # Check if labels are already in column format
+        sample_label = df[label_column].iloc[0] if len(df) > 0 else None
+        if not isinstance(sample_label, list):
+            return df  # Already in column format or not list-based
+        
+        # Create binary columns for each class
+        df_converted = df.copy()
+        
+        # Get all unique classes from the list labels
+        all_classes = set()
+        for label_list in df[label_column]:
+            if isinstance(label_list, list):
+                for idx, value in enumerate(label_list):
+                    if value == 1:  # Binary encoding: 1 means class is active
+                        all_classes.add(f"class_{idx}")
+        
+        # Create binary columns
+        for class_name in sorted(all_classes):
+            class_idx = int(class_name.split('_')[1])
+            df_converted[class_name] = df[label_column].apply(
+                lambda x: x[class_idx] if isinstance(x, list) and len(x) > class_idx else 0
+            )
+        
+        return df_converted
+
+    def _auto_convert_dataframe_format(self, df: pd.DataFrame, text_column: str, 
+                                     label_columns: List[str]) -> pd.DataFrame:
+        """Automatically detect and convert DataFrame format if needed."""
+        # Check if we have a 'label' column with list-based labels
+        if 'label' in df.columns and len(df) > 0:
+            sample_label = df['label'].iloc[0]
+            if isinstance(sample_label, list):
+                print("Detected list-based labels, converting to column format...")
+                return self.convert_list_labels_to_columns(df, 'label')
+        
+        return df
+
+    def _rename_converted_columns(self, df: pd.DataFrame, label_columns: List[str]) -> pd.DataFrame:
+        """Rename converted class_X columns to actual label column names if needed.
+        
+        Args:
+            df: DataFrame potentially containing class_X columns
+            label_columns: Expected label column names
+            
+        Returns:
+            DataFrame with properly named columns
+        """
+        # Handle column renaming if we have class_X columns but need specific label names
+        class_columns = [col for col in df.columns if col.startswith('class_')]
+        if class_columns and label_columns and len(class_columns) == len(label_columns):
+            # Check if we need to rename class_X columns to actual label names
+            missing_labels = [col for col in label_columns if col not in df.columns]
+            if missing_labels and len(missing_labels) == len(label_columns):
+                if self.verbose:
+                    self.logger.info(f"Renaming class columns to label names: {class_columns} -> {label_columns}")
+                    print("Renaming converted columns to match expected labels...")
+                
+                # Sort class columns to ensure proper mapping
+                sorted_class_cols = sorted(class_columns, key=lambda x: int(x.split('_')[1]))
+                rename_mapping = {class_col: label_col for class_col, label_col in zip(sorted_class_cols, label_columns)}
+                df = df.rename(columns=rename_mapping)
+                
+                if self.verbose:
+                    self.logger.info("Column renaming completed")
+        
+        return df
 
     def _validate_prediction_inputs(
         self, 
@@ -297,10 +460,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 
             if label_col not in df.columns:
                 raise ValidationError(f"Label column '{label_col}' not found in DataFrame")
-            if not pd.api.types.is_bool_dtype(df[label_col]) and not pd.api.types.is_numeric_dtype(df[label_col]):
-                raise ValidationError(f"Label column '{label_col}' must contain only boolean or numeric values")
-            if not df[label_col].isin([0, 1, True, False]).all():
-                raise ValidationError(f"Label column '{label_col}' must contain only binary values (0, 1, True, False)")
+            if not pd.api.types.is_numeric_dtype(df[label_col]):
+                raise ValidationError(f"Label column '{label_col}' must contain only integer values")
+            if not df[label_col].isin([0, 1]).all():
+                raise ValidationError(f"Label column '{label_col}' must contain only binary integer values (0, 1)")
         
         if self.verbose:
             self.logger.info(f"All {len(label_columns)} label columns validated")
@@ -316,7 +479,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if invalid_rows.any():
                 problematic_rows = df.index[invalid_rows].tolist()
                 raise ValidationError(
-                    f"Single-label classification requires exactly one 1/True per row. "
+                    f"Single-label classification requires exactly one 1 per row. "
                     f"Problematic rows: {problematic_rows}"
                 )
             if self.verbose:
