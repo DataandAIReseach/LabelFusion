@@ -292,7 +292,7 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 6: Train fusion MLP on validation set predictions
         print("Training fusion MLP on validation predictions...")
-        self._train_fusion_mlp_on_val(val_df, val_llm_result, text_column, label_columns)
+        self._train_fusion_mlp_on_val(val_df, ml_val_result, val_llm_result, text_column, label_columns)
         
         # Step 7: Store LLM result for later use (no calibration needed)
         print("Storing LLM validation results...")
@@ -309,10 +309,9 @@ class FusionEnsemble(BaseEnsemble):
         self.is_trained = True
         print("✅ Fusion ensemble training completed!")
     
-    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, val_llm_result, 
+    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, val_llm_result, 
                                 text_column: str, label_columns: List[str]):
-        """Train the fusion MLP using validation set predictions."""
-        # Use LLM predictions directly - no conversion needed
+        """Train the fusion MLP using validation set predictions from both ML and LLM models."""
         
         # Split validation DataFrame into train/val for fusion MLP training
         fusion_train_df, fusion_val_df = train_test_split(
@@ -320,23 +319,31 @@ class FusionEnsemble(BaseEnsemble):
             test_size=0.3, random_state=42, stratify=None
         )
         
-        # Split LLM results accordingly
+        # Split both ML and LLM results accordingly
         split_idx = len(fusion_train_df)
+        
+        # Split ML predictions
+        fusion_train_ml_predictions = ml_val_result.predictions[:split_idx]
+        fusion_val_ml_predictions = ml_val_result.predictions[split_idx:]
+        
+        # Split LLM predictions
         fusion_train_llm_predictions = val_llm_result.predictions[:split_idx]
         fusion_val_llm_predictions = val_llm_result.predictions[split_idx:]
         
         print(f"   🔧 Fusion training: {len(fusion_train_df)} samples")
         print(f"   🔧 Fusion validation: {len(fusion_val_df)} samples")
         
-        # Create data loaders using DataFrames and LLM predictions
+        # Create data loaders using both ML and LLM predictions
         train_dataset = self._create_fusion_dataset(
             fusion_train_df[text_column].tolist(), 
             fusion_train_df[label_columns].values.tolist(), 
+            fusion_train_ml_predictions,
             fusion_train_llm_predictions
         )
         val_dataset = self._create_fusion_dataset(
             fusion_val_df[text_column].tolist(), 
             fusion_val_df[label_columns].values.tolist(), 
+            fusion_val_ml_predictions,
             fusion_val_llm_predictions
         )
         
@@ -417,8 +424,8 @@ class FusionEnsemble(BaseEnsemble):
             self.fusion_wrapper.train()  # Back to training mode
     
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
-                              llm_predictions: List):
-        """Create dataset for fusion training using LLM predictions directly."""
+                              ml_predictions: List, llm_predictions: List):
+        """Create dataset for fusion training using both ML and LLM predictions."""
         # Tokenize texts using ML model's tokenizer
         tokenized = []
         for text in texts:
@@ -434,16 +441,31 @@ class FusionEnsemble(BaseEnsemble):
                 'attention_mask': encoding['attention_mask'].squeeze()
             })
         
-        # Convert LLM predictions to tensor format (one-hot encoding)
+        # Convert ML predictions to tensor format (binary vectors)
+        ml_tensor = torch.zeros(len(ml_predictions), self.num_labels)
+        for i, prediction in enumerate(ml_predictions):
+            if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                # Already in binary vector format
+                ml_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+            elif isinstance(prediction, str):
+                # Convert class name to binary vector
+                if prediction in self.classes_:
+                    class_idx = self.classes_.index(prediction)
+                    ml_tensor[i, class_idx] = 1.0
+        
+        # Convert LLM predictions to tensor format (binary vectors)
         llm_tensor = torch.zeros(len(llm_predictions), self.num_labels)
         for i, prediction in enumerate(llm_predictions):
-            if isinstance(prediction, str):
-                # Multi-class: single prediction
+            if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                # Already in binary vector format
+                llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+            elif isinstance(prediction, str):
+                # Convert class name to binary vector
                 if prediction in self.classes_:
                     class_idx = self.classes_.index(prediction)
                     llm_tensor[i, class_idx] = 1.0
-            else:
-                # Multi-label: list of predictions
+            elif isinstance(prediction, list):
+                # List of class names (multi-label)
                 for pred_class in prediction:
                     if pred_class in self.classes_:
                         class_idx = self.classes_.index(pred_class)
@@ -454,18 +476,23 @@ class FusionEnsemble(BaseEnsemble):
         attention_mask = torch.stack([item['attention_mask'] for item in tokenized])
         labels_tensor = torch.FloatTensor(labels)
         
-        return torch.utils.data.TensorDataset(input_ids, attention_mask, llm_tensor, labels_tensor)
+        # Combine ML and LLM predictions as input features
+        combined_predictions = torch.cat([ml_tensor, llm_tensor], dim=1)
+        
+        return torch.utils.data.TensorDataset(input_ids, attention_mask, combined_predictions, labels_tensor)
     
     def predict(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Predict using fusion ensemble."""
         if not self.is_trained:
             raise EnsembleError("Fusion ensemble must be trained before prediction")
         
-        # Get LLM predictions directly
+        # Get LLM predictions
         llm_result = self.llm_model.predict(texts)
         
-        # Create dataset using LLM predictions directly
-        dataset = self._create_fusion_dataset(texts, [[0] * self.num_labels] * len(texts), llm_result.predictions)
+        # Create dataset using LLM predictions (ML predictions will be computed in forward pass)
+        dummy_labels = [[0] * self.num_labels] * len(texts)
+        dummy_ml_predictions = [[0] * self.num_labels] * len(texts)  # Not used, ML computed in forward pass
+        dataset = self._create_fusion_dataset(texts, dummy_labels, dummy_ml_predictions, llm_result.predictions)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         
         # Generate predictions
@@ -474,12 +501,15 @@ class FusionEnsemble(BaseEnsemble):
         
         with torch.no_grad():
             for batch in dataloader:
-                input_ids, attention_mask, llm_scores_batch, _ = batch
+                input_ids, attention_mask, combined_predictions, _ = batch
                 input_ids = input_ids.to(self.device)
                 attention_mask = attention_mask.to(self.device)
-                llm_scores_batch = llm_scores_batch.to(self.device)
+                combined_predictions = combined_predictions.to(self.device)
                 
-                outputs = self.fusion_wrapper(input_ids, attention_mask, llm_scores_batch)
+                # Extract LLM scores (second half of combined predictions)
+                llm_scores = combined_predictions[:, self.num_labels:]
+                
+                outputs = self.fusion_wrapper(input_ids, attention_mask, llm_scores)
                 fused_logits = outputs['fused_logits']
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
