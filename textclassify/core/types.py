@@ -200,6 +200,7 @@ class EnsembleConfig:
     # Method-specific parameters  
     weights: Optional[List[float]] = None  # For weighted ensemble
     routing_rules: Optional[Dict[str, str]] = None  # For class routing
+    parameters: Dict[str, Any] = field(default_factory=dict)  # General parameters
     
     # Ensemble behavior
     require_all_models: bool = False  # Whether all models must succeed
