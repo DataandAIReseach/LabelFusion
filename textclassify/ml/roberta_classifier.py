@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader, Dataset
 from typing import Any, Dict, List, Optional, Union
 import warnings
 
-from ..core.types import ClassificationResult, ClassificationType, TrainingData
+from ..core.types import ClassificationResult, ClassificationType, TrainingData, ModelType
 from ..core.exceptions import ModelTrainingError, PredictionError, ValidationError
 from .base import BaseMLClassifier
 from .preprocessing import TextPreprocessor, clean_text, normalize_text
@@ -396,11 +396,12 @@ class RoBERTaClassifier(BaseMLClassifier):
             **metadata
         )
     
-    def predict_proba(self, texts: List[str]) -> ClassificationResult:
+    def predict_proba(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Predict class probabilities for texts.
         
         Args:
             texts: List of texts to classify
+            true_labels: Optional true labels in binary format for evaluation metrics
             
         Returns:
             ClassificationResult with predictions and probabilities
@@ -487,7 +488,8 @@ class RoBERTaClassifier(BaseMLClassifier):
         return self._create_result(
             predictions=all_predictions,
             probabilities=all_probabilities,
-            confidence_scores=all_confidence_scores
+            confidence_scores=all_confidence_scores,
+            true_labels=true_labels if true_labels is not None else None
         )
     
     @property
