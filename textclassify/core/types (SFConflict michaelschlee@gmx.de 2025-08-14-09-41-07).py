@@ -73,7 +73,7 @@ class TrainingData:
     """Training data for classification models."""
     
     texts: List[str]
-    labels: List[List[int]]  # Binary/one-hot encoded labels for both multi-class and multi-label
+    labels: Union[List[str], List[List[str]]]  # Single or multiple labels per text
     classification_type: ClassificationType
     
     # Optional metadata
@@ -88,17 +88,7 @@ class TrainingData:
         if not self.texts:
             raise ValueError("Training data cannot be empty")
         
-        # Validate label format - all labels should be lists of integers
-        if not all(isinstance(label, list) for label in self.labels):
-            raise ValueError("All labels must be lists of integers")
-        
-        for label_list in self.labels:
-            if not all(isinstance(label, int) for label in label_list):
-                raise ValueError("All labels must be lists of integers")
-            if not all(label in [0, 1] for label in label_list):
-                raise ValueError("All label values must be 0 or 1 (binary encoding)")
-        
-        # Additional validation based on classification type
+        # Validate label format based on classification type
         if self.classification_type == ClassificationType.MULTI_CLASS:
             # Check if labels are string format or binary encoded format
             first_label = self.labels[0]
