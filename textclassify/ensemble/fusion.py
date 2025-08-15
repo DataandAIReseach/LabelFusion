@@ -74,34 +74,29 @@ class FusionWrapper(nn.Module):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
     
-    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor, 
-                llm_scores: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, ml_predictions: torch.Tensor, llm_predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Forward pass combining ML and LLM predictions.
         
         Args:
-            input_ids: Tokenized input
-            attention_mask: Attention mask
-            llm_scores: Pre-computed LLM scores (detached)
+            ml_predictions: Pre-computed ML predictions/logits
+            llm_predictions: Pre-computed LLM predictions/scores
             
         Returns:
-            Dict containing ML logits, LLM scores, and fused logits
+            Dict containing ML predictions, LLM predictions, and fused logits
         """
-        # Get ML logits
-        ml_outputs = self.ml_model.model(input_ids=input_ids, attention_mask=attention_mask)
-        ml_logits = ml_outputs.logits
+        # Ensure predictions are detached (no gradient flow to original models)
+        ml_predictions = ml_predictions.detach()
+        llm_predictions = llm_predictions.detach()
         
-        # Ensure LLM scores are detached (no gradient flow)
-        llm_scores = llm_scores.detach()
+        # Concatenate ML and LLM predictions
+        fusion_input = torch.cat([ml_predictions, llm_predictions], dim=1)
         
-        # Concatenate ML logits and LLM scores
-        fusion_input = torch.cat([ml_logits, llm_scores], dim=1)
-        
-        # Generate fused predictions
+        # Generate fused predictions through MLP
         fused_logits = self.fusion_mlp(fusion_input)
         
         return {
-            "ml_logits": ml_logits,
-            "llm_scores": llm_scores,
+            "ml_predictions": ml_predictions,
+            "llm_predictions": llm_predictions,
             "fused_logits": fused_logits
         }
 
@@ -131,6 +126,9 @@ class FusionEnsemble(BaseEnsemble):
         self.llm_scores_cache = {}
         self.calibrator = None
         self.test_performance = {}  # Store test set performance
+        
+        # Initialize training state
+        self.is_trained = False
         
         # Determine classification type from ensemble config or infer from models
         if 'classification_type' in ensemble_config.parameters:
@@ -270,8 +268,7 @@ class FusionEnsemble(BaseEnsemble):
         ml_val_result = self.ml_model.predict(texts=val_df[text_column].tolist(),
                                               true_labels=val_df[label_columns].values.tolist())
         
-
-
+    
 
         # Step 4: Get LLM predictions on validation set
         print("Getting LLM predictions on validation set...")
@@ -279,6 +276,8 @@ class FusionEnsemble(BaseEnsemble):
         # Use DataFrames directly for LLM model - no need to recreate them
         val_llm_result = self.llm_model.predict(train_df=train_df,
                                                 test_df=val_df)
+        
+        
         
         # Step 5: Create fusion wrapper
         print("Creating fusion wrapper...")
@@ -294,19 +293,27 @@ class FusionEnsemble(BaseEnsemble):
         print("Training fusion MLP on validation predictions...")
         self._train_fusion_mlp_on_val(val_df, ml_val_result, val_llm_result, text_column, label_columns)
         
-        # Step 7: Store LLM result for later use (no calibration needed)
-        print("Storing LLM validation results...")
+        # Step 7: Store LLM result and training data for later use
+        print("Storing LLM validation results and training data...")
         self.val_llm_result = val_llm_result
+        self.train_df_cache = train_df.copy()  # Cache training DataFrame for LLM predictions
         
         # Step 8: Evaluate on test set
         print("Evaluating ensemble on test set...")
-        test_result = self.predict(test_df[text_column].tolist(), test_df[label_columns].values.tolist())
         
-        # Store test performance
-        self.test_performance = test_result.metadata.get('metrics', {}) if test_result.metadata else {}
-        print(f"   📈 Test Performance: {self.test_performance}")
-        
+        # Set training flag early to avoid recursive prediction issues
         self.is_trained = True
+        
+        try:
+            test_result = self.predict(test_df[text_column].tolist(), test_df[label_columns].values.tolist())
+            
+            # Store test performance
+            self.test_performance = test_result.metadata.get('metrics', {}) if test_result.metadata else {}
+            print(f"   📈 Test Performance: {self.test_performance}")
+        except Exception as e:
+            print(f"   ⚠️ Warning: Test evaluation failed: {e}")
+            self.test_performance = {}
+        
         print("✅ Fusion ensemble training completed!")
     
     def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, val_llm_result, 
@@ -316,7 +323,7 @@ class FusionEnsemble(BaseEnsemble):
         # Split validation DataFrame into train/val for fusion MLP training
         fusion_train_df, fusion_val_df = train_test_split(
             val_df,
-            test_size=0.3, random_state=42, stratify=None
+            test_size=0.1, random_state=42, stratify=None
         )
         
         # Split both ML and LLM results accordingly
@@ -350,14 +357,13 @@ class FusionEnsemble(BaseEnsemble):
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
         
-        # Setup optimizer with different learning rates
-        ml_params = list(self.fusion_wrapper.ml_model.parameters())
-        fusion_params = list(self.fusion_wrapper.fusion_mlp.parameters())
+        # Freeze ML model parameters - only optimize the fusion MLP
+        for param in self.fusion_wrapper.ml_model.model.parameters():
+            param.requires_grad = False
         
-        optimizer = torch.optim.AdamW([
-            {'params': ml_params, 'lr': self.ml_lr},
-            {'params': fusion_params, 'lr': self.fusion_lr}
-        ])
+        # Setup optimizer for fusion MLP only
+        fusion_params = list(self.fusion_wrapper.fusion_mlp.parameters())
+        optimizer = torch.optim.AdamW(fusion_params, lr=self.fusion_lr)
         
         # Loss function
         if self.classification_type == ClassificationType.MULTI_CLASS:
@@ -373,14 +379,14 @@ class FusionEnsemble(BaseEnsemble):
             # Training phase
             total_train_loss = 0
             for batch in train_loader:
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
-                llm_scores = batch['llm_scores'].to(self.device)
-                labels = batch['labels'].to(self.device)
+                ml_predictions, llm_predictions, labels = batch
+                ml_predictions = ml_predictions.to(self.device)
+                llm_predictions = llm_predictions.to(self.device)
+                labels = labels.to(self.device)
                 
                 optimizer.zero_grad()
                 
-                outputs = self.fusion_wrapper(input_ids, attention_mask, llm_scores)
+                outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
                 fused_logits = outputs['fused_logits']
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
@@ -397,12 +403,12 @@ class FusionEnsemble(BaseEnsemble):
             total_val_loss = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    input_ids = batch['input_ids'].to(self.device)
-                    attention_mask = batch['attention_mask'].to(self.device)
-                    llm_scores = batch['llm_scores'].to(self.device)
-                    labels = batch['labels'].to(self.device)
+                    ml_predictions, llm_predictions, labels = batch
+                    ml_predictions = ml_predictions.to(self.device)
+                    llm_predictions = llm_predictions.to(self.device)
+                    labels = labels.to(self.device)
                     
-                    outputs = self.fusion_wrapper(input_ids, attention_mask, llm_scores)
+                    outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
                     fused_logits = outputs['fused_logits']
                     
                     if self.classification_type == ClassificationType.MULTI_CLASS:
@@ -425,21 +431,7 @@ class FusionEnsemble(BaseEnsemble):
     
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
                               ml_predictions: List, llm_predictions: List):
-        """Create dataset for fusion training using both ML and LLM predictions."""
-        # Tokenize texts using ML model's tokenizer
-        tokenized = []
-        for text in texts:
-            encoding = self.ml_model.tokenizer(
-                text,
-                truncation=True,
-                padding='max_length',
-                max_length=self.ml_model.max_length,
-                return_tensors='pt'
-            )
-            tokenized.append({
-                'input_ids': encoding['input_ids'].squeeze(),
-                'attention_mask': encoding['attention_mask'].squeeze()
-            })
+        """Create dataset for fusion training using pre-computed ML and LLM predictions."""
         
         # Convert ML predictions to tensor format (binary vectors)
         ml_tensor = torch.zeros(len(ml_predictions), self.num_labels)
@@ -471,28 +463,60 @@ class FusionEnsemble(BaseEnsemble):
                         class_idx = self.classes_.index(pred_class)
                         llm_tensor[i, class_idx] = 1.0
         
-        # Create tensor dataset
-        input_ids = torch.stack([item['input_ids'] for item in tokenized])
-        attention_mask = torch.stack([item['attention_mask'] for item in tokenized])
+        # Create tensor dataset with predictions only (no tokenization needed)
         labels_tensor = torch.FloatTensor(labels)
         
-        # Combine ML and LLM predictions as input features
-        combined_predictions = torch.cat([ml_tensor, llm_tensor], dim=1)
-        
-        return torch.utils.data.TensorDataset(input_ids, attention_mask, combined_predictions, labels_tensor)
+        return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
     
-    def predict(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
-        """Predict using fusion ensemble."""
+    def predict(self, data: Union[List[str], pd.DataFrame], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Predict using fusion ensemble.
+        
+        Args:
+            data: Either a list of texts or a DataFrame with text column (and optionally label columns)
+            true_labels: Optional true labels for evaluation (if not provided in DataFrame)
+        """
         if not self.is_trained:
             raise EnsembleError("Fusion ensemble must be trained before prediction")
         
-        # Get LLM predictions
-        llm_result = self.llm_model.predict(texts)
+        # Handle different input formats
+        if isinstance(data, list):
+            # List of texts
+            texts = data
+            test_df = pd.DataFrame({'text': texts})
+            extracted_labels = true_labels  # Use provided true_labels
+        elif isinstance(data, pd.DataFrame):
+            # DataFrame input
+            test_df = data.copy()
+            text_column = 'text'  # Could be configurable
+            if text_column not in test_df.columns:
+                raise EnsembleError(f"Text column '{text_column}' not found in DataFrame")
+            texts = test_df[text_column].tolist()
+            
+            # Extract true labels from DataFrame if available
+            if true_labels is None:
+                # Try to extract labels from DataFrame using the known label columns
+                if hasattr(self, 'classes_') and self.classes_:
+                    label_columns = [col for col in self.classes_ if col in test_df.columns]
+                    if label_columns:
+                        extracted_labels = test_df[label_columns].values.tolist()
+                    else:
+                        extracted_labels = None
+                else:
+                    extracted_labels = None
+            else:
+                extracted_labels = true_labels
+        else:
+            raise EnsembleError(f"Unsupported input format: {type(data)}. Expected List[str] or pd.DataFrame")
         
-        # Create dataset using LLM predictions (ML predictions will be computed in forward pass)
+        # Get ML predictions
+        ml_result = self.ml_model.predict(texts)
+        
+        # Get LLM predictions using cached training data for context
+        llm_result = self.llm_model.predict(train_df=self.train_df_cache, test_df=test_df)
+        
+        # Create dataset using both ML and LLM predictions
         dummy_labels = [[0] * self.num_labels] * len(texts)
-        dummy_ml_predictions = [[0] * self.num_labels] * len(texts)  # Not used, ML computed in forward pass
-        dataset = self._create_fusion_dataset(texts, dummy_labels, dummy_ml_predictions, llm_result.predictions)
+        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_result.predictions, llm_result.predictions)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         
         # Generate predictions
@@ -501,15 +525,11 @@ class FusionEnsemble(BaseEnsemble):
         
         with torch.no_grad():
             for batch in dataloader:
-                input_ids, attention_mask, combined_predictions, _ = batch
-                input_ids = input_ids.to(self.device)
-                attention_mask = attention_mask.to(self.device)
-                combined_predictions = combined_predictions.to(self.device)
+                ml_predictions, llm_predictions, _ = batch
+                ml_predictions = ml_predictions.to(self.device)
+                llm_predictions = llm_predictions.to(self.device)
                 
-                # Extract LLM scores (second half of combined predictions)
-                llm_scores = combined_predictions[:, self.num_labels:]
-                
-                outputs = self.fusion_wrapper(input_ids, attention_mask, llm_scores)
+                outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
                 fused_logits = outputs['fused_logits']
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
@@ -524,7 +544,7 @@ class FusionEnsemble(BaseEnsemble):
                         active_labels = [self.classes_[i] for i, is_active in enumerate(pred_array) if is_active]
                         all_predictions.append(active_labels)
         
-        return self._create_result(predictions=all_predictions, true_labels=true_labels)
+        return self._create_result(predictions=all_predictions, true_labels=extracted_labels)
     
     def _combine_predictions(self, model_results: List[ClassificationResult], texts: List[str]) -> List[Union[str, List[str]]]:
         """Not used in fusion ensemble - predictions are generated directly."""

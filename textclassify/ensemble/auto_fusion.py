@@ -171,17 +171,19 @@ class AutoFusionClassifier(BaseClassifier):
         if not self.is_trained:
             raise ModelTrainingError("AutoFusion classifier must be trained before prediction", self.config.model_name)
         
-        # Prepare input texts
+        # Prepare input data
         if isinstance(texts, str):
-            input_texts = [texts]
+            # Single string - convert to list
+            input_data = [texts]
         elif isinstance(texts, pd.DataFrame):
-            text_column = self._detect_text_column(texts)
-            input_texts = texts[text_column].tolist()
+            # DataFrame - pass directly to fusion ensemble (it will handle label extraction)
+            input_data = texts
         else:
-            input_texts = texts
+            # List of texts - pass as is
+            input_data = texts
         
         # Make predictions using fusion ensemble
-        result = self.fusion_ensemble.predict(input_texts, true_labels)
+        result = self.fusion_ensemble.predict(input_data, true_labels)
         
         # Add AutoFusion metadata
         if result.metadata is None:

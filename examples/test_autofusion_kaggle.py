@@ -50,6 +50,14 @@ def prepare_kaggle_data():
     print(f"   ✅ Training set: {len(train_df)} samples")
     print(f"   ✅ Test set: {len(test_df)} samples")
     
+    # Verify DataFrame structure
+    print(f"   📋 Train DataFrame columns: {train_df.columns.tolist()}")
+    print(f"   📋 Test DataFrame columns: {test_df.columns.tolist()}")
+    print(f"   📋 Test DataFrame shape: {test_df.shape}")
+    print(f"   📋 Test DataFrame sample:")
+    print(f"       Text: {test_df['text'].iloc[0][:50]}...")
+    print(f"       Labels: {[col for col in label_columns if test_df[col].iloc[0] == 1]}")
+    
     return train_df, test_df, label_columns
 
 def test_autofusion_with_kaggle():
