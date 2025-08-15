@@ -1,153 +1,75 @@
 """OpenAI-based text classifier."""
 
 import asyncio
-import aiohttp
-import json
-from typing import Dict, Any
+from typing import Dict, List, Optional, Union
+import pandas as pd
 
-from ..core.exceptions import APIError, ConfigurationError
+from ..core.types import ClassificationResult
+from ..core.exceptions import APIError, ConfigurationError, PredictionError
 from .base import BaseLLMClassifier
 
 
 class OpenAIClassifier(BaseLLMClassifier):
     """Text classifier using OpenAI's GPT models."""
     
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        text_column: str = 'text',
+        label_columns: Optional[List[str]] = None,
+        multi_label: bool = False,
+        few_shot_mode: str = "few_shot"
+    ):
         """Initialize OpenAI classifier.
         
         Args:
-            config: Model configuration with OpenAI-specific parameters
+            config: Configuration object containing API keys and parameters
+            text_column: Name of the column containing text data
+            label_columns: List of column names containing labels
+            multi_label: Whether this is a multi-label classifier
+            few_shot_mode: Mode for few-shot learning
         """
-        super().__init__(config)
+        super().__init__(
+            config=config,
+            multi_label=multi_label,
+            few_shot_mode=few_shot_mode,
+            label_columns=label_columns
+        )
         
-        # Validate required configuration
-        if not self.config.api_key:
-            raise ConfigurationError("OpenAI API key is required")
+        # Set up classes and prompt engineer configuration
+        self.classes_ = label_columns if label_columns else []
+        if text_column:
+            self.prompt_engineer.text_column = text_column
+        if label_columns:
+            self.prompt_engineer.label_columns = label_columns
         
-        # Set default parameters
+        # Set OpenAI specific parameters (these could be passed to the service layer if needed)
         self.model = self.config.parameters.get('model', 'gpt-3.5-turbo')
-        self.temperature = self.config.parameters.get('temperature', 0.1)
-        self.max_tokens = self.config.parameters.get('max_tokens', 150)
-        self.api_base = self.config.api_base or "https://api.openai.com/v1"
+        self.temperature = self.config.parameters.get('temperature', 1)
+        self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
         
-        # Headers for API requests
-        self.headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json"
-        }
+        # No need to create separate client - use the service layer from BaseLLMClassifier
     
     async def _call_llm(self, prompt: str) -> str:
-        """Call OpenAI API with the given prompt.
+        """Call OpenAI API with the given prompt using the service layer.
         
-        Args:
-            prompt: The prompt to send to OpenAI
-            
-        Returns:
-            The model's response
-            
-        Raises:
-            APIError: If the API call fails
+        This uses the llm_generator from BaseLLMClassifier which handles
+        API key management and provides a consistent interface.
         """
-        url = f"{self.api_base}/chat/completions"
-        
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens
-        }
-        
-        # Add additional parameters if specified
-        if 'top_p' in self.config.parameters:
-            payload['top_p'] = self.config.parameters['top_p']
-        if 'frequency_penalty' in self.config.parameters:
-            payload['frequency_penalty'] = self.config.parameters['frequency_penalty']
-        if 'presence_penalty' in self.config.parameters:
-            payload['presence_penalty'] = self.config.parameters['presence_penalty']
-        
-        for attempt in range(self.config.max_retries):
-            try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.config.timeout)) as session:
-                    async with session.post(url, headers=self.headers, json=payload) as response:
-                        response_data = await response.json()
-                        
-                        if response.status == 200:
-                            return response_data['choices'][0]['message']['content'].strip()
-                        
-                        elif response.status == 429:  # Rate limit
-                            if attempt < self.config.max_retries - 1:
-                                wait_time = 2 ** attempt  # Exponential backoff
-                                await asyncio.sleep(wait_time)
-                                continue
-                            else:
-                                raise APIError(
-                                    f"Rate limit exceeded after {self.config.max_retries} attempts",
-                                    provider="openai",
-                                    status_code=response.status
-                                )
-                        
-                        elif response.status == 401:
-                            raise APIError(
-                                "Invalid API key",
-                                provider="openai",
-                                status_code=response.status
-                            )
-                        
-                        elif response.status == 400:
-                            error_msg = response_data.get('error', {}).get('message', 'Bad request')
-                            raise APIError(
-                                f"Bad request: {error_msg}",
-                                provider="openai",
-                                status_code=response.status
-                            )
-                        
-                        else:
-                            error_msg = response_data.get('error', {}).get('message', 'Unknown error')
-                            raise APIError(
-                                f"API error: {error_msg}",
-                                provider="openai",
-                                status_code=response.status
-                            )
+        try:
+            # Use the service layer instead of direct API calls
+            response = await self.llm_generator.generate_content(prompt)
             
-            except aiohttp.ClientError as e:
-                if attempt < self.config.max_retries - 1:
-                    wait_time = 2 ** attempt
-                    await asyncio.sleep(wait_time)
-                    continue
-                else:
-                    raise APIError(
-                        f"Network error after {self.config.max_retries} attempts: {str(e)}",
-                        provider="openai"
-                    )
+            # Handle empty or None responses
+            if response is None:
+                raise APIError("LLM service returned None response")
             
-            except asyncio.TimeoutError:
-                if attempt < self.config.max_retries - 1:
-                    wait_time = 2 ** attempt
-                    await asyncio.sleep(wait_time)
-                    continue
-                else:
-                    raise APIError(
-                        f"Request timeout after {self.config.max_retries} attempts",
-                        provider="openai"
-                    )
-        
-        raise APIError(
-            f"Failed to get response after {self.config.max_retries} attempts",
-            provider="openai"
-        )
-    
-    @property
-    def model_info(self) -> Dict[str, Any]:
-        """Get OpenAI model information."""
-        info = super().model_info
-        info.update({
-            "provider": "openai",
-            "model": self.model,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "api_base": self.api_base
-        })
-        return info
+            response = response.strip()
+            if not response:
+                raise APIError("LLM service returned empty response")
+            
+            return response
+            
+        except Exception as e:
+            raise APIError(f"LLM service call failed: {str(e)}")
 
