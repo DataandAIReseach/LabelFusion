@@ -390,14 +390,19 @@ class RoBERTaClassifier(BaseMLClassifier):
             # Add metrics to metadata
             metadata['metrics'] = metrics
         
-        # Call parent _create_result with all the metadata
-        return super()._create_result(
+        # Call parent _create_result and then add metadata
+        result = super()._create_result(
             predictions=predictions,
             probabilities=probabilities,
-            confidence_scores=confidence_scores,
-            processing_time=processing_time,
-            **metadata
+            confidence_scores=confidence_scores
         )
+        
+        # Add metadata to the result
+        if result.metadata is None:
+            result.metadata = {}
+        result.metadata.update(metadata)
+        
+        return result
     
     def predict_proba(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Predict class probabilities for texts.
