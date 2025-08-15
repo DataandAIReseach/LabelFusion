@@ -40,7 +40,15 @@ setup(
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     python_requires=">=3.8",
-    install_requires=read_requirements(),
+    install_requires=[
+        "pandas",
+        "python-dotenv",
+        "openai>=1.0.0",  # Ensure using newer version
+        "aiohttp",
+        "pytest",
+        "pytest-asyncio",
+        "google-generativeai",
+    ],
     extras_require={
         "dev": [
             "pytest>=7.0.0",

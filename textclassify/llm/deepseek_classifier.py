@@ -1,162 +1,83 @@
 """DeepSeek based text classifier."""
 
 import asyncio
-import aiohttp
-import json
-from typing import Dict, Any
+from typing import Dict, List, Optional, Union, Any
+import pandas as pd
 
-from ..core.exceptions import APIError, ConfigurationError
+from ..core.types import ClassificationResult
+from ..core.exceptions import APIError, ConfigurationError, PredictionError
 from .base import BaseLLMClassifier
 
 
 class DeepSeekClassifier(BaseLLMClassifier):
     """Text classifier using DeepSeek models."""
     
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        text_column: str = 'text',
+        label_columns: Optional[List[str]] = None,
+        multi_label: bool = False,
+        few_shot_mode: str = "few_shot"
+    ):
         """Initialize DeepSeek classifier.
         
         Args:
-            config: Model configuration with DeepSeek-specific parameters
+            config: Configuration object containing API keys and parameters
+            text_column: Name of the column containing text data
+            label_columns: List of column names containing labels
+            multi_label: Whether this is a multi-label classifier
+            few_shot_mode: Mode for few-shot learning
         """
-        super().__init__(config)
+        # Set provider before calling super().__init__
+        config.provider = 'deepseek'
         
-        # Validate required configuration
-        if not self.config.api_key:
-            raise ConfigurationError("DeepSeek API key is required")
+        super().__init__(
+            config=config,
+            multi_label=multi_label,
+            few_shot_mode=few_shot_mode,
+            label_columns=label_columns
+        )
         
-        # Set default parameters
+        # Set up classes and prompt engineer configuration
+        self.classes_ = label_columns if label_columns else []
+        if text_column:
+            self.prompt_engineer.text_column = text_column
+        if label_columns:
+            self.prompt_engineer.label_columns = label_columns
+        
+        # Set DeepSeek specific parameters
         self.model = self.config.parameters.get('model', 'deepseek-chat')
-        self.temperature = self.config.parameters.get('temperature', 0.1)
-        self.max_tokens = self.config.parameters.get('max_tokens', 150)
-        self.api_base = self.config.api_base or "https://api.deepseek.com"
+        self.temperature = self.config.parameters.get('temperature', 1)
+        self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
         
-        # Headers for API requests (DeepSeek uses OpenAI-compatible API)
-        self.headers = {
-            "Authorization": f"Bearer {self.config.api_key}",
-            "Content-Type": "application/json"
-        }
+        # DeepSeek-specific parameters (similar to OpenAI)
+        self.top_p = self.config.parameters.get('top_p', 1.0)
+        self.frequency_penalty = self.config.parameters.get('frequency_penalty', 0.0)
+        self.presence_penalty = self.config.parameters.get('presence_penalty', 0.0)
     
     async def _call_llm(self, prompt: str) -> str:
-        """Call DeepSeek API with the given prompt.
+        """Call DeepSeek API with the given prompt using the service layer.
         
-        Args:
-            prompt: The prompt to send to DeepSeek
-            
-        Returns:
-            The model's response
-            
-        Raises:
-            APIError: If the API call fails
+        This uses the llm_generator from BaseLLMClassifier which handles
+        API key management and provides a consistent interface.
         """
-        url = f"{self.api_base}/v1/chat/completions"
-        
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "stream": False
-        }
-        
-        # Add additional parameters if specified
-        if 'top_p' in self.config.parameters:
-            payload['top_p'] = self.config.parameters['top_p']
-        if 'frequency_penalty' in self.config.parameters:
-            payload['frequency_penalty'] = self.config.parameters['frequency_penalty']
-        if 'presence_penalty' in self.config.parameters:
-            payload['presence_penalty'] = self.config.parameters['presence_penalty']
-        if 'stop' in self.config.parameters:
-            payload['stop'] = self.config.parameters['stop']
-        
-        for attempt in range(self.config.max_retries):
-            try:
-                async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.config.timeout)) as session:
-                    async with session.post(url, headers=self.headers, json=payload) as response:
-                        response_data = await response.json()
-                        
-                        if response.status == 200:
-                            choices = response_data.get('choices', [])
-                            if choices and len(choices) > 0:
-                                message = choices[0].get('message', {})
-                                content = message.get('content', '').strip()
-                                if content:
-                                    return content
-                                else:
-                                    raise APIError(
-                                        "Empty content in DeepSeek response",
-                                        provider="deepseek",
-                                        status_code=response.status
-                                    )
-                            else:
-                                raise APIError(
-                                    "No choices in DeepSeek response",
-                                    provider="deepseek",
-                                    status_code=response.status
-                                )
-                        
-                        elif response.status == 429:  # Rate limit
-                            if attempt < self.config.max_retries - 1:
-                                wait_time = 2 ** attempt  # Exponential backoff
-                                await asyncio.sleep(wait_time)
-                                continue
-                            else:
-                                raise APIError(
-                                    f"Rate limit exceeded after {self.config.max_retries} attempts",
-                                    provider="deepseek",
-                                    status_code=response.status
-                                )
-                        
-                        elif response.status == 401:
-                            raise APIError(
-                                "Invalid API key",
-                                provider="deepseek",
-                                status_code=response.status
-                            )
-                        
-                        elif response.status == 400:
-                            error_msg = response_data.get('error', {}).get('message', 'Bad request')
-                            raise APIError(
-                                f"Bad request: {error_msg}",
-                                provider="deepseek",
-                                status_code=response.status
-                            )
-                        
-                        else:
-                            error_msg = response_data.get('error', {}).get('message', 'Unknown error')
-                            raise APIError(
-                                f"API error: {error_msg}",
-                                provider="deepseek",
-                                status_code=response.status
-                            )
+        try:
+            # Use the service layer instead of direct API calls
+            response = await self.llm_generator.generate_content(prompt)
             
-            except aiohttp.ClientError as e:
-                if attempt < self.config.max_retries - 1:
-                    wait_time = 2 ** attempt
-                    await asyncio.sleep(wait_time)
-                    continue
-                else:
-                    raise APIError(
-                        f"Network error after {self.config.max_retries} attempts: {str(e)}",
-                        provider="deepseek"
-                    )
+            # Handle empty or None responses
+            if response is None:
+                raise APIError("LLM service returned None response")
             
-            except asyncio.TimeoutError:
-                if attempt < self.config.max_retries - 1:
-                    wait_time = 2 ** attempt
-                    await asyncio.sleep(wait_time)
-                    continue
-                else:
-                    raise APIError(
-                        f"Request timeout after {self.config.max_retries} attempts",
-                        provider="deepseek"
-                    )
-        
-        raise APIError(
-            f"Failed to get response after {self.config.max_retries} attempts",
-            provider="deepseek"
-        )
+            response = response.strip()
+            if not response:
+                raise APIError("LLM service returned empty response")
+            
+            return response
+            
+        except Exception as e:
+            raise APIError(f"LLM service call failed: {str(e)}")
     
     @property
     def model_info(self) -> Dict[str, Any]:
@@ -166,8 +87,10 @@ class DeepSeekClassifier(BaseLLMClassifier):
             "provider": "deepseek",
             "model": self.model,
             "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "api_base": self.api_base
+            "max_completion_tokens": self.max_completion_tokens,
+            "top_p": self.top_p,
+            "frequency_penalty": self.frequency_penalty,
+            "presence_penalty": self.presence_penalty
         })
         return info
 

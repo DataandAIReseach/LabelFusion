@@ -1,0 +1,6 @@
+/docu/
+/data/
+
+# Environment variables
+.env
+.env.*autofusion_kaggle_test/auto_fusion_classifier.pkl

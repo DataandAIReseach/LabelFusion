@@ -22,17 +22,17 @@ class BaseClassifier(ABC):
         self.classes_ = None
         self.classification_type = None
         
-    @abstractmethod
-    def fit(self, training_data: TrainingData) -> None:
-        """Train the classifier on the provided data.
+    # @abstractmethod
+    # def fit(self, training_data: TrainingData) -> None:
+    #     """Train the classifier on the provided data.
         
-        Args:
-            training_data: Training data containing texts and labels
+    #     Args:
+    #         training_data: Training data containing texts and labels
             
-        Raises:
-            ModelTrainingError: If training fails
-        """
-        pass
+    #     Raises:
+    #         ModelTrainingError: If training fails
+    #     """
+    #     pass
     
     @abstractmethod
     def predict(self, texts: List[str]) -> ClassificationResult:
@@ -50,21 +50,21 @@ class BaseClassifier(ABC):
         """
         pass
     
-    @abstractmethod
-    def predict_proba(self, texts: List[str]) -> ClassificationResult:
-        """Predict class probabilities for the given texts.
+    # @abstractmethod
+    # def predict_proba(self, texts: List[str]) -> ClassificationResult:
+    #     """Predict class probabilities for the given texts.
         
-        Args:
-            texts: List of texts to classify
+    #     Args:
+    #         texts: List of texts to classify
             
-        Returns:
-            ClassificationResult containing predictions, probabilities and metadata
+    #     Returns:
+    #         ClassificationResult containing predictions, probabilities and metadata
             
-        Raises:
-            PredictionError: If prediction fails
-            ValidationError: If input validation fails
-        """
-        pass
+    #     Raises:
+    #         PredictionError: If prediction fails
+    #         ValidationError: If input validation fails
+    #     """
+    #     pass
     
     def validate_input(self, texts: List[str]) -> None:
         """Validate input texts.
@@ -174,19 +174,19 @@ class AsyncBaseClassifier(BaseClassifier):
         """
         pass
     
-    @abstractmethod
-    async def predict_proba_async(self, texts: List[str]) -> ClassificationResult:
-        """Asynchronously predict class probabilities for the given texts.
+    # @abstractmethod
+    # async def predict_proba_async(self, texts: List[str]) -> ClassificationResult:
+    #     """Asynchronously predict class probabilities for the given texts.
         
-        Args:
-            texts: List of texts to classify
+    #     Args:
+    #         texts: List of texts to classify
             
-        Returns:
-            ClassificationResult containing predictions, probabilities and metadata
+    #     Returns:
+    #         ClassificationResult containing predictions, probabilities and metadata
             
-        Raises:
-            PredictionError: If prediction fails
-            ValidationError: If input validation fails
-        """
-        pass
+    #     Raises:
+    #         PredictionError: If prediction fails
+    #         ValidationError: If input validation fails
+    #     """
+    #     pass
 
