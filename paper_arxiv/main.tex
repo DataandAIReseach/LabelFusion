@@ -1,0 +1,102 @@
+% arXiv-style LaTeX paper for LabelFusion
+% To compile: pdflatex main && bibtex main && pdflatex main && pdflatex main
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{url}
+
+% Metadata
+\title{LabelFusion: Learning to Fuse LLMs and Transformer Classifiers for Robust Text Classification}
+\author{Christoph Weisser$^{1,2}$, LabelFusion Contributors$^{1}$ \\
+\small $^{1}$Campus-Institut Data Science, G\"ottingen, Germany \\
+\small $^{2}$Centre for Statistics, Georg-August-Universit\"at G\"ottingen, Germany}
+\date{August 15, 2025}
+
+% Helpers
+\newcommand{\etal}{\textit{et al.}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+LabelFusion is a learned fusion ensemble for text classification that combines a fine-tuned transformer classifier (e.g., RoBERTa) with one or more Large Language Models (LLMs). It concatenates calibrated per-class signals from both model families and trains a small multi-layer perceptron (MLP) to produce final predictions for multi-class and multi-label tasks. This approach harnesses complementary strengths---LLM reasoning and transformer efficiency---to deliver robust accuracy with practical control over latency and cost. We describe the design, implementation, and use cases, and provide command-line and Python APIs for reproducible training and evaluation.
+\end{abstract}
+
+\section{Introduction}
+Text classification underpins applications such as sentiment analysis, topic tagging, moderation, and document routing. Transformer-based classifiers (e.g., BERT/RoBERTa) achieve strong supervised performance\cite{devlin2018bert,liu2019roberta}, whereas frontier LLMs provide powerful few-/zero-shot capabilities\cite{openai2023gpt4}. However, no single approach is uniformly optimal: LLMs may be costly and rate-limited; supervised transformers can struggle with ambiguous or out-of-distribution cases. 
+
+\emph{LabelFusion} addresses this gap by learning to fuse signals from both model families. The core idea is simple: obtain logits (per-class scores) from a transformer classifier and per-class scores from LLM(s), calibrate them, concatenate, and train a compact MLP to output fused logits. The ML backbone uses a small learning rate; the fusion head uses a higher rate for fast adaptation. LabelFusion supports multi-class and multi-label tasks, includes LLM caching and retries, and integrates cleanly with common ensemble utilities.
+
+\section{Related Work}
+Ensemble methods improve robustness by aggregating diverse predictors\cite{dietterich2000ensemble,hansen1990neural}. Mixture-of-experts techniques learn to combine specialized components\cite{jacobs1991adaptive}. In tooling, scikit-learn\cite{pedregosa2011scikit} and Hugging Face Transformers\cite{wolf2019huggingface} provide strong baselines but do not offer a turnkey learned fusion of LLMs with supervised transformers. Orchestration frameworks focus on tool use rather than classification ensembles. Calibration methods\cite{guo2017calibration,zadrozny2002transforming} improve probability estimates and are directly applicable to the per-class signals LabelFusion consumes.
+
+\section{Method}
+\subsection{Components}
+\paragraph{Transformer classifier.} We employ a RoBERTa-style classifier fine-tuned on labeled data to produce per-class logits. Training can be performed end-to-end or reused from existing checkpoints.
+
+\paragraph{LLM classifiers.} Provider-specific classifiers (e.g., OpenAI, Claude, Gemini, DeepSeek) are prompted to return per-class scores. Responses are cached on disk to reduce cost and latency, and batched where supported.
+
+\paragraph{Fusion head.} A small MLP (typically 1--3 hidden layers, e.g., [64, 32]) takes the concatenation of transformer logits and LLM scores and outputs fused logits. During training, we keep the backbone learning rate small (e.g., $1\times10^{-5}$) and use a higher rate for the MLP (e.g., $1\times10^{-3}$).
+
+\subsection{Calibration}
+To improve probability estimates and downstream decision quality, LabelFusion applies calibration to model signals prior to fusion. For multi-class tasks, temperature scaling or Platt-style calibration is used; for multi-label tasks, isotonic regression per label is supported\cite{guo2017calibration,zadrozny2002transforming}. Calibrated signals often improve both fused accuracy and threshold-based decisions.
+
+\subsection{Training and Inference}
+Training proceeds in five steps: (1) prepare/train the transformer backbone; (2) collect LLM scores for the training split (with caching); (3) split validation data for calibration; (4) train the fusion head with differential learning rates; (5) evaluate on held-out data and store metrics. Inference replicates the signal path: transformer logits + cached/online LLM scores $\rightarrow$ calibration $\rightarrow$ fusion head $\rightarrow$ predictions.
+
+\section{Implementation}
+LabelFusion is implemented within a modular text classification package. It offers two primary usage modes:
+
+\paragraph{AutoFusion (high-level).} A minimal Python API trains the full pipeline end-to-end:
+\begin{verbatim}
+from textclassify import AutoFusionClassifier
+config = { 'llm_provider': 'deepseek',
+           'label_columns': ['positive','negative','neutral'] }
+clf = AutoFusionClassifier(config)
+clf.fit(train_df)
+pred = clf.predict(["This is amazing!"])
+\end{verbatim}
+
+\paragraph{CLI and YAML.} The command-line interface supports creating a starter config, training, and optional evaluation artifacts:
+\begin{verbatim}
+python train_fusion.py --create-config fusion_config.yaml
+python train_fusion.py --config fusion_config.yaml
+\end{verbatim}
+
+\paragraph{Engineering features.} The implementation includes: (i) LLM score caching; (ii) retries/backoff for provider limits; (iii) batching; (iv) deterministic seeds for tests; (v) automatic metrics (accuracy, F1, per-label reports) stored with run outputs.
+
+\section{Experiments}
+We observe that learned fusion typically outperforms either component alone when label boundaries are ambiguous or domains vary. While exact numbers depend on datasets and providers, representative patterns include: (i) consistent F1 improvements over the transformer baseline; (ii) cost reduction versus LLM-only pipelines by relegating routine examples to the transformer and reserving LLM calls for uncertain cases; (iii) stable calibration that benefits thresholding in multi-label tasks. A thorough benchmark suite is planned as part of future work.
+
+\section{Use Cases}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Customer feedback analysis:} multi-label taxonomies spanning sentiment, aspects, and urgency.
+  \item \textbf{Content moderation:} routine items handled by the transformer; uncertain cases benefit from LLM reasoning.
+  \item \textbf{Document routing:} scientific and technical article triage across heterogeneous topics.
+\end{itemize}
+
+\section{Discussion and Limitations}
+LabelFusion depends on provider APIs for LLM scoring. Cost and latency vary by provider and quota; caching mitigates repeated calls. Data governance or privacy constraints may limit LLM use; the method remains applicable with local LLMs where available. The learned fusion head is small but introduces an extra training stage; we provide sensible defaults and simple APIs to reduce friction.
+
+\section{Conclusion}
+LabelFusion provides a practical, learned method to combine transformer classifiers with LLMs for robust text classification across multi-class and multi-label settings. By calibrating and fusing complementary signals, it enables accuracy gains with explicit cost and latency control. The system integrates cleanly with existing pipelines via a minimal high-level API and a CLI for reproducible training.
+
+\paragraph{Availability} LabelFusion is distributed under the MIT license as part of the text classification package in this repository. See the README and Fusion documentation for installation and examples.
+
+\section*{Acknowledgements}
+We thank contributors and users for feedback and datasets. LabelFusion builds on Hugging Face Transformers, scikit-learn, PyTorch, and provider SDKs.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
