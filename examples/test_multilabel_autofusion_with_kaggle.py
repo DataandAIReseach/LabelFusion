@@ -21,55 +21,53 @@ from textclassify.ensemble.auto_fusion import AutoFusionClassifier
 load_dotenv()
 
 def prepare_multilabel_kaggle_data():
-    """Load and prepare a multi-label version of the Kaggle ecommerce dataset."""
-    print("📂 Loading Kaggle ecommerce dataset for multi-label classification...")
+    """Load and prepare a multi-label version of the abstracts dataset."""
+    print("📂 Loading abstracts dataset for multi-label classification...")
     
     # Load data
-    df = pd.read_csv('data/ecommerceDataset.csv', encoding='latin1')
+    df = pd.read_csv('data/abstracts.csv', encoding='latin1')
     print(f"   📊 Original dataset shape: {df.shape}")
+    print(f"   📋 Original columns: {df.columns.tolist()}")
     
-    # Drop first column and reorder/rename columns
-    cols = df.columns.tolist()
-    df = df[[cols[1], cols[0]]]  # Swap columns
-    df.columns = ['text', 'original_label']  # Rename columns
+    # Delete ID column if it exists
+    if 'ID' in df.columns:
+        df = df.drop('ID', axis=1)
+        print("   🗑️  Deleted ID column")
     
-    # Create multi-label scenario by analyzing text content
-    # We'll create multiple binary labels based on keywords in the text
-    print("   🏷️  Creating multi-label scenario from text content...")
+    # Fuse TITLE and ABSTRACT columns into a new "text" column
+    if 'TITLE' in df.columns and 'ABSTRACT' in df.columns:
+        print("   🔗 Fusing TITLE and ABSTRACT columns into 'text' column...")
+        df['text'] = df['TITLE'].fillna('') + ' ' + df['ABSTRACT'].fillna('')
+        df['text'] = df['text'].str.strip()  # Remove leading/trailing whitespace
+        
+        # Remove TITLE and ABSTRACT columns, keep other columns as labels
+        label_columns = [col for col in df.columns if col not in ['TITLE', 'ABSTRACT', 'text']]
+        df = df[['text'] + label_columns]
+        
+        print(f"   🏷️  Using existing label columns: {label_columns}")
+        
+        # Verify that label columns contain binary values (0/1)
+        for label_col in label_columns:
+            unique_vals = df[label_col].unique()
+            print(f"       {label_col}: unique values = {sorted(unique_vals)}")
+            
+            # Convert to binary if needed
+            if not all(val in [0, 1] for val in unique_vals if pd.notna(val)):
+                print(f"       Converting {label_col} to binary format...")
+                df[label_col] = (df[label_col] > 0).astype(int)
+        
+    else:
+        # Fallback: assume first column is text, rest are labels
+        print("   📝 Using first column as text, rest as label columns...")
+        text_col = df.columns[0]
+        label_columns = df.columns[1:].tolist()
+        df = df.rename(columns={text_col: 'text'})
     
-    # Define label categories based on common ecommerce themes
-    label_categories = {
-        'positive_sentiment': ['good', 'great', 'excellent', 'amazing', 'love', 'perfect', 'best', 'awesome', 'wonderful'],
-        'negative_sentiment': ['bad', 'terrible', 'awful', 'hate', 'worst', 'horrible', 'disappointing', 'poor'],
-        'quality_related': ['quality', 'material', 'build', 'construction', 'durable', 'cheap', 'flimsy'],
-        'price_related': ['price', 'cost', 'expensive', 'cheap', 'value', 'money', 'affordable', 'budget'],
-        'delivery_related': ['delivery', 'shipping', 'arrived', 'fast', 'slow', 'quick', 'package']
-    }
+    print(f"   📋 After processing columns: {df.columns.tolist()}")
+    print(f"   📊 Processed dataset shape: {df.shape}")
+    print(f"   📝 Sample text length: {len(df['text'].iloc[0])} characters")
     
-    # Create binary labels for each category
-    for category, keywords in label_categories.items():
-        df[category] = 0
-        for keyword in keywords:
-            # Case-insensitive search for keywords in text
-            mask = df['text'].str.lower().str.contains(keyword, na=False)
-            df.loc[mask, category] = 1
-    
-    # Ensure each sample has at least one label
-    label_columns = list(label_categories.keys())
-    no_labels_mask = df[label_columns].sum(axis=1) == 0
-    
-    # For samples with no labels, assign based on original label sentiment
-    if no_labels_mask.sum() > 0:
-        print(f"   📝 Assigning default labels to {no_labels_mask.sum()} samples without labels...")
-        # Simple heuristic: positive original labels get positive sentiment
-        positive_original = df[no_labels_mask]['original_label'].isin(['Books', 'Clothing & Accessories', 'Electronics'])
-        df.loc[no_labels_mask & positive_original, 'positive_sentiment'] = 1
-        df.loc[no_labels_mask & ~positive_original, 'negative_sentiment'] = 1
-    
-    # Remove the original label column
-    df = df.drop('original_label', axis=1)
-    
-    print(f"   🏷️  Multi-label categories: {label_columns}")
+    # Check label distribution
     print(f"   📊 Label distribution:")
     for label in label_columns:
         count = df[label].sum()
@@ -80,12 +78,24 @@ def prepare_multilabel_kaggle_data():
     multi_label_count = (df[label_columns].sum(axis=1) > 1).sum()
     print(f"   🔄 Samples with multiple labels: {multi_label_count} ({(multi_label_count/len(df)*100):.1f}%)")
     
-    # Shuffle and split data
+    # Ensure each sample has at least one label
+    no_labels_mask = df[label_columns].sum(axis=1) == 0
+    if no_labels_mask.sum() > 0:
+        print(f"   ⚠️  Warning: {no_labels_mask.sum()} samples have no labels")
+        # Assign first label as default for samples without labels
+        if label_columns:
+            df.loc[no_labels_mask, label_columns[0]] = 1
+            print(f"   📝 Assigned {label_columns[0]} as default label for samples without labels")
+    multi_label_count = (df[label_columns].sum(axis=1) > 1).sum()
+    print(f"   🔄 Samples with multiple labels: {multi_label_count} ({(multi_label_count/len(df)*100):.1f}%)")
+    
+    # Shuffle and split data randomly
     df_shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
     
-    # Use appropriate data size for multi-label testing (25 for training, 10 for testing)
-    train_df = df_shuffled.iloc[:25]
-    test_df = df_shuffled.iloc[25:35]
+    # Randomly sample training and test sets
+    train_df = df_shuffled.sample(n=20, random_state=42).reset_index(drop=True)
+    remaining_df = df_shuffled.drop(train_df.index).reset_index(drop=True)
+    test_df = remaining_df.sample(n=10, random_state=42).reset_index(drop=True)
     
     print(f"   ✅ Training set: {len(train_df)} samples")
     print(f"   ✅ Test set: {len(test_df)} samples")
@@ -102,8 +112,8 @@ def prepare_multilabel_kaggle_data():
     return train_df, test_df, label_columns
 
 def test_multilabel_autofusion_with_kaggle():
-    """Test AutoFusion classifier with multi-label Kaggle dataset."""
-    print("\n🚀 TESTING MULTI-LABEL AUTOFUSION WITH KAGGLE DATASET")
+    """Test AutoFusion classifier with multi-label abstracts dataset."""
+    print("\n🚀 TESTING MULTI-LABEL AUTOFUSION WITH ABSTRACTS DATASET")
     print("=" * 70)
     
     # Prepare data
@@ -118,7 +128,7 @@ def test_multilabel_autofusion_with_kaggle():
         'batch_size': 4,  # Small batch for quick testing
         'num_epochs': 2,  # Reduced epochs for quick testing
         'fusion_epochs': 3,  # Reduced fusion epochs
-        'output_dir': 'autofusion_multilabel_kaggle_test',
+        'output_dir': 'autofusion_multilabel_abstracts_test',
         'ml_model': 'roberta-base',
         'max_length': 256  # Shorter for quick testing
     }
@@ -223,16 +233,16 @@ def compare_with_single_label():
     print("   📊 See test_singlelabel_autofusion_with_ecommerce.py for single-label testing")
 
 def main():
-    """Main function to run Multi-Label AutoFusion test with Kaggle data."""
-    print("🧪 MULTI-LABEL AUTOFUSION KAGGLE DATASET TEST")
+    """Main function to run Multi-Label AutoFusion test with abstracts data."""
+    print("🧪 MULTI-LABEL AUTOFUSION ABSTRACTS DATASET TEST")
     print("=" * 70)
     print("Testing the simplified AutoFusion interface with multi-label classification")
-    print("This demonstrates how config is passed for multi-label scenarios")
+    print("This demonstrates how config is passed for multi-label scenarios using research abstracts")
     
     # Check if data file exists
-    if not os.path.exists('data/ecommerceDataset.csv'):
-        print("❌ Error: data/ecommerceDataset.csv not found")
-        print("   Please ensure the Kaggle dataset is in the data/ directory")
+    if not os.path.exists('data/abstracts.csv'):
+        print("❌ Error: data/abstracts.csv not found")
+        print("   Please ensure the abstracts dataset is in the data/ directory")
         return
     
     # Run Multi-Label AutoFusion test

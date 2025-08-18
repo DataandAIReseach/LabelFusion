@@ -26,11 +26,38 @@ def prepare_kaggle_data():
     # Load data
     df = pd.read_csv('data/ecommerceDataset.csv', encoding='latin1')
     print(f"   📊 Original dataset shape: {df.shape}")
+    print(f"   📋 Original columns: {df.columns.tolist()}")
     
-    # Drop first column and reorder/rename columns
-    cols = df.columns.tolist()
-    df = df[[cols[1], cols[0]]]  # Swap columns
-    df.columns = ['text', 'label']  # Rename columns
+    # Delete ID column if it exists
+    if 'ID' in df.columns:
+        df = df.drop('ID', axis=1)
+        print("   🗑️  Deleted ID column")
+    
+    # Fuse TITLE and ABSTRACT columns into a new "text" column
+    if 'TITLE' in df.columns and 'ABSTRACT' in df.columns:
+        print("   🔗 Fusing TITLE and ABSTRACT columns into 'text' column...")
+        df['text'] = df['TITLE'].fillna('') + ' ' + df['ABSTRACT'].fillna('')
+        df['text'] = df['text'].str.strip()  # Remove leading/trailing whitespace
+        
+        # Keep the original label column name for now
+        if len(df.columns) >= 3:  # Should have TITLE, ABSTRACT, and at least one label column
+            label_col = [col for col in df.columns if col not in ['TITLE', 'ABSTRACT', 'text']][0]
+            df = df[['text', label_col]]
+            df.columns = ['text', 'label']
+        else:
+            # Fallback: assume last column is label
+            cols = df.columns.tolist()
+            df = df[['text', cols[-1]]]
+            df.columns = ['text', 'label']
+    else:
+        # Original logic for ecommerce dataset without TITLE/ABSTRACT columns
+        cols = df.columns.tolist()
+        df = df[[cols[1], cols[0]]]  # Swap columns
+        df.columns = ['text', 'label']  # Rename columns
+    
+    print(f"   📋 After processing columns: {df.columns.tolist()}")
+    print(f"   📊 Processed dataset shape: {df.shape}")
+    print(f"   📝 Sample text length: {len(df['text'].iloc[0])} characters")
     
     # Convert label column to dummy variables
     label_dummies = pd.get_dummies(df['label'], prefix='')
@@ -40,12 +67,13 @@ def prepare_kaggle_data():
     label_columns = label_dummies.columns.tolist()
     print(f"   🏷️  Available labels: {label_columns}")
     
-    # Shuffle and split data
+    # Shuffle and split data randomly
     df_shuffled = df.sample(frac=1, random_state=42).reset_index(drop=True)
     
-    # Use more data for AutoFusion test (20 for training, 10 for testing)
-    train_df = df_shuffled.iloc[:20]
-    test_df = df_shuffled.iloc[20:25]
+    # Randomly sample training and test sets
+    train_df = df_shuffled.sample(n=20, random_state=42).reset_index(drop=True)
+    remaining_df = df_shuffled.drop(train_df.index).reset_index(drop=True)
+    test_df = remaining_df.sample(n=10, random_state=42).reset_index(drop=True)
     
     print(f"   ✅ Training set: {len(train_df)} samples")
     print(f"   ✅ Test set: {len(test_df)} samples")
