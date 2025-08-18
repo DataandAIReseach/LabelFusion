@@ -40,10 +40,18 @@ class Prompt:
         rendered_parts = []
         for part in self.parts:
             try:
-                rendered = part["content"].format(**combined_vars)
-            except KeyError as e:
-                raise ValueError(f"Missing variable in prompt: {e}")
-            rendered_parts.append(rendered)
+                # Use safe string formatting to avoid issues with LaTeX symbols and backslashes
+                content = part["content"]
+                
+                # Replace variables one by one to avoid conflicts with special characters
+                for var_name, var_value in combined_vars.items():
+                    placeholder = "{" + var_name + "}"
+                    if placeholder in content:
+                        content = content.replace(placeholder, str(var_value))
+                
+                rendered_parts.append(content)
+            except Exception as e:
+                raise ValueError(f"Error rendering prompt part '{part.get('name', 'unknown')}': {e}")
 
         return "\n\n".join(rendered_parts).strip()
 

@@ -265,7 +265,8 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 3: Get ML predictions on validation set
         print("Getting ML predictions on validation set...")
-        ml_val_result = self.ml_model.predict(texts=val_df[text_column].tolist())
+        ml_val_result = self.ml_model.predict(texts=val_df[text_column].tolist(), 
+                                             true_labels=val_df[label_columns].values.tolist())
         
     
 
@@ -304,7 +305,7 @@ class FusionEnsemble(BaseEnsemble):
         self.is_trained = True
         
         try:
-            test_result = self.predict(test_df[text_column].tolist(), test_df[label_columns].values.tolist())
+            test_result = self.predict(test_df)
             
             # Store test performance
             self.test_performance = test_result.metadata.get('metrics', {}) if test_result.metadata else {}
