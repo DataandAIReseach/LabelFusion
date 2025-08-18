@@ -265,8 +265,7 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 3: Get ML predictions on validation set
         print("Getting ML predictions on validation set...")
-        ml_val_result = self.ml_model.predict(texts=val_df[text_column].tolist(),
-                                              true_labels=val_df[label_columns].values.tolist())
+        ml_val_result = self.ml_model.predict(texts=val_df[text_column].tolist())
         
     
 
@@ -468,50 +467,33 @@ class FusionEnsemble(BaseEnsemble):
         
         return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
     
-    def predict(self, data: Union[List[str], pd.DataFrame], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+    def predict(self, data: pd.DataFrame) -> ClassificationResult:
         """Predict using fusion ensemble.
         
         Args:
-            data: Either a list of texts or a DataFrame with text column (and optionally label columns)
-            true_labels: Optional true labels for evaluation (if not provided in DataFrame)
+            data: DataFrame with text column (and optionally label columns)
         """
         if not self.is_trained:
             raise EnsembleError("Fusion ensemble must be trained before prediction")
         
-        # Handle different input formats
-        if isinstance(data, list):
-            # List of texts
-            texts = data
-            test_df = pd.DataFrame({'text': texts})
-            extracted_labels = true_labels  # Use provided true_labels
-        elif isinstance(data, pd.DataFrame):
-            # DataFrame input
-            test_df = data.copy()
-            text_column = 'text'  # Could be configurable
-            if text_column not in test_df.columns:
-                raise EnsembleError(f"Text column '{text_column}' not found in DataFrame")
-            texts = test_df[text_column].tolist()
-            
-            # Extract true labels from DataFrame if available
-            if true_labels is None:
-                # Try to extract labels from DataFrame using the known label columns
-                if hasattr(self, 'classes_') and self.classes_:
-                    label_columns = [col for col in self.classes_ if col in test_df.columns]
-                    if label_columns:
-                        extracted_labels = test_df[label_columns].values.tolist()
-                    else:
-                        extracted_labels = None
-                else:
-                    extracted_labels = None
-            else:
-                extracted_labels = true_labels
-        else:
-            raise EnsembleError(f"Unsupported input format: {type(data)}. Expected List[str] or pd.DataFrame")
+        # DataFrame input only
+        test_df = data.copy()
+        text_column = 'text'  # Could be configurable
+        if text_column not in test_df.columns:
+            raise EnsembleError(f"Text column '{text_column}' not found in DataFrame")
+        texts = test_df[text_column].tolist()
         
-        # Get ML predictions
-        ml_result = self.ml_model.predict(texts)
+        # Extract true labels from DataFrame if available
+        extracted_labels = None
+        if hasattr(self, 'classes_') and self.classes_:
+            label_columns = [col for col in self.classes_ if col in test_df.columns]
+            if label_columns:
+                extracted_labels = test_df[label_columns].values.tolist()
         
-        # Get LLM predictions using cached training data for context
+        # Get ML predictions - match the format used in fit()
+        ml_result = self.ml_model.predict(texts=texts)
+        
+        # Get LLM predictions - match the format used in fit()
         llm_result = self.llm_model.predict(train_df=self.train_df_cache, test_df=test_df)
         
         # Create dataset using both ML and LLM predictions

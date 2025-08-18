@@ -163,7 +163,7 @@ class AutoFusionClassifier(BaseClassifier):
                 - List of strings
                 - pandas DataFrame with text column
                 - Single string
-            true_labels: Optional true labels for evaluation
+            true_labels: Optional true labels for evaluation (will be added to DataFrame if provided)
             
         Returns:
             ClassificationResult with predictions and optional metrics
@@ -171,19 +171,31 @@ class AutoFusionClassifier(BaseClassifier):
         if not self.is_trained:
             raise ModelTrainingError("AutoFusion classifier must be trained before prediction", self.config.model_name)
         
-        # Prepare input data
+        # Convert all input formats to DataFrame
         if isinstance(texts, str):
-            # Single string - convert to list
-            input_data = [texts]
+            # Single string - convert to DataFrame
+            input_df = pd.DataFrame({'text': [texts]})
+        elif isinstance(texts, list):
+            # List of texts - convert to DataFrame
+            input_df = pd.DataFrame({'text': texts})
         elif isinstance(texts, pd.DataFrame):
-            # DataFrame - pass directly to fusion ensemble (it will handle label extraction)
-            input_data = texts
+            # Already a DataFrame - use as is
+            input_df = texts.copy()
         else:
-            # List of texts - pass as is
-            input_data = texts
+            raise ValueError(f"Unsupported input type: {type(texts)}")
         
-        # Make predictions using fusion ensemble
-        result = self.fusion_ensemble.predict(input_data, true_labels)
+        # Add true labels to DataFrame if provided
+        if true_labels is not None:
+            if len(true_labels) != len(input_df):
+                raise ValueError(f"Number of true labels ({len(true_labels)}) must match number of texts ({len(input_df)})")
+            
+            # Add label columns to DataFrame
+            for i, label_col in enumerate(self.label_columns):
+                if i < len(true_labels[0]):
+                    input_df[label_col] = [labels[i] for labels in true_labels]
+        
+        # Make predictions using fusion ensemble (now only accepts DataFrame)
+        result = self.fusion_ensemble.predict(input_df)
         
         # Add AutoFusion metadata
         if result.metadata is None:
@@ -404,39 +416,124 @@ class AutoFusionClassifier(BaseClassifier):
     
     def _save_models(self):
         """Save all trained models and configuration."""
-        # Save fusion ensemble
         import pickle
-        model_path = self.output_dir / 'auto_fusion_classifier.pkl'
-        with open(model_path, 'wb') as f:
-            pickle.dump(self, f)
-        
-        # Save configuration
+        import torch
         import yaml
+        
+        # Save configuration first
         config_path = self.output_dir / 'auto_fusion_config.yaml'
         with open(config_path, 'w') as f:
             yaml.dump(self.user_config, f, default_flow_style=False)
+        
+        # Save basic classifier state (without PyTorch models)
+        classifier_state = {
+            'llm_provider': self.llm_provider,
+            'label_columns': self.label_columns,
+            'multi_label': self.multi_label,
+            'ml_model_name': self.ml_model_name,
+            'classification_type': self.classification_type,
+            'classes_': self.classes_,
+            'is_trained': self.is_trained,
+            'user_config': self.user_config
+        }
+        
+        state_path = self.output_dir / 'classifier_state.pkl'
+        with open(state_path, 'wb') as f:
+            pickle.dump(classifier_state, f)
+        
+        # Save PyTorch models separately using torch.save
+        if self.fusion_ensemble and hasattr(self.fusion_ensemble, 'fusion_wrapper') and self.fusion_ensemble.fusion_wrapper:
+            fusion_model_path = self.output_dir / 'fusion_model.pt'
+            torch.save({
+                'fusion_mlp_state_dict': self.fusion_ensemble.fusion_wrapper.fusion_mlp.state_dict(),
+                'num_labels': self.fusion_ensemble.num_labels,
+                'fusion_hidden_dims': self.fusion_ensemble.fusion_hidden_dims,
+                'classification_type': self.fusion_ensemble.classification_type
+            }, fusion_model_path)
+        
+        # Save ML model separately if it has a save method
+        if self.ml_model and hasattr(self.ml_model, 'save_model'):
+            ml_model_path = self.output_dir / 'ml_model'
+            self.ml_model.save_model(str(ml_model_path))
+        
+        print(f"   💾 Saved classifier state to {state_path}")
+        print(f"   💾 Saved configuration to {config_path}")
+        if self.fusion_ensemble and hasattr(self.fusion_ensemble, 'fusion_wrapper') and self.fusion_ensemble.fusion_wrapper:
+            print(f"   💾 Saved fusion model to {self.output_dir / 'fusion_model.pt'}")
+        if self.ml_model and hasattr(self.ml_model, 'save_model'):
+            print(f"   💾 Saved ML model to {self.output_dir / 'ml_model'}")
     
     @classmethod
     def load(cls, model_path: str) -> 'AutoFusionClassifier':
         """Load a saved AutoFusion classifier.
         
         Args:
-            model_path: Path to saved model directory or pickle file
+            model_path: Path to saved model directory
             
         Returns:
             Loaded AutoFusionClassifier
         """
+        import pickle
+        import torch
+        
         model_path = Path(model_path)
         
-        if model_path.is_dir():
-            pickle_path = model_path / 'auto_fusion_classifier.pkl'
-        else:
-            pickle_path = model_path
+        if not model_path.is_dir():
+            raise ValueError(f"Model path must be a directory: {model_path}")
         
-        import pickle
-        with open(pickle_path, 'rb') as f:
-            classifier = pickle.load(f)
+        # Load classifier state
+        state_path = model_path / 'classifier_state.pkl'
+        if not state_path.exists():
+            raise FileNotFoundError(f"Classifier state not found: {state_path}")
         
+        with open(state_path, 'rb') as f:
+            classifier_state = pickle.load(f)
+        
+        # Recreate the classifier
+        classifier = cls(classifier_state['user_config'])
+        
+        # Restore state
+        classifier.llm_provider = classifier_state['llm_provider']
+        classifier.label_columns = classifier_state['label_columns']
+        classifier.multi_label = classifier_state['multi_label']
+        classifier.ml_model_name = classifier_state['ml_model_name']
+        classifier.classification_type = classifier_state['classification_type']
+        classifier.classes_ = classifier_state['classes_']
+        classifier.is_trained = classifier_state['is_trained']
+        
+        # Recreate the models
+        classifier.ml_model = classifier._create_ml_model()
+        classifier.llm_model = classifier._create_llm_model()
+        classifier.fusion_ensemble = classifier._create_fusion_ensemble()
+        
+        # Load ML model if it was saved
+        ml_model_path = model_path / 'ml_model'
+        if ml_model_path.exists() and hasattr(classifier.ml_model, 'load_model'):
+            classifier.ml_model.load_model(str(ml_model_path))
+            classifier.ml_model.is_trained = True
+        
+        # Load fusion model if it was saved
+        fusion_model_path = model_path / 'fusion_model.pt'
+        if fusion_model_path.exists():
+            fusion_data = torch.load(fusion_model_path, map_location='cpu')
+            
+            # Recreate fusion wrapper with correct parameters
+            from .fusion import FusionWrapper
+            task = "multilabel" if classifier.classification_type == ClassificationType.MULTI_LABEL else "multiclass"
+            classifier.fusion_ensemble.fusion_wrapper = FusionWrapper(
+                ml_model=classifier.ml_model,
+                num_labels=fusion_data['num_labels'],
+                task=task,
+                hidden_dims=fusion_data['fusion_hidden_dims']
+            )
+            
+            # Load the trained weights
+            classifier.fusion_ensemble.fusion_wrapper.fusion_mlp.load_state_dict(fusion_data['fusion_mlp_state_dict'])
+            classifier.fusion_ensemble.num_labels = fusion_data['num_labels']
+            classifier.fusion_ensemble.fusion_hidden_dims = fusion_data['fusion_hidden_dims']
+            classifier.fusion_ensemble.is_trained = True
+        
+        print(f"✅ Loaded AutoFusion classifier from {model_path}")
         return classifier
     
     @property
