@@ -163,7 +163,11 @@ class AutoFusionClassifier(BaseClassifier):
                 - List of strings
                 - pandas DataFrame with text column
                 - Single string
+<<<<<<< HEAD
             true_labels: Optional true labels for evaluation (will be added to DataFrame if provided)
+=======
+            true_labels: Optional true labels for evaluation
+>>>>>>> 95da0f5d2970ec22017dd511104cf4a56cdfdadf
             
         Returns:
             ClassificationResult with predictions and optional metrics
@@ -171,6 +175,7 @@ class AutoFusionClassifier(BaseClassifier):
         if not self.is_trained:
             raise ModelTrainingError("AutoFusion classifier must be trained before prediction", self.config.model_name)
         
+<<<<<<< HEAD
         # Convert all input formats to DataFrame
         if isinstance(texts, str):
             # Single string - convert to DataFrame
@@ -196,6 +201,21 @@ class AutoFusionClassifier(BaseClassifier):
         
         # Make predictions using fusion ensemble (now only accepts DataFrame)
         result = self.fusion_ensemble.predict(input_df)
+=======
+        # Prepare input data
+        if isinstance(texts, str):
+            # Single string - convert to list
+            input_data = [texts]
+        elif isinstance(texts, pd.DataFrame):
+            # DataFrame - pass directly to fusion ensemble (it will handle label extraction)
+            input_data = texts
+        else:
+            # List of texts - pass as is
+            input_data = texts
+        
+        # Make predictions using fusion ensemble
+        result = self.fusion_ensemble.predict(input_data, true_labels)
+>>>>>>> 95da0f5d2970ec22017dd511104cf4a56cdfdadf
         
         # Add AutoFusion metadata
         if result.metadata is None:
@@ -416,6 +436,7 @@ class AutoFusionClassifier(BaseClassifier):
     
     def _save_models(self):
         """Save all trained models and configuration."""
+<<<<<<< HEAD
         import pickle
         import torch
         import yaml
@@ -462,17 +483,35 @@ class AutoFusionClassifier(BaseClassifier):
             print(f"   💾 Saved fusion model to {self.output_dir / 'fusion_model.pt'}")
         if self.ml_model and hasattr(self.ml_model, 'save_model'):
             print(f"   💾 Saved ML model to {self.output_dir / 'ml_model'}")
+=======
+        # Save fusion ensemble
+        import pickle
+        model_path = self.output_dir / 'auto_fusion_classifier.pkl'
+        with open(model_path, 'wb') as f:
+            pickle.dump(self, f)
+        
+        # Save configuration
+        import yaml
+        config_path = self.output_dir / 'auto_fusion_config.yaml'
+        with open(config_path, 'w') as f:
+            yaml.dump(self.user_config, f, default_flow_style=False)
+>>>>>>> 95da0f5d2970ec22017dd511104cf4a56cdfdadf
     
     @classmethod
     def load(cls, model_path: str) -> 'AutoFusionClassifier':
         """Load a saved AutoFusion classifier.
         
         Args:
+<<<<<<< HEAD
             model_path: Path to saved model directory
+=======
+            model_path: Path to saved model directory or pickle file
+>>>>>>> 95da0f5d2970ec22017dd511104cf4a56cdfdadf
             
         Returns:
             Loaded AutoFusionClassifier
         """
+<<<<<<< HEAD
         import pickle
         import torch
         
@@ -534,6 +573,19 @@ class AutoFusionClassifier(BaseClassifier):
             classifier.fusion_ensemble.is_trained = True
         
         print(f"✅ Loaded AutoFusion classifier from {model_path}")
+=======
+        model_path = Path(model_path)
+        
+        if model_path.is_dir():
+            pickle_path = model_path / 'auto_fusion_classifier.pkl'
+        else:
+            pickle_path = model_path
+        
+        import pickle
+        with open(pickle_path, 'rb') as f:
+            classifier = pickle.load(f)
+        
+>>>>>>> 95da0f5d2970ec22017dd511104cf4a56cdfdadf
         return classifier
     
     @property
