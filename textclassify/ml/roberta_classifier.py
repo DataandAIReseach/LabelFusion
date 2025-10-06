@@ -179,7 +179,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         total_steps = len(dataloader) * self.num_epochs
         scheduler = get_linear_schedule_with_warmup(
-            optimizer,
+            optimizer,g
             num_warmup_steps=self.warmup_steps,
             num_training_steps=total_steps
         )
