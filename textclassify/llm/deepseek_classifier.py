@@ -29,14 +29,13 @@ class DeepSeekClassifier(BaseLLMClassifier):
             multi_label: Whether this is a multi-label classifier
             few_shot_mode: Mode for few-shot learning
         """
-        # Set provider before calling super().__init__
-        config.provider = 'deepseek'
-        
         super().__init__(
             config=config,
+            text_column=text_column,
+            label_columns=label_columns,
             multi_label=multi_label,
             few_shot_mode=few_shot_mode,
-            label_columns=label_columns
+            provider='deepseek'
         )
         
         # Set up classes and prompt engineer configuration

@@ -4,6 +4,8 @@ import pytest
 import sys
 import os
 
+from textclassify.core.types import ModelConfig
+
 # Add the package to the path for testing
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -105,6 +107,48 @@ class TestPackageImports:
         
         # Test version
         assert hasattr(textclassify, '__version__')
+    
+    def test_openai_classifier_on_ag_news(self):
+        """Test OpenAI classifier on AG News dataset."""
+        import pandas as pd
+        from textclassify.llm.openai_classifier import OpenAIClassifier
+        from textclassify.core.types import ModelConfig
+        
+        # Load your dataset
+        train_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_train_balanced.csv")
+        test_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_test_balanced.csv")
+        
+        # Configure the model
+        from textclassify.core.types import ModelConfig, ModelType
+        config = ModelConfig(
+            model_name="gpt-3.5-turbo",  # Required
+            model_type=ModelType.LLM,    # Required
+            parameters={
+                "model": "gpt-5-2025-08-07",
+                "temperature": 0.1,
+                "max_completion_tokens": 150,
+                "top_p": 1.0
+            }
+        )
+        
+        # Initialize classifier
+        classifier = OpenAIClassifier(
+            config=config,
+            text_column='description',
+            label_columns=["label_1", "label_2", "label_3", "label_4"],
+            multi_label=False
+        )
+        
+        # Test prediction (use small sample for testing)
+        result = classifier.predict(
+            train_df=train_df.head(5),  # Few-shot examples
+            test_df=test_df.head(3)     # Test samples
+        )
+        
+        # Assert results
+        assert len(result.predictions) == 3
+        assert result.model_name == "gpt-3.5-turbo"
+        assert 'openai' in result.model_info['provider']
 
 
 class TestBasicFunctionality:
