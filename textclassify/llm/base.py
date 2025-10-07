@@ -15,6 +15,7 @@ from ..core.exceptions import PredictionError, ValidationError, APIError
 from ..prompt_engineer.base import PromptEngineer
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
+from .prediction_cache import LLMPredictionCache
 
 class BaseLLMClassifier(AsyncBaseClassifier):
     """Base class for all LLM-based text classifiers."""
@@ -27,7 +28,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         multi_label: bool = False,
         few_shot_mode: str = "few_shot",
         verbose: bool = True,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
+        enable_cache: bool = True,
+        cache_dir: str = "cache/llm"
     ):
         """Initialize the LLM classifier.
         
@@ -39,6 +42,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             few_shot_mode: Mode for few-shot learning (default: "few_shot")
             verbose: Whether to show detailed progress (default: True)
             provider: LLM provider to use ('openai', 'gemini', 'deepseek', etc.)
+            enable_cache: Whether to enable prediction caching and persistence (default: True)
+            cache_dir: Directory for caching prediction results (default: "llm_cache")
         """
         super().__init__(config)
         self.config.model_type = ModelType.LLM
@@ -106,15 +111,169 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             self.logger.info(f"LLM generator initialized with provider: {self.provider}")
             self.logger.info(f"Using API key for: {self.provider}")
         
+        # Initialize prediction cache
+        self.enable_cache = enable_cache
+        self.cache = None
+        if self.enable_cache:
+            self.cache = LLMPredictionCache(
+                cache_dir=cache_dir,
+                verbose=self.verbose
+            )
+            if self.verbose:
+                self.logger.info(f"Prediction cache initialized: {self.cache.cache_dir}")
+        
         self._setup_config()
 
     def _setup_config(self) -> None:
         """Initialize configuration parameters."""
-        self.batch_size = self.config.parameters.get('batch_size', 32)
+        self.batch_size = self.config.parameters.get('batch_size', 64)  # Increased from 32 to better support stratified sampling
         self.threshold = self.config.parameters.get('threshold', 0.5)
         
         if self.verbose:
             self.logger.info(f"Configuration setup - Batch size: {self.batch_size}, Threshold: {self.threshold}")
+
+    def _sample_training_data_stratified(
+        self, 
+        train_df: pd.DataFrame, 
+        sample_size: int
+    ) -> pd.DataFrame:
+        """Sample training data ensuring all classes are represented.
+        
+        Args:
+            train_df: Training DataFrame with one-hot encoded labels
+            sample_size: Target number of samples to select
+            
+        Returns:
+            pd.DataFrame: Stratified sample ensuring class representation
+        """
+        if self.verbose:
+            self.logger.info(f"Performing stratified sampling: {sample_size} samples from {len(train_df)} total")
+        
+        if self.multi_label:
+            # For multi-label, use smart sampling to ensure label diversity
+            return self._sample_multilabel_data(train_df, sample_size)
+        else:
+            # For single-label, use stratified sampling
+            return self._sample_single_label_data(train_df, sample_size)
+
+    def _sample_single_label_data(
+        self, 
+        train_df: pd.DataFrame, 
+        sample_size: int
+    ) -> pd.DataFrame:
+        """Stratified sampling for single-label classification."""
+        
+        # Convert one-hot encoded labels back to single labels for stratification
+        label_df = train_df[self.label_columns]
+        train_df_copy = train_df.copy()
+        train_df_copy['_temp_label'] = label_df.idxmax(axis=1)
+        
+        # Calculate samples per class
+        unique_classes = train_df_copy['_temp_label'].unique()
+        num_classes = len(unique_classes)
+        min_per_class = max(2, sample_size // num_classes)  # At least 2 per class
+        
+        if self.verbose:
+            self.logger.info(f"Single-label stratified sampling: {num_classes} classes, {min_per_class} min per class")
+        
+        sampled_dfs = []
+        remaining_samples = sample_size
+        
+        # First pass: ensure minimum representation per class
+        for class_val in unique_classes:
+            class_df = train_df_copy[train_df_copy['_temp_label'] == class_val]
+            
+            # Take minimum of: available samples, desired per class, remaining budget
+            n_samples = min(len(class_df), min_per_class, remaining_samples)
+            
+            if n_samples > 0:
+                sampled_class = class_df.sample(n=n_samples, random_state=42)
+                sampled_dfs.append(sampled_class)
+                remaining_samples -= n_samples
+                
+                if self.verbose:
+                    self.logger.debug(f"Class '{class_val}': sampled {n_samples}/{len(class_df)} examples")
+        
+        # Second pass: distribute remaining samples proportionally
+        if remaining_samples > 0 and sampled_dfs:
+            combined_sample = pd.concat(sampled_dfs, ignore_index=True)
+            
+            for class_val in unique_classes:
+                if remaining_samples <= 0:
+                    break
+                    
+                class_df = train_df_copy[train_df_copy['_temp_label'] == class_val]
+                already_sampled_indices = combined_sample[combined_sample['_temp_label'] == class_val].index
+                available_df = class_df.drop(already_sampled_indices, errors='ignore')
+                
+                if len(available_df) > 0:
+                    additional = min(len(available_df), remaining_samples // num_classes + 1)
+                    if additional > 0:
+                        additional_sample = available_df.sample(n=additional, random_state=42)
+                        sampled_dfs.append(additional_sample)
+                        remaining_samples -= len(additional_sample)
+        
+        # Combine all samples and remove temp column
+        if sampled_dfs:
+            result = pd.concat(sampled_dfs, ignore_index=True)
+            result = result.drop('_temp_label', axis=1)
+            # Shuffle the final result
+            result = result.sample(frac=1, random_state=42).reset_index(drop=True)
+        else:
+            # Fallback to random sampling if stratification fails
+            result = train_df.sample(n=min(sample_size, len(train_df)), random_state=42)
+        
+        if self.verbose:
+            self.logger.info(f"Stratified sampling completed: {len(result)} samples selected")
+        
+        return result
+
+    def _sample_multilabel_data(
+        self, 
+        train_df: pd.DataFrame, 
+        sample_size: int
+    ) -> pd.DataFrame:
+        """Smart sampling for multi-label data to ensure label diversity."""
+        
+        if self.verbose:
+            self.logger.info(f"Multi-label diversity sampling: {sample_size} samples from {len(train_df)} total")
+        
+        # Calculate label frequencies to prioritize rare labels
+        label_counts = train_df[self.label_columns].sum()
+        
+        if self.verbose:
+            rare_labels = label_counts.nsmallest(5)
+            self.logger.info(f"Rarest labels: {rare_labels.to_dict()}")
+        
+        # Score each sample based on label rarity
+        sample_scores = []
+        for idx, row in train_df.iterrows():
+            score = 0
+            active_labels = [col for col in self.label_columns if row[col] == 1]
+            
+            if active_labels:
+                # Higher score for rarer label combinations
+                for label in active_labels:
+                    label_freq = label_counts[label]
+                    score += 1.0 / (label_freq + 1)  # +1 to avoid division by zero
+            else:
+                score = 0.1  # Small score for samples with no labels
+            
+            sample_scores.append((idx, score))
+        
+        # Sort by score (highest first) and take top samples
+        sample_scores.sort(key=lambda x: x[1], reverse=True)
+        selected_indices = [idx for idx, _ in sample_scores[:sample_size]]
+        
+        result = train_df.loc[selected_indices].reset_index(drop=True)
+        
+        if self.verbose:
+            # Check label coverage in selected samples
+            selected_label_counts = result[self.label_columns].sum()
+            covered_labels = (selected_label_counts > 0).sum()
+            self.logger.info(f"Multi-label sampling completed: {covered_labels}/{len(self.label_columns)} labels covered")
+        
+        return result
 
     def predict(
         self,
@@ -251,6 +410,15 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 print(f"\nProcess completed in {total_time:.2f} seconds")
                 print(f"Average: {total_time/len(prepared_test_df):.3f} seconds per sample")
             
+            # Finalize cache
+            if self.enable_cache and self.cache:
+                self.cache.save_cache()
+                if self.verbose:
+                    cache_stats = self.cache.get_cache_stats()
+                    self.logger.info(f"💾 Cache saved: {cache_stats['total_predictions']} predictions, "
+                                   f"{cache_stats['cache_size_mb']:.2f}MB")
+                    print(f"Cache: {cache_stats['total_predictions']} predictions saved to {cache_stats['cache_directory']}")
+            
             return self._create_result(predictions=predictions, metrics=metrics)
             
         except Exception as e:
@@ -374,35 +542,110 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         df: pd.DataFrame,
         text_column: str
     ) -> List[List[int]]:
-        """Generate predictions in batches with progress tracking.
+        """Generate predictions in batches with enhanced progress tracking.
         
         Returns:
             List[List[int]]: List of binary vectors representing predictions
         """
         predictions = []
-        total_batches = (len(df) + self.batch_size - 1) // self.batch_size
+        total_samples = len(df)
+        total_batches = (total_samples + self.batch_size - 1) // self.batch_size
+        
+        # Initialize progress tracking
+        cache_hits = 0
+        cache_misses = 0
+        successful_predictions = 0
+        failed_predictions = 0
         
         if self.verbose:
-            self.logger.info(f"Processing {len(df)} samples in {total_batches} batches of size {self.batch_size}")
-            print(f"Processing in {total_batches} batches...")
+            self.logger.info(f"🚀 Starting prediction for {total_samples} samples in {total_batches} batches")
+            print(f"📊 Processing {total_samples} samples in {total_batches} batches of size {self.batch_size}")
         
-        # Use tqdm for progress bar if verbose mode is enabled
+        # Create main progress bar for batches
         batch_iterator = range(0, len(df), self.batch_size)
         if self.verbose:
-            batch_iterator = tqdm(batch_iterator, desc="Processing batches", total=total_batches)
+            from tqdm import tqdm
+            batch_pbar = tqdm(
+                batch_iterator, 
+                desc="🔮 LLM Prediction Batches",
+                total=total_batches,
+                unit="batch",
+                ncols=100,
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+            )
+        else:
+            batch_pbar = batch_iterator
         
-        for i, batch_start in enumerate(batch_iterator):
-            batch_df = df.iloc[batch_start:batch_start + self.batch_size]
+        # Create individual prediction progress bar
+        if self.verbose:
+            pred_pbar = tqdm(
+                total=total_samples,
+                desc="📝 Individual Predictions",
+                unit="pred",
+                ncols=100,
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
+                position=1,
+                leave=True
+            )
+        
+        try:
+            for i, batch_start in enumerate(batch_pbar):
+                batch_df = df.iloc[batch_start:batch_start + self.batch_size]
+                batch_size_actual = len(batch_df)
+                
+                if self.verbose and not isinstance(batch_pbar, tqdm):
+                    self.logger.info(f"Processing batch {i+1}/{total_batches} ({batch_size_actual} samples)")
+                
+                # Process batch and track individual predictions
+                batch_predictions, batch_stats = await self._process_batch_with_stats(batch_df, text_column)
+                predictions.extend(batch_predictions)
+                
+                # Update statistics
+                cache_hits += batch_stats.get('cache_hits', 0)
+                cache_misses += batch_stats.get('cache_misses', 0)
+                successful_predictions += batch_stats.get('successful', 0)
+                failed_predictions += batch_stats.get('failed', 0)
+                
+                # Update progress bars
+                if self.verbose:
+                    pred_pbar.update(batch_size_actual)
+                    
+                    # Calculate rates
+                    total_processed = successful_predictions + failed_predictions
+                    success_rate = (successful_predictions / total_processed * 100) if total_processed > 0 else 0
+                    cache_rate = (cache_hits / (cache_hits + cache_misses) * 100) if (cache_hits + cache_misses) > 0 else 0
+                    
+                    # Update progress bar postfix with statistics
+                    pred_pbar.set_postfix({
+                        'Success': f'{success_rate:.1f}%',
+                        'Cache': f'{cache_rate:.1f}%',
+                        'Fails': failed_predictions
+                    })
+                    
+                    # Update batch progress bar description with current stats
+                    batch_pbar.set_description(f"🔮 Batches [✓{successful_predictions} ❌{failed_predictions} 💾{cache_hits}]")
+                
+                if self.verbose and not isinstance(batch_pbar, tqdm):
+                    self.logger.info(f"Batch {i+1} completed: {batch_size_actual} predictions, {batch_stats.get('cache_hits', 0)} cache hits")
+        
+        finally:
+            # Close progress bars
+            if self.verbose:
+                pred_pbar.close()
+                if isinstance(batch_pbar, tqdm):
+                    batch_pbar.close()
+        
+        # Final statistics
+        if self.verbose:
+            total_processed = successful_predictions + failed_predictions
+            success_rate = (successful_predictions / total_processed * 100) if total_processed > 0 else 0
+            cache_rate = (cache_hits / (cache_hits + cache_misses) * 100) if (cache_hits + cache_misses) > 0 else 0
             
-            if self.verbose and not isinstance(batch_iterator, tqdm):
-                self.logger.info(f"Processing batch {i+1}/{total_batches} ({len(batch_df)} samples)")
-                print(f"Batch {i+1}/{total_batches} processing...")
-            
-            batch_predictions = await self._process_batch(batch_df, text_column)
-            predictions.extend(batch_predictions)
-            
-            if self.verbose and not isinstance(batch_iterator, tqdm):
-                self.logger.info(f"Batch {i+1} completed ({len(batch_predictions)} predictions)")
+            print(f"\n📊 Prediction Summary:")
+            print(f"   ✅ Successful: {successful_predictions}/{total_processed} ({success_rate:.1f}%)")
+            print(f"   ❌ Failed: {failed_predictions}/{total_processed}")
+            print(f"   💾 Cache hits: {cache_hits}/{cache_hits + cache_misses} ({cache_rate:.1f}%)")
+            print(f"   🚀 Total processed: {total_samples} samples")
         
         return predictions
 
@@ -420,15 +663,37 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         batch_df: pd.DataFrame,
         text_column: str
     ) -> List[List[int]]:
-        """Process a batch of texts for prediction with detailed logging.
+        """Process a batch of texts for prediction with caching support.
         
         Returns:
             List[List[int]]: List of binary vectors representing predictions
+        """
+        predictions, _ = await self._process_batch_with_stats(batch_df, text_column)
+        return predictions
+
+    async def _process_batch_with_stats(
+        self,
+        batch_df: pd.DataFrame,
+        text_column: str
+    ) -> Tuple[List[List[int]], Dict[str, int]]:
+        """Process a batch of texts for prediction with caching support and detailed statistics.
+        
+        Returns:
+            Tuple[List[List[int]], Dict[str, int]]: (predictions, statistics)
         """
         if self.verbose:
             self.logger.debug(f"Processing batch with {len(batch_df)} texts")
         
         texts = batch_df[text_column].tolist()
+        batch_predictions = []
+        
+        # Statistics tracking
+        stats = {
+            'cache_hits': 0,
+            'cache_misses': 0,
+            'successful': 0,
+            'failed': 0
+        }
         
         # Check if prompts are already engineered
         if 'engineered_prompt' in batch_df.columns:
@@ -439,22 +704,58 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if self.verbose:
             self.logger.debug(f"Generated {len(prompts)} prompts for LLM calls")
 
-        responses = await asyncio.gather(
-            *[self._call_llm(prompt) for prompt in prompts],
-            return_exceptions=True
-        )
+        # Process each text in the batch
+        for i, (text, prompt) in enumerate(zip(texts, prompts)):
+            try:
+                # Check cache first
+                if self.enable_cache and self.cache and self.cache.has_prediction(text):
+                    cached_pred = self.cache.get_prediction(text)
+                    if cached_pred and cached_pred["success"]:
+                        batch_predictions.append(cached_pred["prediction"])
+                        stats['cache_hits'] += 1
+                        stats['successful'] += 1
+                        if self.verbose:
+                            self.logger.debug(f"Using cached prediction for text {i+1}")
+                        continue
+                
+                # Cache miss - make LLM call
+                stats['cache_misses'] += 1
+                response = await self._call_llm(prompt)
+                prediction = self._parse_prediction_response(response)
+                batch_predictions.append(prediction)
+                stats['successful'] += 1
+                
+                # Store in cache
+                if self.enable_cache and self.cache:
+                    self.cache.store_prediction(
+                        text=text,
+                        prediction=prediction,
+                        response_text=response,
+                        prompt=prompt,
+                        success=True
+                    )
+                
+            except Exception as e:
+                error_prediction = self._handle_error(e)
+                batch_predictions.append(error_prediction)
+                stats['failed'] += 1
+                stats['cache_misses'] += 1  # Failed predictions are also cache misses
+                
+                # Store failed prediction in cache
+                if self.enable_cache and self.cache:
+                    self.cache.store_prediction(
+                        text=text,
+                        prediction=error_prediction,
+                        response_text="",
+                        prompt=prompt,
+                        success=False,
+                        error_message=str(e)
+                    )
         
-        successful_responses = sum(1 for r in responses if not isinstance(r, Exception))
-        failed_responses = len(responses) - successful_responses
+        if self.verbose and stats['failed'] > 0:
+            self.logger.warning(f"WARNING: {stats['failed']} out of {len(batch_predictions)} predictions failed")
         
-        if self.verbose and failed_responses > 0:
-            self.logger.warning(f"WARNING: {failed_responses} out of {len(responses)} LLM calls failed")
-        
-        return [
-            self._parse_prediction_response(r) if not isinstance(r, Exception)
-            else self._handle_error(r)
-            for r in responses
-        ]
+        return batch_predictions, stats
 
     def _parse_prediction_response(self, response: str) -> List[int]:
         """Parse the LLM response for predictions.
@@ -868,6 +1169,39 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         """Call the LLM API with the given prompt."""
         raise NotImplementedError("Subclasses must implement _call_llm method")
 
+    def get_cache_stats(self) -> Optional[Dict[str, Any]]:
+        """Get cache statistics if caching is enabled."""
+        if self.enable_cache and self.cache:
+            return self.cache.get_cache_stats()
+        return None
+    
+    def export_cache(self, output_file: str, format: str = "csv") -> None:
+        """Export cached predictions to a file.
+        
+        Args:
+            output_file: Path to output file
+            format: Export format ('csv', 'json', 'xlsx')
+        """
+        if not self.enable_cache or not self.cache:
+            raise ValueError("Caching is not enabled")
+        
+        self.cache.export_predictions(output_file, format)
+        if self.verbose:
+            self.logger.info(f"Cache exported to {output_file}")
+    
+    def clear_cache(self, confirm: bool = False) -> None:
+        """Clear the prediction cache.
+        
+        Args:
+            confirm: Must be True to actually clear the cache
+        """
+        if not self.enable_cache or not self.cache:
+            raise ValueError("Caching is not enabled")
+        
+        self.cache.clear_cache(confirm=confirm)
+        if self.verbose:
+            self.logger.info("Cache cleared")
+
     async def _engineer_prompts_for_data(
         self,
         test_df: pd.DataFrame,
@@ -893,10 +1227,18 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if train_df is not None:
                 self.logger.info(f"Using {len(train_df)} training samples for few-shot learning")
 
-        # Engineer prompts using PromptEngineer
+        # Engineer prompts using PromptEngineer with stratified sampling
+        if train_df is not None and len(train_df) > self.batch_size:
+            # Use stratified sampling to ensure all classes are represented
+            sampled_train_df = self._sample_training_data_stratified(train_df, self.batch_size)
+            if self.verbose:
+                self.logger.info(f"Applied stratified sampling: {len(sampled_train_df)} samples from {len(train_df)} training examples")
+        else:
+            sampled_train_df = train_df
+        
         engineered_prompts = await self.prompt_engineer.engineer_prompts(
             test_df=test_df,
-            train_df=train_df,
+            train_df=sampled_train_df,
             sample_size=self.batch_size
         )
 

@@ -1,4 +1,13 @@
 """Integration tests for package functionality."""
+import sys
+import importlib
+sys.path.insert(0, '.')
+
+# Force clear all cached modules
+modules_to_clear = [mod for mod in sys.modules.keys() if mod.startswith('textclassify')]
+for mod in modules_to_clear:
+    if mod in sys.modules:
+        del sys.modules[mod]
 
 import pytest
 import sys
@@ -121,10 +130,10 @@ class TestPackageImports:
         # Configure the model
         from textclassify.core.types import ModelConfig, ModelType
         config = ModelConfig(
-            model_name="gpt-3.5-turbo",  # Required
+            model_name="gpt-5-2025-08-07",  # Required
             model_type=ModelType.LLM,    # Required
             parameters={
-                "model": "gpt-5-2025-08-07",
+                "model": "gpt-5-2025-08-07",  # The actual model to use
                 "temperature": 0.1,
                 "max_completion_tokens": 150,
                 "top_p": 1.0
@@ -136,19 +145,21 @@ class TestPackageImports:
             config=config,
             text_column='description',
             label_columns=["label_1", "label_2", "label_3", "label_4"],
+            enable_cache=True,
+            cache_dir="cache/experimente/ag_news_klassifikation",
             multi_label=False
         )
         
         # Test prediction (use small sample for testing)
         result = classifier.predict(
-            train_df=train_df.head(5),  # Few-shot examples
-            test_df=test_df.head(3)     # Test samples
+            train_df=train_df,  # Few-shot examples
+            test_df=test_df     # Test samples
         )
         
         # Assert results
         assert len(result.predictions) == 3
-        assert result.model_name == "gpt-3.5-turbo"
-        assert 'openai' in result.model_info['provider']
+        assert result.model_name == "gpt-5-2025-08-07"  # Should match parameters["model"]
+        assert result.model_type.value == "llm"
 
 
 class TestBasicFunctionality:

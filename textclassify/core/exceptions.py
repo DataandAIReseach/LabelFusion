@@ -67,3 +67,11 @@ class EnsembleError(TextClassifyError):
         super().__init__(message, "ENSEMBLE_ERROR")
         self.ensemble_method = ensemble_method
 
+
+class PersistenceError(TextClassifyError):
+    """Raised when there's an error in persistence operations (caching, saving, loading)."""
+    
+    def __init__(self, message: str, operation: str = None):
+        super().__init__(message, "PERSISTENCE_ERROR")
+        self.operation = operation
+

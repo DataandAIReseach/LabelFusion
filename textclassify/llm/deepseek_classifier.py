@@ -18,7 +18,9 @@ class DeepSeekClassifier(BaseLLMClassifier):
         text_column: str = 'text',
         label_columns: Optional[List[str]] = None,
         multi_label: bool = False,
-        few_shot_mode: str = "few_shot"
+        few_shot_mode: str = "few_shot",
+        enable_cache: bool = True,
+        cache_dir: str = "cache/llm"
     ):
         """Initialize DeepSeek classifier.
         
@@ -28,6 +30,8 @@ class DeepSeekClassifier(BaseLLMClassifier):
             label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier
             few_shot_mode: Mode for few-shot learning
+            enable_cache: Whether to enable prediction caching
+            cache_dir: Directory for caching prediction results
         """
         super().__init__(
             config=config,
@@ -35,7 +39,9 @@ class DeepSeekClassifier(BaseLLMClassifier):
             label_columns=label_columns,
             multi_label=multi_label,
             few_shot_mode=few_shot_mode,
-            provider='deepseek'
+            provider='deepseek',
+            enable_cache=enable_cache,
+            cache_dir=cache_dir
         )
         
         # Set up classes and prompt engineer configuration

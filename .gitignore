@@ -1,6 +1,33 @@
+# Cache directories
+cache/
+llm_cache/
+test_llm_cache/
+*_cache/
+
+# Model files
+models/
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+*.safetensors
+
+# Data directories (keep structure but ignore large files)
 /docu/
 /data/
 
 # Environment variables
 .env
-.env.*autofusion_kaggle_test/auto_fusion_classifier.pkl
+.env.*
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Logs
+*.log
+logs/
+.autofusion_kaggle_test/auto_fusion_classifier.pkl

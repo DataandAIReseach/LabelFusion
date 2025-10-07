@@ -227,8 +227,11 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("Data must be set before generating context keywords")
             
-        # Take a random sample of the data
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)), random_state=42)
+        # Use provided data if sample_size >= available data, otherwise sample
+        if sample_size >= len(train_df):
+            sampled_data = train_df  # Use all provided data (likely already stratified)
+        else:
+            sampled_data = train_df.sample(n=sample_size, random_state=42)
 
         # Format the data
         formatted_data = []
@@ -296,8 +299,11 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("No data available for role prompt creation")
             
-        # Sample data
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
+        # Use provided data if sample_size >= available data, otherwise sample
+        if sample_size >= len(train_df):
+            sampled_data = train_df  # Use all provided data (likely already stratified)
+        else:
+            sampled_data = train_df.sample(n=sample_size)
         examples = []
         for _, row in sampled_data.iterrows():
             text = row[self.text_column]
@@ -374,8 +380,11 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("No data available for context brainstorming")
         
-        # Sample data
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
+        # Use provided data if sample_size >= available data, otherwise sample
+        if sample_size >= len(train_df):
+            sampled_data = train_df  # Use all provided data (likely already stratified)
+        else:
+            sampled_data = train_df.sample(n=sample_size)
         examples = []
         for _, row in sampled_data.iterrows():
             text = row[self.text_column]
@@ -438,8 +447,11 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("No data available for procedure prompt creation")
         
-        # Sample data
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
+        # Use provided data if sample_size >= available data, otherwise sample
+        if sample_size >= len(train_df):
+            sampled_data = train_df  # Use all provided data (likely already stratified)
+        else:
+            sampled_data = train_df.sample(n=sample_size)
         examples = []
         for _, row in sampled_data.iterrows():
             text = row[self.text_column]
@@ -501,8 +513,11 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("No data available for training data intro")
         
-        # Sample data
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
+        # Use provided data if sample_size >= available data, otherwise sample
+        if sample_size >= len(train_df):
+            sampled_data = train_df  # Use all provided data (likely already stratified)
+        else:
+            sampled_data = train_df.sample(n=sample_size)
         
         # Format examples
         formatted_examples = []
@@ -648,8 +663,11 @@ class PromptEngineer:
         if num_examples == 0:
             return ""  # No examples for zero-shot
 
-        # Sample data
-        sampled_data = train_df.sample(n=min(num_examples, len(train_df)))
+        # Use provided data if num_examples >= available data, otherwise sample
+        if num_examples >= len(train_df):
+            sampled_data = train_df  # Use all provided data (likely already stratified)
+        else:
+            sampled_data = train_df.sample(n=num_examples)
 
         # Generate the training data prompt
         prompt_lines = []
@@ -703,8 +721,11 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("No data available for procedure prompt creation")
     
-        # Sample data
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
+        # Use provided data if sample_size >= available data, otherwise sample
+        if sample_size >= len(train_df):
+            sampled_data = train_df  # Use all provided data (likely already stratified)
+        else:
+            sampled_data = train_df.sample(n=sample_size)
         examples = []
         for _, row in sampled_data.iterrows():
             text = row[self.text_column]
