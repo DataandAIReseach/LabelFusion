@@ -21,18 +21,25 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 try:
     # Use Auto* classes which are the recommended approach for modern transformers
+    # Use Auto* classes which are the recommended approach for modern transformers
     from transformers import (
+        AutoTokenizer,
+        AutoModelForSequenceClassification,
         AutoTokenizer,
         AutoModelForSequenceClassification,
         get_linear_schedule_with_warmup
     )
+    from torch.optim import AdamW
     from torch.optim import AdamW
     from sklearn.preprocessing import MultiLabelBinarizer, LabelEncoder
     from sklearn.metrics import accuracy_score, f1_score
     TRANSFORMERS_AVAILABLE = True
 except ImportError as e:
     print(f"Import error: {e}")
+except ImportError as e:
+    print(f"Import error: {e}")
     TRANSFORMERS_AVAILABLE = False
+
 
 
 
@@ -40,10 +47,12 @@ class TextDataset(Dataset):
     """Dataset class for text classification."""
     
     def __init__(self, texts, labels, tokenizer, max_length=512, classification_type=None):
+    def __init__(self, texts, labels, tokenizer, max_length=512, classification_type=None):
         self.texts = texts
         self.labels = labels
         self.tokenizer = tokenizer
         self.max_length = max_length
+        self.classification_type = classification_type
         self.classification_type = classification_type
     
     def __len__(self):
@@ -73,9 +82,23 @@ class TextDataset(Dataset):
                 class_idx = int(np.argmax(self.labels[idx]))  # For numpy arrays
             label_tensor = torch.tensor(class_idx, dtype=torch.long)
         
+        # Use appropriate data type based on classification type
+        if self.classification_type == ClassificationType.MULTI_LABEL:
+            # Multi-label needs float for BCEWithLogitsLoss
+            label_tensor = torch.tensor(self.labels[idx], dtype=torch.float)
+        else:
+            # Multi-class: convert one-hot encoded vector to class index
+            # e.g., [0, 1, 0] -> 1 (index of the 1)
+            if isinstance(self.labels[idx], list):
+                class_idx = self.labels[idx].index(1)  # Find index of the 1 in one-hot vector
+            else:
+                class_idx = int(np.argmax(self.labels[idx]))  # For numpy arrays
+            label_tensor = torch.tensor(class_idx, dtype=torch.long)
+        
         return {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
+            'labels': label_tensor
             'labels': label_tensor
         }
 
@@ -306,9 +329,21 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         # No label encoder needed since labels are already in binary format
         self.label_encoder = None
+            if self.classification_type == ClassificationType.MULTI_CLASS:
+                self.classes_ = [f"class_{i}" for i in range(self.num_labels)]
+            else:
+                self.classes_ = [f"label_{i}" for i in range(self.num_labels)]
+        
+        # No label encoder needed since labels are already in binary format
+        self.label_encoder = None
         
         # Initialize tokenizer and model
         try:
+            # Validate that this is actually a RoBERTa model
+            if not any(roberta_variant in self.model_name.lower() for roberta_variant in ['roberta', 'distilroberta']):
+                raise ValueError(f"RoBERTaClassifier only supports RoBERTa models. Got: {self.model_name}")
+            
+            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             # Validate that this is actually a RoBERTa model
             if not any(roberta_variant in self.model_name.lower() for roberta_variant in ['roberta', 'distilroberta']):
                 raise ValueError(f"RoBERTaClassifier only supports RoBERTa models. Got: {self.model_name}")
@@ -321,13 +356,21 @@ class RoBERTaClassifier(BaseMLClassifier):
                 num_labels=self.num_labels,
                 problem_type="multi_label_classification" if self.classification_type == ClassificationType.MULTI_LABEL else "single_label_classification"
             )
+            # Use AutoModelForSequenceClassification for both multi-class and multi-label
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                self.model_name,
+                num_labels=self.num_labels,
+                problem_type="multi_label_classification" if self.classification_type == ClassificationType.MULTI_LABEL else "single_label_classification"
+            )
             
             self.model.to(self.device)
             
         except Exception as e:
             raise ModelTrainingError(f"Failed to initialize RoBERTa model: {str(e)}", self.model_name)
+            raise ModelTrainingError(f"Failed to initialize RoBERTa model: {str(e)}", self.model_name)
         
         # Create dataset and dataloader
+        dataset = TextDataset(processed_texts, encoded_labels, self.tokenizer, self.max_length, self.classification_type)
         dataset = TextDataset(processed_texts, encoded_labels, self.tokenizer, self.max_length, self.classification_type)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         
@@ -374,6 +417,8 @@ class RoBERTaClassifier(BaseMLClassifier):
                 # Forward pass
                 optimizer.zero_grad()
                 
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
+                loss = outputs.loss
                 outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
                 loss = outputs.loss
                 
@@ -550,13 +595,16 @@ class RoBERTaClassifier(BaseMLClassifier):
         Args:
             texts: List of texts to classify
             true_labels: Optional true labels in binary format for evaluation metrics
+            true_labels: Optional true labels in binary format for evaluation metrics
             
         Returns:
+            ClassificationResult with predictions and optional metrics
             ClassificationResult with predictions and optional metrics
         """
         self.validate_input(texts)
         
         if not self.is_trained:
+            raise PredictionError("Model must be trained before prediction", self.model_name)
             raise PredictionError("Model must be trained before prediction", self.model_name)
         
         # Preprocess texts
@@ -568,6 +616,11 @@ class RoBERTaClassifier(BaseMLClassifier):
             processed_texts.append(preprocessed if preprocessed else text)
         
         # Create dataset and dataloader
+        if self.classification_type == ClassificationType.MULTI_LABEL:
+            dummy_labels = [[0] * self.num_labels] * len(processed_texts)  # Multi-label dummy labels
+        else:
+            dummy_labels = [0] * len(processed_texts)  # Multi-class dummy labels
+        dataset = TextDataset(processed_texts, dummy_labels, self.tokenizer, self.max_length, self.classification_type)
         if self.classification_type == ClassificationType.MULTI_LABEL:
             dummy_labels = [[0] * self.num_labels] * len(processed_texts)  # Multi-label dummy labels
         else:
@@ -739,6 +792,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         Args:
             texts: List of texts to classify
             true_labels: Optional true labels in binary format for evaluation metrics
+            true_labels: Optional true labels in binary format for evaluation metrics
             
         Returns:
             ClassificationResult with predictions and probabilities
@@ -746,6 +800,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.validate_input(texts)
         
         if not self.is_trained:
+            raise PredictionError("Model must be trained before prediction", self.model_name)
             raise PredictionError("Model must be trained before prediction", self.model_name)
         
         # Preprocess texts
@@ -757,6 +812,11 @@ class RoBERTaClassifier(BaseMLClassifier):
             processed_texts.append(preprocessed if preprocessed else text)
         
         # Create dataset and dataloader
+        if self.classification_type == ClassificationType.MULTI_LABEL:
+            dummy_labels = [[0] * self.num_labels] * len(processed_texts)  # Multi-label dummy labels
+        else:
+            dummy_labels = [0] * len(processed_texts)  # Multi-class dummy labels
+        dataset = TextDataset(processed_texts, dummy_labels, self.tokenizer, self.max_length, self.classification_type)
         if self.classification_type == ClassificationType.MULTI_LABEL:
             dummy_labels = [[0] * self.num_labels] * len(processed_texts)  # Multi-label dummy labels
         else:
@@ -791,6 +851,14 @@ class RoBERTaClassifier(BaseMLClassifier):
                             pred_name = f"class_{pred_idx}"  # Fallback
                         
                         all_predictions.append(pred_name)
+                    # Convert predictions to class names using self.classes_
+                    for i, pred_idx in enumerate(predictions.cpu().numpy()):
+                        if pred_idx < len(self.classes_):
+                            pred_name = self.classes_[pred_idx]
+                        else:
+                            pred_name = f"class_{pred_idx}"  # Fallback
+                        
+                        all_predictions.append(pred_name)
                         
                         # Create probability dictionary
                         prob_dict = {
@@ -798,6 +866,7 @@ class RoBERTaClassifier(BaseMLClassifier):
                             for j, class_name in enumerate(self.classes_)
                         }
                         all_probabilities.append(prob_dict)
+                        all_confidence_scores.append(float(batch_probabilities[i][pred_idx]))
                         all_confidence_scores.append(float(batch_probabilities[i][pred_idx]))
                 
                 else:
@@ -807,6 +876,10 @@ class RoBERTaClassifier(BaseMLClassifier):
                     predictions = (probabilities > threshold).cpu().numpy()
                     batch_probabilities = probabilities.cpu().numpy()
                     
+                    # Convert predictions to class names using self.classes_
+                    for i, pred_array in enumerate(predictions):
+                        active_labels = [self.classes_[j] for j, is_active in enumerate(pred_array) if is_active]
+                        all_predictions.append(active_labels)
                     # Convert predictions to class names using self.classes_
                     for i, pred_array in enumerate(predictions):
                         active_labels = [self.classes_[j] for j, is_active in enumerate(pred_array) if is_active]
@@ -825,6 +898,9 @@ class RoBERTaClassifier(BaseMLClassifier):
         return self._create_result(
             predictions=all_predictions,
             probabilities=all_probabilities,
+            confidence_scores=all_confidence_scores,
+            true_labels=true_labels if true_labels is not None else None
+        )
             confidence_scores=all_confidence_scores,
             true_labels=true_labels if true_labels is not None else None
         )
