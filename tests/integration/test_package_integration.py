@@ -284,62 +284,170 @@ class TestPackageImports:
     #     cache_stats = classifier.cache.get_cache_stats()
     #     assert cache_stats is not None
     
-    def test_roberta_classifier_on_ag_news(self):
-        """Test RoBERTa classifier on AG News dataset."""
+    # def test_roberta_classifier_on_ag_news(self):
+    #     """Test RoBERTa classifier on AG News dataset."""
+    #     import pandas as pd
+    #     from textclassify.ml.roberta_classifier import RoBERTaClassifier
+    #     from textclassify.core.types import ModelConfig, ModelType
+        
+    #     # Load your dataset
+    #     train_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_train_balanced.csv")
+    #     val_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_val_balanced.csv")
+    #     test_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_test_balanced.csv")
+        
+    #     # Configure the model
+    #     config = ModelConfig(
+    #         model_name="roberta-base",  # Required
+    #         model_type=ModelType.TRADITIONAL_ML,  # Required
+    #         parameters={
+    #             "model_name": "roberta-base",  # The actual model to use
+    #             "learning_rate": 2e-5,
+    #             "num_epochs": 1,  # Use 1 epoch for faster testing
+    #             "batch_size": 8,
+    #             "max_length": 256
+    #         }
+    #     )
+        
+    #     # Initialize classifier
+    #     classifier = RoBERTaClassifier(
+    #         config=config,
+    #         text_column='description',
+    #         label_columns=["label_1", "label_2", "label_3", "label_4"],
+    #         multi_label=False,
+    #         auto_save_path="cache/experimente/ag_news_roberta_model"
+    #     )
+        
+    #     # Use small samples for testing
+    #     train_sample = train_df.head(50)  # Use small sample for faster training
+    #     val_sample = val_df.head(20)      # Use small validation set from separate file
+    #     test_sample = test_df.head(10)    # Use small test set
+        
+    #     # Train the model
+    #     training_result = classifier.fit(train_sample, val_sample)
+        
+    #     # Test prediction
+    #     result = classifier.predict(test_df=test_sample)
+        
+    #     # Assert training results
+    #     assert training_result['model_name'] == 'roberta-base'
+    #     assert training_result['training_samples'] == 50
+    #     assert training_result['validation_samples'] == 20
+    #     assert training_result['num_labels'] == 4
+    #     assert training_result['classes'] == ["label_1", "label_2", "label_3", "label_4"]
+        
+    #     # Assert prediction results
+    #     assert len(result.predictions) == 10
+    #     assert all(pred in ["label_1", "label_2", "label_3", "label_4"] for pred in result.predictions)
+    #     assert classifier.is_trained
+
+    def test_fusion_ensemble_on_ag_news(self):
+        """Test Fusion Ensemble combining RoBERTa and OpenAI LLM on AG News dataset."""
         import pandas as pd
         from textclassify.ml.roberta_classifier import RoBERTaClassifier
-        from textclassify.core.types import ModelConfig, ModelType
+        from textclassify.llm.openai_classifier import OpenAIClassifier
+        from textclassify.ensemble.fusion import FusionEnsemble
+        from textclassify.core.types import ModelConfig, ModelType, EnsembleConfig
         
-        # Load your dataset
+        # Load your dataset (same as RoBERTa test)
         train_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_train_balanced.csv")
         val_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_val_balanced.csv")
         test_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_test_balanced.csv")
         
-        # Configure the model
-        config = ModelConfig(
-            model_name="roberta-base",  # Required
-            model_type=ModelType.TRADITIONAL_ML,  # Required
+        # Configure ML model (RoBERTa)
+        ml_config = ModelConfig(
+            model_name="roberta-base",
+            model_type=ModelType.TRADITIONAL_ML,
             parameters={
-                "model_name": "roberta-base",  # The actual model to use
+                "model_name": "roberta-base",
                 "learning_rate": 2e-5,
-                "num_epochs": 1,  # Use 1 epoch for faster testing
+                "num_epochs": 1,  # Fast training for testing
                 "batch_size": 8,
                 "max_length": 256
             }
         )
         
-        # Initialize classifier
-        classifier = RoBERTaClassifier(
-            config=config,
+        # Create RoBERTa classifier
+        ml_classifier = RoBERTaClassifier(
+            config=ml_config,
             text_column='description',
             label_columns=["label_1", "label_2", "label_3", "label_4"],
             multi_label=False,
-            auto_save_path="cache/experimente/ag_news_roberta_model"
+            auto_save_path="cache/experimente/fusion_roberta_model"
         )
         
-        # Use small samples for testing
+        # Configure LLM model (OpenAI)
+        llm_config = ModelConfig(
+            model_name="gpt-4o-mini",
+            model_type=ModelType.LLM,
+            parameters={
+                "model": "gpt-4o-mini",
+                "temperature": 0.1,
+                "max_completion_tokens": 150,
+                "top_p": 1.0
+            }
+        )
+        
+        # Create OpenAI LLM classifier
+        llm_classifier = OpenAIClassifier(
+            config=llm_config,
+            text_column='description',
+            label_columns=["label_1", "label_2", "label_3", "label_4"],
+            enable_cache=True,
+            cache_dir="cache/experimente/fusion_openai_cache",
+            multi_label=False
+        )
+        
+        # Configure Fusion Ensemble
+        fusion_config = EnsembleConfig(
+            ensemble_method="fusion",
+            models=[ml_classifier, llm_classifier],
+            parameters={
+                "fusion_hidden_dims": [32, 16],  # Smaller network for testing
+                "ml_lr": 1e-5,
+                "fusion_lr": 1e-3,
+                "num_epochs": 5,  # Fewer epochs for testing
+                "batch_size": 8,
+                "classification_type": "multi_class"
+            }
+        )
+        
+        # Create Fusion Ensemble
+        fusion_ensemble = FusionEnsemble(fusion_config)
+        
+        # Add models to ensemble
+        fusion_ensemble.add_ml_model(ml_classifier)
+        fusion_ensemble.add_llm_model(llm_classifier)
+        
+        # Use small samples for testing (same as RoBERTa test)
         train_sample = train_df.head(50)  # Use small sample for faster training
         val_sample = val_df.head(20)      # Use small validation set from separate file
         test_sample = test_df.head(10)    # Use small test set
         
-        # Train the model
-        training_result = classifier.fit(train_sample, val_sample)
+        # Train the fusion ensemble (like RoBERTa fit method)
+        training_result = fusion_ensemble.fit(train_sample, val_sample)
         
-        # Test prediction
-        result = classifier.predict(test_df=test_sample)
+        # Test prediction (like RoBERTa predict method)
+        result = fusion_ensemble.predict(test_df=test_sample)
         
         # Assert training results
-        assert training_result['model_name'] == 'roberta-base'
+        assert training_result['ensemble_method'] == 'fusion'
         assert training_result['training_samples'] == 50
         assert training_result['validation_samples'] == 20
         assert training_result['num_labels'] == 4
-        assert training_result['classes'] == ["label_1", "label_2", "label_3", "label_4"]
         
         # Assert prediction results
         assert len(result.predictions) == 10
         assert all(pred in ["label_1", "label_2", "label_3", "label_4"] for pred in result.predictions)
-        assert classifier.is_trained
-
+        assert fusion_ensemble.is_trained
+        assert fusion_ensemble.ml_model.is_trained
+        
+        # Check that the fusion ensemble has required components
+        assert fusion_ensemble.fusion_wrapper is not None
+        assert fusion_ensemble.classes_ == ["label_1", "label_2", "label_3", "label_4"]
+        assert fusion_ensemble.num_labels == 4
+        
+        print(f"Fusion Ensemble Predictions: {result.predictions}")
+        print(f"Training Result: {training_result}")
 
 class TestBasicFunctionality:
     """Test basic package functionality."""

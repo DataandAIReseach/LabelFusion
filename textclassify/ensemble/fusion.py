@@ -2,9 +2,10 @@
 
 import torch
 import torch.nn as nn
+import torch.utils.data
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Union, Optional, Tuple
+from typing import Dict, List, Union, Optional, Tuple, Any
 from sklearn.model_selection import train_test_split
 from sklearn.isotonic import IsotonicRegression
 from sklearn.calibration import CalibratedClassifierCV
@@ -154,11 +155,15 @@ class FusionEnsemble(BaseEnsemble):
         self.models.append(llm_model)
         self.model_names.append("llm_model")
     
-    def fit(self, df: Union[TrainingData, pd.DataFrame, Dict]) -> None:
-        """Train the fusion ensemble with proper train/val/test split.
+    def fit(self, train_df: pd.DataFrame, val_df: pd.DataFrame) -> Dict[str, Any]:
+        """Train the fusion ensemble with train and validation DataFrames.
         
         Args:
-            df: Training data in various formats (DataFrame, TrainingData, or Dict)
+            train_df: Training DataFrame with text and label columns
+            val_df: Validation DataFrame with text and label columns
+            
+        Returns:
+            Dictionary with training results and metrics
         """
         if self.ml_model is None or self.llm_model is None:
             raise EnsembleError("Both ML and LLM models must be added before training")
@@ -173,89 +178,29 @@ class FusionEnsemble(BaseEnsemble):
                 # Default to multi-class
                 self.classification_type = ClassificationType.MULTI_CLASS
         
-        # Work with DataFrame directly as long as possible
-        if isinstance(df, TrainingData):
-            # Convert TrainingData to DataFrame for consistent processing
-            labels = df.labels
-            label_data = {}
-            # Create label columns from the labels
-            if labels and isinstance(labels[0], list):
-                # 2D format: [[1,0,0], [0,1,0], ...]
-                for i in range(len(labels[0])):
-                    label_data[f'label_{i}'] = [label[i] for label in labels]
-            else:
-                # This shouldn't happen with TrainingData but handle gracefully
-                raise EnsembleError("TrainingData labels should be in 2D list format")
-            
-            working_df = pd.DataFrame({
-                'text': df.texts,
-                **label_data
-            })
-            text_column = 'text'
-            label_columns = [col for col in working_df.columns if col.startswith('label_')]
-        elif isinstance(df, pd.DataFrame):
-            working_df = df.copy()
-            text_column = 'text'  # Could be configurable
-            if text_column not in working_df.columns:
-                raise EnsembleError(f"Text column '{text_column}' not found in DataFrame")
-            label_columns = [col for col in working_df.columns if col != text_column]
-        elif isinstance(df, dict):
-            # Convert dict to DataFrame for consistent processing
-            labels = df['labels']
-            label_data = {}
-            # Handle both 2D list format and 1D list format
-            if labels and isinstance(labels[0], list):
-                # 2D format: [[1,0,0], [0,1,0], ...]
-                for i in range(len(labels[0])):
-                    label_data[f'label_{i}'] = [label[i] for label in labels]
-            else:
-                # 1D format: [0, 1, 2, ...] - convert to one-hot
-                unique_labels = sorted(set(labels))
-                for i, unique_label in enumerate(unique_labels):
-                    label_data[f'label_{i}'] = [1 if label == unique_label else 0 for label in labels]
-            
-            working_df = pd.DataFrame({
-                'text': df['texts'],
-                **label_data
-            })
-            text_column = 'text'
-            label_columns = [col for col in working_df.columns if col.startswith('label_')]
-        else:
-            raise EnsembleError(f"Unsupported training data format: {type(df)}")
+        # Extract text and label columns - assume they match ML model configuration
+        text_column = self.ml_model.text_column or 'text'
+        label_columns = self.ml_model.label_columns or [col for col in train_df.columns if col != text_column]
         
         print(f"Classification type: {self.classification_type}")
-        print(f"Training data: {len(working_df)} samples")
+        print(f"Training data: {len(train_df)} samples")
+        print(f"Validation data: {len(val_df)} samples")
         
-        # Step 1: Split DataFrames directly (60/20/20)
-        print("Splitting data into train/validation/test sets...")
-        train_df, temp_df = train_test_split(
-            working_df, 
-            test_size=0.4, 
-            random_state=42, 
-            stratify=None
-        )
-        
-        val_df, test_df = train_test_split(
-            temp_df, 
-            test_size=0.5, 
-            random_state=42, 
-            stratify=None
-        )
-        
-        print(f"   📊 Train: {len(train_df)} samples")
-        print(f"   📊 Validation: {len(val_df)} samples") 
-        print(f"   📊 Test: {len(test_df)} samples")
-        
-        # Step 2: Train ML model on training set only
+        # Step 1: Train ML model on training set
         if not self.ml_model.is_trained:
             print("Training ML model on training set...")
-            # Convert to TrainingData format only when needed for ML model
+            # Convert to TrainingData format for ML model
             train_data = TrainingData(
                 texts=train_df[text_column].tolist(),
                 labels=train_df[label_columns].values.tolist(),
                 classification_type=self.classification_type
             )
-            self.ml_model.fit(train_data)
+            val_data = TrainingData(
+                texts=val_df[text_column].tolist(),
+                labels=val_df[label_columns].values.tolist(),
+                classification_type=self.classification_type
+            )
+            self.ml_model.fit(train_data, val_data)
         else:
             print("ML model already trained")
         
@@ -263,23 +208,21 @@ class FusionEnsemble(BaseEnsemble):
         self.classes_ = self.ml_model.classes_
         self.num_labels = len(self.classes_)
         
-        # Step 3: Get ML predictions on validation set
+        # Step 2: Get ML predictions on validation set
         print("Getting ML predictions on validation set...")
-        ml_val_result = self.ml_model.predict(texts=val_df[text_column].tolist(),
-                                              true_labels=val_df[label_columns].values.tolist())
+        ml_val_result = self.ml_model.predict(
+            texts=val_df[text_column].tolist(),
+            true_labels=val_df[label_columns].values.tolist()
+        )
         
-    
-
-        # Step 4: Get LLM predictions on validation set
+        # Step 3: Get LLM predictions on validation set
         print("Getting LLM predictions on validation set...")
+        val_llm_result = self.llm_model.predict(
+            train_df=train_df,  # Few-shot examples
+            test_df=val_df      # Validation texts
+        )
         
-        # Use DataFrames directly for LLM model - no need to recreate them
-        val_llm_result = self.llm_model.predict(train_df=train_df,
-                                                test_df=val_df)
-        
-        
-        
-        # Step 5: Create fusion wrapper
+        # Step 4: Create fusion wrapper
         print("Creating fusion wrapper...")
         task = "multilabel" if self.classification_type == ClassificationType.MULTI_LABEL else "multiclass"
         self.fusion_wrapper = FusionWrapper(
@@ -289,33 +232,36 @@ class FusionEnsemble(BaseEnsemble):
             hidden_dims=self.fusion_hidden_dims
         )
         
-        # Step 6: Train fusion MLP on validation set predictions
+        # Step 5: Train fusion MLP on validation set predictions
         print("Training fusion MLP on validation predictions...")
         self._train_fusion_mlp_on_val(val_df, ml_val_result, val_llm_result, text_column, label_columns)
         
-        # Step 7: Store LLM result and training data for later use
-        print("Storing LLM validation results and training data...")
-        self.val_llm_result = val_llm_result
-        self.train_df_cache = train_df.copy()  # Cache training DataFrame for LLM predictions
+        # Cache training data for later LLM predictions
+        self.train_df_cache = train_df.copy()
         
-        # Step 8: Evaluate on test set
-        print("Evaluating ensemble on test set...")
-        
-        # Set training flag early to avoid recursive prediction issues
+        # Set training flag
         self.is_trained = True
         
-        try:
-            test_result = self.predict(test_df[text_column].tolist(), test_df[label_columns].values.tolist())
-            
-            # Store test performance
-            self.test_performance = test_result.metadata.get('metrics', {}) if test_result.metadata else {}
-            print(f"   📈 Test Performance: {self.test_performance}")
-        except Exception as e:
-            print(f"   ⚠️ Warning: Test evaluation failed: {e}")
-            self.test_performance = {}
+        # Return training results (similar to RoBERTa)
+        training_result = {
+            'ensemble_method': 'fusion',
+            'training_samples': len(train_df),
+            'validation_samples': len(val_df),
+            'num_labels': self.num_labels,
+            'classes': self.classes_,
+            'classification_type': self.classification_type.value,
+            'ml_model_trained': self.ml_model.is_trained,
+            'fusion_mlp_trained': True
+        }
         
         print("✅ Fusion ensemble training completed!")
+        return training_result
     
+    def train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, val_llm_result, 
+                                text_column: str, label_columns: List[str]):
+        """Public method to train the fusion MLP using validation set predictions from both ML and LLM models."""
+        return self._train_fusion_mlp_on_val(val_df, ml_val_result, val_llm_result, text_column, label_columns)
+
     def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, val_llm_result, 
                                 text_column: str, label_columns: List[str]):
         """Train the fusion MLP using validation set predictions from both ML and LLM models."""
@@ -468,52 +414,59 @@ class FusionEnsemble(BaseEnsemble):
         
         return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
     
-    def predict(self, data: Union[List[str], pd.DataFrame], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
-        """Predict using fusion ensemble.
+    def predict(self, test_df: pd.DataFrame, true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Predict using fusion ensemble on test DataFrame.
         
         Args:
-            data: Either a list of texts or a DataFrame with text column (and optionally label columns)
-            true_labels: Optional true labels for evaluation (if not provided in DataFrame)
+            test_df: Test DataFrame with text and optionally label columns
+            true_labels: Optional true labels for evaluation (deprecated, will be extracted from DataFrame)
+            
+        Returns:
+            ClassificationResult with predictions and metrics
         """
         if not self.is_trained:
             raise EnsembleError("Fusion ensemble must be trained before prediction")
         
-        # Handle different input formats
-        if isinstance(data, list):
-            # List of texts
-            texts = data
-            test_df = pd.DataFrame({'text': texts})
-            extracted_labels = true_labels  # Use provided true_labels
-        elif isinstance(data, pd.DataFrame):
-            # DataFrame input
-            test_df = data.copy()
-            text_column = 'text'  # Could be configurable
-            if text_column not in test_df.columns:
-                raise EnsembleError(f"Text column '{text_column}' not found in DataFrame")
-            texts = test_df[text_column].tolist()
-            
-            # Extract true labels from DataFrame if available
-            if true_labels is None:
-                # Try to extract labels from DataFrame using the known label columns
-                if hasattr(self, 'classes_') and self.classes_:
-                    label_columns = [col for col in self.classes_ if col in test_df.columns]
-                    if label_columns:
-                        extracted_labels = test_df[label_columns].values.tolist()
-                    else:
-                        extracted_labels = None
-                else:
-                    extracted_labels = None
-            else:
-                extracted_labels = true_labels
-        else:
-            raise EnsembleError(f"Unsupported input format: {type(data)}. Expected List[str] or pd.DataFrame")
+        # Extract text and label columns - assume they match ML model configuration
+        text_column = self.ml_model.text_column or 'text'
+        label_columns = self.ml_model.label_columns or [col for col in test_df.columns if col != text_column]
         
-        # Get ML predictions
-        ml_result = self.ml_model.predict(texts)
+        texts = test_df[text_column].tolist()
         
-        # Get LLM predictions using cached training data for context
-        llm_result = self.llm_model.predict(train_df=self.train_df_cache, test_df=test_df)
+        # Extract true labels from DataFrame if available
+        extracted_labels = None
+        if all(col in test_df.columns for col in label_columns):
+            extracted_labels = test_df[label_columns].values.tolist()
+        elif true_labels is not None:
+            extracted_labels = true_labels
         
+        # Step 1: Get ML predictions on test data
+        print("Getting ML predictions on test data...")
+        ml_test_result = self.ml_model.predict(
+            texts=texts,
+            true_labels=extracted_labels
+        )
+        
+        # Step 2: Get LLM predictions on test data
+        print("Getting LLM predictions on test data...")
+        # Use cached training data for few-shot examples
+        train_df_for_llm = getattr(self, 'train_df_cache', None)
+        if train_df_for_llm is None:
+            # Fallback: use test_df as both train and test (not ideal but functional)
+            print("Warning: No cached training data found, using test data for LLM few-shot")
+            train_df_for_llm = test_df
+        
+        llm_test_result = self.llm_model.predict(
+            train_df=train_df_for_llm,  # Few-shot examples
+            test_df=test_df             # Test data
+        )
+        
+        # Step 3: Use fusion MLP to combine predictions
+        print("Generating fusion predictions...")
+        return self._predict_with_fusion(ml_test_result, llm_test_result, texts, extracted_labels)
+    
+    def _predict_with_fusion(self, ml_result, llm_result, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Generate fusion predictions using trained MLP."""
         # Create dataset using both ML and LLM predictions
         dummy_labels = [[0] * self.num_labels] * len(texts)
         dataset = self._create_fusion_dataset(texts, dummy_labels, ml_result.predictions, llm_result.predictions)
@@ -544,7 +497,7 @@ class FusionEnsemble(BaseEnsemble):
                         active_labels = [self.classes_[i] for i, is_active in enumerate(pred_array) if is_active]
                         all_predictions.append(active_labels)
         
-        return self._create_result(predictions=all_predictions, true_labels=extracted_labels)
+        return self._create_result(predictions=all_predictions, true_labels=true_labels)
     
     def _combine_predictions(self, model_results: List[ClassificationResult], texts: List[str]) -> List[Union[str, List[str]]]:
         """Not used in fusion ensemble - predictions are generated directly."""
