@@ -3,7 +3,11 @@
 import asyncio
 from typing import Dict, List, Optional, Union
 import pandas as pd
+from typing import Dict, List, Optional, Union
+import pandas as pd
 
+from ..core.types import ClassificationResult
+from ..core.exceptions import APIError, ConfigurationError, PredictionError
 from ..core.types import ClassificationResult
 from ..core.exceptions import APIError, ConfigurationError, PredictionError
 from .base import BaseLLMClassifier
@@ -57,8 +61,33 @@ class OpenAIClassifier(BaseLLMClassifier):
         self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
         
         # No need to create separate client - use the service layer from BaseLLMClassifier
+        self.temperature = self.config.parameters.get('temperature', 1)
+        self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
+        
+        # No need to create separate client - use the service layer from BaseLLMClassifier
     
     async def _call_llm(self, prompt: str) -> str:
+        """Call OpenAI API with the given prompt using the service layer.
+        
+        This uses the llm_generator from BaseLLMClassifier which handles
+        API key management and provides a consistent interface.
+        """
+        try:
+            # Use the service layer instead of direct API calls
+            response = await self.llm_generator.generate_content(prompt)
+            
+            # Handle empty or None responses
+            if response is None:
+                raise APIError("LLM service returned None response")
+            
+            response = response.strip()
+            if not response:
+                raise APIError("LLM service returned empty response")
+            
+            return response
+            
+        except Exception as e:
+            raise APIError(f"LLM service call failed: {str(e)}")
         """Call OpenAI API with the given prompt using the service layer.
         
         This uses the llm_generator from BaseLLMClassifier which handles

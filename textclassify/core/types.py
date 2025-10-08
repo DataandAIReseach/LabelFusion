@@ -11,9 +11,18 @@ except ImportError:
     np = None
     NUMPY_AVAILABLE = False
 
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    np = None
+    NUMPY_AVAILABLE = False
+
 
 class ClassificationType(Enum):
     """Type of classification task."""
+    SINGLE_LABEL = "single_label"  # Single label per text (mutually exclusive)
+    MULTI_CLASS = "multi_class"  # Single label per text (mutually exclusive) - alias for SINGLE_LABEL
     SINGLE_LABEL = "single_label"  # Single label per text (mutually exclusive)
     MULTI_CLASS = "multi_class"  # Single label per text (mutually exclusive) - alias for SINGLE_LABEL
     MULTI_LABEL = "multi_label"  # Multiple labels per text (non-exclusive)
@@ -90,6 +99,19 @@ class TrainingData:
         
         # Validate based on classification type and label format
         if self.classification_type == ClassificationType.MULTI_CLASS:
+            # Check if labels are string format or binary encoded format
+            first_label = self.labels[0]
+            
+            if isinstance(first_label, str):
+                # String format: all labels should be strings
+                if not all(isinstance(label, str) for label in self.labels):
+                    raise ValueError("Multi-class labels must all be strings when using string format")
+            elif isinstance(first_label, (list, tuple)) or (NUMPY_AVAILABLE and isinstance(first_label, np.ndarray)):
+                # Binary encoded format: validate one-hot encoding
+                self._validate_binary_encoded_labels(is_multi_class=True)
+            else:
+                raise ValueError("Multi-class labels must be strings or binary encoded vectors")
+                
             # Check if labels are string format or binary encoded format
             first_label = self.labels[0]
             
@@ -216,10 +238,17 @@ class EnsembleConfig:
     
     # General parameters
     parameters: Dict[str, Any] = field(default_factory=dict)
+    ensemble_method: str  # "voting", "weighted", "routing", "fusion"
+    models: Optional[List] = None  # List of model instances or configs
     
+    # General parameters
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    
+    # Method-specific parameters  
     # Method-specific parameters  
     weights: Optional[List[float]] = None  # For weighted ensemble
     routing_rules: Optional[Dict[str, str]] = None  # For class routing
+    parameters: Dict[str, Any] = field(default_factory=dict)  # General parameters
     parameters: Dict[str, Any] = field(default_factory=dict)  # General parameters
     
     # Ensemble behavior
