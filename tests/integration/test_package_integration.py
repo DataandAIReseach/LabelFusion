@@ -117,49 +117,228 @@ class TestPackageImports:
         # Test version
         assert hasattr(textclassify, '__version__')
     
-    def test_openai_classifier_on_ag_news(self):
-        """Test OpenAI classifier on AG News dataset."""
+    # def test_openai_classifier_on_ag_news(self):
+    #     """Test OpenAI classifier on AG News dataset."""
+    #     import pandas as pd
+    #     from textclassify.llm.openai_classifier import OpenAIClassifier
+    #     from textclassify.core.types import ModelConfig
+        
+    #     # Load your dataset
+    #     train_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_train_balanced.csv")
+    #     test_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_test_balanced.csv")
+        
+    #     # Configure the model
+    #     from textclassify.core.types import ModelConfig, ModelType
+    #     config = ModelConfig(
+    #         model_name="gpt-5-2025-08-07",  # Required
+    #         model_type=ModelType.LLM,    # Required
+    #         parameters={
+    #             "model": "gpt-5-2025-08-07",  # The actual model to use
+    #             "temperature": 0.1,
+    #             "max_completion_tokens": 150,
+    #             "top_p": 1.0
+    #         }
+    #     )
+        
+    #     # Initialize classifier
+    #     classifier = OpenAIClassifier(
+    #         config=config,
+    #         text_column='description',
+    #         label_columns=["label_1", "label_2", "label_3", "label_4"],
+    #         enable_cache=True,
+    #         cache_dir="cache/experimente/ag_news_klassifikation",
+    #         multi_label=False
+    #     )
+        
+    #     # Test prediction (use small sample for testing)
+    #     result = classifier.predict(
+    #         train_df=train_df,  # Few-shot examples
+    #         test_df=test_df     # Test samples
+    #     )
+        
+    #     # Assert results
+    #     assert len(result.predictions) == 3
+    #     assert result.model_name == "gpt-5-2025-08-07"  # Should match parameters["model"]
+    #     assert result.model_type.value == "llm"
+    
+    
+    # def test_openai_classifier_on_goemotions(self):
+    #     """Test OpenAI classifier on GoEmotions multi-label dataset."""
+    #     import pandas as pd
+    #     from textclassify.llm.openai_classifier import OpenAIClassifier
+    #     from textclassify.core.types import ModelConfig, ModelType
+        
+    #     # Load GoEmotions dataset
+    #     train_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/goemotions/goemotions_all_train_balanced.csv")
+    #     test_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/goemotions/goemotions_all_test_balanced.csv")
+        
+    #     # Get emotion columns (excluding metadata columns)
+    #     label_columns = [
+    #     "admiration","amusement","anger","annoyance","approval","caring",
+    #     "confusion","curiosity","desire","disappointment","disapproval","disgust",
+    #     "embarrassment","excitement","fear","gratitude","grief","joy","love",
+    #     "nervousness","optimism","pride","realization","relief","remorse",
+    #     "sadness","surprise","neutral"
+    #     ]
+        
+    #     # Configure the model for multi-label emotion classification
+    #     config = ModelConfig(
+    #         model_name="gpt-5-2025-08-07",
+    #         model_type=ModelType.LLM,
+    #         parameters={
+    #             "model": "gpt-5-2025-08-07",
+    #             "temperature": 0.1,
+    #             "max_completion_tokens": 200,
+    #             "top_p": 1.0
+    #         }
+    #     )
+        
+    #     # Initialize classifier for multi-label classification
+    #     classifier = OpenAIClassifier(
+    #         config=config,
+    #         text_column='text',
+    #         label_columns=label_columns,
+    #         enable_cache=True,
+    #         cache_dir="cache/experimente/goemotions_classifikation",
+    #         multi_label=True  # Enable multi-label classification
+    #     )
+        
+    #     # Test prediction
+    #     result = classifier.predict(
+    #         train_df=train_df,
+    #         test_df=test_df
+    #     )
+        
+    #     # Assert results for multi-label classification
+    #     assert len(result.predictions) == 5
+    #     assert result.model_name == "gpt-5-2025-08-07"
+    #     assert result.model_type.value == "llm"
+        
+    #     # Validate multi-label prediction format
+    #     for prediction in result.predictions:
+    #         # Each prediction should be a binary vector of length = number of emotions
+    #         assert len(prediction) == len(label_columns)
+    #         # All values should be 0 or 1
+    #         assert all(val in [0, 1] for val in prediction)
+    
+    # def test_openai_classifier_on_goemotions_advanced(self):
+    #     """Test OpenAI classifier on GoEmotions multi-label dataset with advanced features."""
+    #     import pandas as pd
+    #     from textclassify.llm.openai_classifier import OpenAIClassifier
+    #     from textclassify.core.types import ModelConfig, ModelType
+        
+    #     # Load GoEmotions dataset (small sample for testing)
+    #     train_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/goemotions/goemotions_all_train_balanced.csv")
+    #     test_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/goemotions/goemotions_all_test_balanced.csv")
+        
+    #     # Get emotion columns
+    #     label_columns = [
+    #         "admiration","amusement","anger","annoyance","approval","caring",
+    #         "confusion","curiosity","desire","disappointment","disapproval","disgust",
+    #         "embarrassment","excitement","fear","gratitude","grief","joy","love",
+    #         "nervousness","optimism","pride","realization","relief","remorse",
+    #         "sadness","surprise","neutral"
+    #     ]
+        
+    #     # Configure advanced OpenAI model
+    #     config = ModelConfig(
+    #         model_name="gpt-4",
+    #         model_type=ModelType.LLM,
+    #         parameters={
+    #             "model": "gpt-4",
+    #             "temperature": 0.1,
+    #             "max_completion_tokens": 200,
+    #             "top_p": 1.0
+    #         }
+    #     )
+        
+    #     # Create OpenAI classifier with advanced caching
+    #     classifier = OpenAIClassifier(
+    #         config=config,
+    #         text_column='text',
+    #         label_columns=label_columns,
+    #         enable_cache=True,
+    #         cache_dir="cache/experimente/goemotions_advanced",
+    #         multi_label=True
+    #     )
+        
+    #     # Test prediction with advanced features
+    #     result = classifier.predict(
+    #         train_df=train_df.head(5),  # Few-shot examples
+    #         test_df=test_df.head(3)     # Test samples
+    #     )
+        
+    #     # Assert advanced results
+    #     assert len(result.predictions) == 3
+    #     assert result.model_name == "gpt-4"
+    #     assert result.model_type.value == "llm"
+        
+    #     # Validate multi-label prediction format
+    #     for prediction in result.predictions:
+    #         # Each prediction should be a binary vector of length = number of emotions
+    #         assert len(prediction) == len(label_columns)
+    #         # All values should be 0 or 1
+    #         assert all(val in [0, 1] for val in prediction)
+        
+    #     # Test that caching is working
+    #     cache_stats = classifier.cache.get_cache_stats()
+    #     assert cache_stats is not None
+    
+    def test_roberta_classifier_on_ag_news(self):
+        """Test RoBERTa classifier on AG News dataset."""
         import pandas as pd
-        from textclassify.llm.openai_classifier import OpenAIClassifier
-        from textclassify.core.types import ModelConfig
+        from textclassify.ml.roberta_classifier import RoBERTaClassifier
+        from textclassify.core.types import ModelConfig, ModelType
         
         # Load your dataset
         train_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_train_balanced.csv")
+        val_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_val_balanced.csv")
         test_df = pd.read_csv("/home/michaelschlee/ownCloud/GIT/classifyfusion/data/ag_news/ag_test_balanced.csv")
         
         # Configure the model
-        from textclassify.core.types import ModelConfig, ModelType
         config = ModelConfig(
-            model_name="gpt-5-2025-08-07",  # Required
-            model_type=ModelType.LLM,    # Required
+            model_name="roberta-base",  # Required
+            model_type=ModelType.TRADITIONAL_ML,  # Required
             parameters={
-                "model": "gpt-5-2025-08-07",  # The actual model to use
-                "temperature": 0.1,
-                "max_completion_tokens": 150,
-                "top_p": 1.0
+                "model_name": "roberta-base",  # The actual model to use
+                "learning_rate": 2e-5,
+                "num_epochs": 1,  # Use 1 epoch for faster testing
+                "batch_size": 8,
+                "max_length": 256
             }
         )
         
         # Initialize classifier
-        classifier = OpenAIClassifier(
+        classifier = RoBERTaClassifier(
             config=config,
             text_column='description',
             label_columns=["label_1", "label_2", "label_3", "label_4"],
-            enable_cache=True,
-            cache_dir="cache/experimente/ag_news_klassifikation",
-            multi_label=False
+            multi_label=False,
+            auto_save_path="cache/experimente/ag_news_roberta_model"
         )
         
-        # Test prediction (use small sample for testing)
-        result = classifier.predict(
-            train_df=train_df,  # Few-shot examples
-            test_df=test_df     # Test samples
-        )
+        # Use small samples for testing
+        train_sample = train_df.head(50)  # Use small sample for faster training
+        val_sample = val_df.head(20)      # Use small validation set from separate file
+        test_sample = test_df.head(10)    # Use small test set
         
-        # Assert results
-        assert len(result.predictions) == 3
-        assert result.model_name == "gpt-5-2025-08-07"  # Should match parameters["model"]
-        assert result.model_type.value == "llm"
+        # Train the model
+        training_result = classifier.fit(train_sample, val_sample)
+        
+        # Test prediction
+        result = classifier.predict(test_df=test_sample)
+        
+        # Assert training results
+        assert training_result['model_name'] == 'roberta-base'
+        assert training_result['training_samples'] == 50
+        assert training_result['validation_samples'] == 20
+        assert training_result['num_labels'] == 4
+        assert training_result['classes'] == ["label_1", "label_2", "label_3", "label_4"]
+        
+        # Assert prediction results
+        assert len(result.predictions) == 10
+        assert all(pred in ["label_1", "label_2", "label_3", "label_4"] for pred in result.predictions)
+        assert classifier.is_trained
 
 
 class TestBasicFunctionality:

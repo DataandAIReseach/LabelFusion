@@ -559,42 +559,39 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         if self.verbose:
             self.logger.info(f"🚀 Starting prediction for {total_samples} samples in {total_batches} batches")
-            print(f"📊 Processing {total_samples} samples in {total_batches} batches of size {self.batch_size}")
+            print(f"\n📊 Processing {total_samples} samples in {total_batches} batches of size {self.batch_size}")
         
-        # Create main progress bar for batches
-        batch_iterator = range(0, len(df), self.batch_size)
+        # Create simple, visible progress bar
         if self.verbose:
             from tqdm import tqdm
-            batch_pbar = tqdm(
-                batch_iterator, 
-                desc="🔮 LLM Prediction Batches",
-                total=total_batches,
-                unit="batch",
-                ncols=100,
-                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
-            )
-        else:
-            batch_pbar = batch_iterator
-        
-        # Create individual prediction progress bar
-        if self.verbose:
-            pred_pbar = tqdm(
+            import sys
+            
+            # Single progress bar for all predictions (simpler and more reliable)
+            pbar = tqdm(
                 total=total_samples,
-                desc="📝 Individual Predictions",
-                unit="pred",
-                ncols=100,
-                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
-                position=1,
-                leave=True
+                desc="� LLM Predictions",
+                unit="sample",
+                ncols=80,
+                file=sys.stdout,
+                dynamic_ncols=True,
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}"
             )
+        
+        batch_iterator = range(0, len(df), self.batch_size)
         
         try:
-            for i, batch_start in enumerate(batch_pbar):
+            for i, batch_start in enumerate(batch_iterator):
                 batch_df = df.iloc[batch_start:batch_start + self.batch_size]
                 batch_size_actual = len(batch_df)
                 
-                if self.verbose and not isinstance(batch_pbar, tqdm):
-                    self.logger.info(f"Processing batch {i+1}/{total_batches} ({batch_size_actual} samples)")
+                if self.verbose:
+                    # Update postfix with current batch info
+                    pbar.set_postfix({
+                        'Batch': f'{i+1}/{total_batches}',
+                        'Cache': f'💾{cache_hits}',
+                        'Miss': f'🌐{cache_misses}',
+                        'Fail': f'❌{failed_predictions}'
+                    })
                 
                 # Process batch and track individual predictions
                 batch_predictions, batch_stats = await self._process_batch_with_stats(batch_df, text_column)
@@ -606,46 +603,34 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 successful_predictions += batch_stats.get('successful', 0)
                 failed_predictions += batch_stats.get('failed', 0)
                 
-                # Update progress bars
+                # Update progress bar by batch size
                 if self.verbose:
-                    pred_pbar.update(batch_size_actual)
-                    
-                    # Calculate rates
-                    total_processed = successful_predictions + failed_predictions
-                    success_rate = (successful_predictions / total_processed * 100) if total_processed > 0 else 0
-                    cache_rate = (cache_hits / (cache_hits + cache_misses) * 100) if (cache_hits + cache_misses) > 0 else 0
-                    
-                    # Update progress bar postfix with statistics
-                    pred_pbar.set_postfix({
-                        'Success': f'{success_rate:.1f}%',
-                        'Cache': f'{cache_rate:.1f}%',
-                        'Fails': failed_predictions
-                    })
-                    
-                    # Update batch progress bar description with current stats
-                    batch_pbar.set_description(f"🔮 Batches [✓{successful_predictions} ❌{failed_predictions} 💾{cache_hits}]")
+                    pbar.update(batch_size_actual)
+                    # Force refresh
+                    pbar.refresh()
                 
-                if self.verbose and not isinstance(batch_pbar, tqdm):
-                    self.logger.info(f"Batch {i+1} completed: {batch_size_actual} predictions, {batch_stats.get('cache_hits', 0)} cache hits")
+                # Log batch completion for non-tqdm environments
+                if not self.verbose:
+                    print(f"Completed batch {i+1}/{total_batches}")
         
         finally:
-            # Close progress bars
+            # Clean up progress bar
             if self.verbose:
-                pred_pbar.close()
-                if isinstance(batch_pbar, tqdm):
-                    batch_pbar.close()
-        
-        # Final statistics
-        if self.verbose:
-            total_processed = successful_predictions + failed_predictions
-            success_rate = (successful_predictions / total_processed * 100) if total_processed > 0 else 0
-            cache_rate = (cache_hits / (cache_hits + cache_misses) * 100) if (cache_hits + cache_misses) > 0 else 0
-            
-            print(f"\n📊 Prediction Summary:")
-            print(f"   ✅ Successful: {successful_predictions}/{total_processed} ({success_rate:.1f}%)")
-            print(f"   ❌ Failed: {failed_predictions}/{total_processed}")
-            print(f"   💾 Cache hits: {cache_hits}/{cache_hits + cache_misses} ({cache_rate:.1f}%)")
-            print(f"   🚀 Total processed: {total_samples} samples")
+                # Final statistics update
+                pbar.set_postfix({
+                    'Cache': f'💾{cache_hits}',
+                    'API': f'🌐{cache_misses}',
+                    'Success': f'✅{successful_predictions}',
+                    'Failed': f'❌{failed_predictions}'
+                })
+                pbar.close()
+                
+                # Print final summary
+                print(f"\n📊 Prediction Summary:")
+                print(f"   ✅ Successful: {successful_predictions}/{total_samples}")
+                print(f"   ❌ Failed: {failed_predictions}/{total_samples}")
+                print(f"   💾 Cache hits: {cache_hits}/{total_samples}")
+                print(f"   🌐 API calls: {cache_misses}/{total_samples}")
         
         return predictions
 
