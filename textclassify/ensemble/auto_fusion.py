@@ -331,23 +331,37 @@ class AutoFusionClassifier(BaseClassifier):
             }
         )
         
-        return RoBERTaClassifier(config=ml_config)
+        return RoBERTaClassifier(
+            config=ml_config,
+            text_column=self.user_config.get('text_column', 'description'),
+            label_columns=self.label_columns,
+            multi_label=self.multi_label,
+            auto_save_path=self.output_dir / "ml_model"
+        )
     
     def _create_llm_model(self):
         """Create and configure the LLM model."""
-        llm_config = Config()
-        llm_config.model_type = ModelType.LLM
-        llm_config.parameters = {
-            'model': self.user_config.get('llm_model', self._get_default_llm_model()),
-            'temperature': self.user_config.get('temperature', 0.1),
-            'max_completion_tokens': self.user_config.get('max_completion_tokens', 150)
-        }
+        llm_config = ModelConfig(
+            model_name=self.user_config.get('llm_model', self._get_default_llm_model()),
+            model_type=ModelType.LLM,
+            parameters={
+                'model': self.user_config.get('llm_model', self._get_default_llm_model()),
+                'temperature': self.user_config.get('temperature', 0.1),
+                'max_completion_tokens': self.user_config.get('max_completion_tokens', 150)
+            }
+        )
         
         # Add provider-specific parameters
         if self.llm_provider == 'openai':
+            llm_config.parameters.update({
+                'top_p': self.user_config.get('top_p', 1.0)
+            })
             return OpenAIClassifier(
                 config=llm_config,
+                text_column=self.user_config.get('text_column', 'description'),
                 label_columns=self.label_columns,
+                enable_cache=True,
+                cache_dir=self.output_dir / "llm_cache",
                 multi_label=self.multi_label
             )
         elif self.llm_provider == 'gemini':
@@ -357,7 +371,10 @@ class AutoFusionClassifier(BaseClassifier):
             })
             return GeminiClassifier(
                 config=llm_config,
+                text_column=self.user_config.get('text_column', 'description'),
                 label_columns=self.label_columns,
+                enable_cache=True,
+                cache_dir=self.output_dir / "llm_cache",
                 multi_label=self.multi_label
             )
         else:  # deepseek (default)
@@ -368,7 +385,10 @@ class AutoFusionClassifier(BaseClassifier):
             })
             return DeepSeekClassifier(
                 config=llm_config,
+                text_column=self.user_config.get('text_column', 'description'),
                 label_columns=self.label_columns,
+                enable_cache=True,
+                cache_dir=self.output_dir / "llm_cache",
                 multi_label=self.multi_label
             )
     
@@ -376,7 +396,7 @@ class AutoFusionClassifier(BaseClassifier):
         """Get default model name for the LLM provider."""
         defaults = {
             'deepseek': 'deepseek-chat',
-            'openai': 'gpt-3.5-turbo',
+            'openai': 'gpt-4o-mini',  # Updated to newer, faster model
             'gemini': 'gemini-1.5-flash'
         }
         return defaults.get(self.llm_provider, 'deepseek-chat')
