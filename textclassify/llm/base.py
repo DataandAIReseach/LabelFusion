@@ -462,9 +462,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         Returns:
             List[int]: Binary vector representation of predictions
         """
-        if not response:
+        if not response or not response.strip():
             if self.verbose:
-                self.logger.warning("Received empty response from LLM")
+                self.logger.warning("Received empty or whitespace-only response from LLM")
             # Return default values for empty responses
             if self.multi_label:
                 return [0] * len(self.classes_) if self.classes_ else [0]
@@ -472,14 +472,6 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 return [1] + [0] * (len(self.classes_) - 1) if self.classes_ else [1]
         
         response = response.strip()
-        if not response:
-            if self.verbose:
-                self.logger.warning("Received whitespace-only response from LLM")
-            # Return default values for empty responses
-            if self.multi_label:
-                return [0] * len(self.classes_) if self.classes_ else [0]
-            else:
-                return [1] + [0] * (len(self.classes_) - 1) if self.classes_ else [1]
         
         if self.multi_label:
             return self._parse_multiple_labels(response)
