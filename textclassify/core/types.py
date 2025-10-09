@@ -23,8 +23,6 @@ class ClassificationType(Enum):
     """Type of classification task."""
     SINGLE_LABEL = "single_label"  # Single label per text (mutually exclusive)
     MULTI_CLASS = "multi_class"  # Single label per text (mutually exclusive) - alias for SINGLE_LABEL
-    SINGLE_LABEL = "single_label"  # Single label per text (mutually exclusive)
-    MULTI_CLASS = "multi_class"  # Single label per text (mutually exclusive) - alias for SINGLE_LABEL
     MULTI_LABEL = "multi_label"  # Multiple labels per text (non-exclusive)
 
 
