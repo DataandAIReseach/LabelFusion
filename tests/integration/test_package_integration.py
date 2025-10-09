@@ -1,7 +1,8 @@
 """Integration tests for package functionality."""
 import sys
 import importlib
-sys.path.insert(0, '.')
+import pytest
+import os
 
 # Force clear all cached modules
 modules_to_clear = [mod for mod in sys.modules.keys() if mod.startswith('textclassify')]
@@ -9,13 +10,10 @@ for mod in modules_to_clear:
     if mod in sys.modules:
         del sys.modules[mod]
 
-import pytest
-import sys
-import os
-
 from textclassify.core.types import ModelConfig
 
 # Add the package to the path for testing
+sys.path.insert(0, '.')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 
