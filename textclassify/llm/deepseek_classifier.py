@@ -3,11 +3,7 @@
 import asyncio
 from typing import Dict, List, Optional, Union, Any
 import pandas as pd
-from typing import Dict, List, Optional, Union, Any
-import pandas as pd
 
-from ..core.types import ClassificationResult
-from ..core.exceptions import APIError, ConfigurationError, PredictionError
 from ..core.types import ClassificationResult
 from ..core.exceptions import APIError, ConfigurationError, PredictionError
 from .base import BaseLLMClassifier
@@ -22,9 +18,7 @@ class DeepSeekClassifier(BaseLLMClassifier):
         text_column: str = 'text',
         label_columns: Optional[List[str]] = None,
         multi_label: bool = False,
-        few_shot_mode: str = "few_shot",
-        enable_cache: bool = True,
-        cache_dir: str = "cache/llm"
+        few_shot_mode: str = "few_shot"
     ):
         """Initialize DeepSeek classifier.
         
@@ -34,18 +28,15 @@ class DeepSeekClassifier(BaseLLMClassifier):
             label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier
             few_shot_mode: Mode for few-shot learning
-            enable_cache: Whether to enable prediction caching
-            cache_dir: Directory for caching prediction results
         """
+        # Set provider before calling super().__init__
+        config.provider = 'deepseek'
+        
         super().__init__(
             config=config,
-            text_column=text_column,
-            label_columns=label_columns,
             multi_label=multi_label,
             few_shot_mode=few_shot_mode,
-            provider='deepseek',
-            enable_cache=enable_cache,
-            cache_dir=cache_dir
+            label_columns=label_columns
         )
         
         # Set up classes and prompt engineer configuration
@@ -57,13 +48,6 @@ class DeepSeekClassifier(BaseLLMClassifier):
         
         # Set DeepSeek specific parameters
         self.model = self.config.parameters.get('model', 'deepseek-chat')
-        self.temperature = self.config.parameters.get('temperature', 1)
-        self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
-        
-        # DeepSeek-specific parameters (similar to OpenAI)
-        self.top_p = self.config.parameters.get('top_p', 1.0)
-        self.frequency_penalty = self.config.parameters.get('frequency_penalty', 0.0)
-        self.presence_penalty = self.config.parameters.get('presence_penalty', 0.0)
         self.temperature = self.config.parameters.get('temperature', 1)
         self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
         
@@ -94,27 +78,6 @@ class DeepSeekClassifier(BaseLLMClassifier):
             
         except Exception as e:
             raise APIError(f"LLM service call failed: {str(e)}")
-        """Call DeepSeek API with the given prompt using the service layer.
-        
-        This uses the llm_generator from BaseLLMClassifier which handles
-        API key management and provides a consistent interface.
-        """
-        try:
-            # Use the service layer instead of direct API calls
-            response = await self.llm_generator.generate_content(prompt)
-            
-            # Handle empty or None responses
-            if response is None:
-                raise APIError("LLM service returned None response")
-            
-            response = response.strip()
-            if not response:
-                raise APIError("LLM service returned empty response")
-            
-            return response
-            
-        except Exception as e:
-            raise APIError(f"LLM service call failed: {str(e)}")
     
     @property
     def model_info(self) -> Dict[str, Any]:
@@ -124,10 +87,6 @@ class DeepSeekClassifier(BaseLLMClassifier):
             "provider": "deepseek",
             "model": self.model,
             "temperature": self.temperature,
-            "max_completion_tokens": self.max_completion_tokens,
-            "top_p": self.top_p,
-            "frequency_penalty": self.frequency_penalty,
-            "presence_penalty": self.presence_penalty
             "max_completion_tokens": self.max_completion_tokens,
             "top_p": self.top_p,
             "frequency_penalty": self.frequency_penalty,
