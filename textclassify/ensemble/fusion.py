@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.isotonic import IsotonicRegression
 from sklearn.calibration import CalibratedClassifierCV
 
-from ..core.types import ClassificationResult, ClassificationType, TrainingData, EnsembleConfig
+from ..core.types import ClassificationResult, ClassificationType, EnsembleConfig
 from ..core.exceptions import EnsembleError, ModelTrainingError
 from .base import BaseEnsemble
 
@@ -133,7 +133,17 @@ class FusionEnsemble(BaseEnsemble):
         
         # Determine classification type from ensemble config or infer from models
         if 'classification_type' in ensemble_config.parameters:
-            self.classification_type = ensemble_config.parameters['classification_type']
+            config_type = ensemble_config.parameters['classification_type']
+            if isinstance(config_type, str):
+                # Convert string to enum
+                if config_type.lower() in ['multi_label', 'multilabel']:
+                    self.classification_type = ClassificationType.MULTI_LABEL
+                elif config_type.lower() in ['multi_class', 'multiclass', 'single_label']:
+                    self.classification_type = ClassificationType.MULTI_CLASS
+                else:
+                    self.classification_type = ClassificationType.MULTI_CLASS  # Default
+            else:
+                self.classification_type = config_type
         elif 'multi_label' in ensemble_config.parameters:
             self.classification_type = ClassificationType.MULTI_LABEL if ensemble_config.parameters['multi_label'] else ClassificationType.MULTI_CLASS
         else:
@@ -155,12 +165,15 @@ class FusionEnsemble(BaseEnsemble):
         self.models.append(llm_model)
         self.model_names.append("llm_model")
     
-    def fit(self, train_df: pd.DataFrame, val_df: pd.DataFrame) -> Dict[str, Any]:
+    def fit(self, train_df: pd.DataFrame, val_df: pd.DataFrame, 
+            val_llm_predictions: Optional[List[Union[str, List[str]]]] = None) -> Dict[str, Any]:
         """Train the fusion ensemble with train and validation DataFrames.
         
         Args:
             train_df: Training DataFrame with text and label columns
             val_df: Validation DataFrame with text and label columns
+            val_llm_predictions: Optional pre-computed LLM predictions for validation set.
+                                 If provided, skips LLM inference on validation data.
             
         Returns:
             Dictionary with training results and metrics
@@ -189,18 +202,8 @@ class FusionEnsemble(BaseEnsemble):
         # Step 1: Train ML model on training set
         if not self.ml_model.is_trained:
             print("Training ML model on training set...")
-            # Convert to TrainingData format for ML model
-            train_data = TrainingData(
-                texts=train_df[text_column].tolist(),
-                labels=train_df[label_columns].values.tolist(),
-                classification_type=self.classification_type
-            )
-            val_data = TrainingData(
-                texts=val_df[text_column].tolist(),
-                labels=val_df[label_columns].values.tolist(),
-                classification_type=self.classification_type
-            )
-            self.ml_model.fit(train_data, val_data)
+            # Use DataFrame interface directly
+            self.ml_model.fit(train_df, val_df)
         else:
             print("ML model already trained")
         
@@ -210,17 +213,24 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 2: Get ML predictions on validation set
         print("Getting ML predictions on validation set...")
-        ml_val_result = self.ml_model.predict(
-            texts=val_df[text_column].tolist(),
-            true_labels=val_df[label_columns].values.tolist()
-        )
+        ml_val_result = self.ml_model.predict(val_df)
         
         # Step 3: Get LLM predictions on validation set
-        print("Getting LLM predictions on validation set...")
-        val_llm_result = self.llm_model.predict(
-            train_df=train_df,  # Few-shot examples
-            test_df=val_df      # Validation texts
-        )
+        if val_llm_predictions is not None:
+            print("Using provided LLM predictions for validation set...")
+            # Create a mock ClassificationResult with the provided predictions
+            from ..core.types import ClassificationResult
+            llm_val_result = ClassificationResult(
+                predictions=val_llm_predictions,
+                model_name="llm_model_cached",
+                classification_type=self.classification_type
+            )
+        else:
+            print("Getting LLM predictions on validation set...")
+            llm_val_result = self.llm_model.predict(
+                train_df=train_df,  # Few-shot examples
+                test_df=val_df      # Validation texts
+            )
         
         # Step 4: Create fusion wrapper
         print("Creating fusion wrapper...")
@@ -234,7 +244,7 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 5: Train fusion MLP on validation set predictions
         print("Training fusion MLP on validation predictions...")
-        self._train_fusion_mlp_on_val(val_df, ml_val_result, val_llm_result, text_column, label_columns)
+        self._train_fusion_mlp_on_val(val_df, ml_val_result, llm_val_result, text_column, label_columns)
         
         # Cache training data for later LLM predictions
         self.train_df_cache = train_df.copy()
@@ -249,20 +259,81 @@ class FusionEnsemble(BaseEnsemble):
             'validation_samples': len(val_df),
             'num_labels': self.num_labels,
             'classes': self.classes_,
-            'classification_type': self.classification_type.value,
+            'classification_type': self.classification_type.value if hasattr(self.classification_type, 'value') else self.classification_type,
             'ml_model_trained': self.ml_model.is_trained,
-            'fusion_mlp_trained': True
+            'fusion_mlp_trained': True,
+            'used_cached_val_llm_predictions': val_llm_predictions is not None
         }
         
         print("✅ Fusion ensemble training completed!")
         return training_result
     
-    def train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, val_llm_result, 
+    def get_llm_predictions(self, df: pd.DataFrame, train_df: Optional[pd.DataFrame] = None) -> List[Union[str, List[str]]]:
+        """Get LLM predictions for a DataFrame without training the fusion ensemble.
+        
+        This is useful for caching LLM predictions that can be reused later.
+        
+        Args:
+            df: DataFrame to get predictions for
+            train_df: Optional training DataFrame for few-shot examples.
+                     If not provided, uses cached training data or df itself.
+            
+        Returns:
+            List of LLM predictions that can be passed to fit() or predict()
+        """
+        if self.llm_model is None:
+            raise EnsembleError("LLM model must be added before getting predictions")
+        
+        # Use provided train_df, cached training data, or df itself for few-shot
+        if train_df is not None:
+            few_shot_df = train_df
+        elif hasattr(self, 'train_df_cache') and self.train_df_cache is not None:
+            few_shot_df = self.train_df_cache
+        else:
+            few_shot_df = df
+            print("Warning: No training data available for few-shot examples, using target data")
+        
+        print(f"Getting LLM predictions for {len(df)} samples...")
+        llm_result = self.llm_model.predict(
+            train_df=few_shot_df,
+            test_df=df
+        )
+        
+        return llm_result.predictions
+    
+    def save_llm_predictions(self, predictions: List[Union[str, List[str]]], filepath: str):
+        """Save LLM predictions to a file for later reuse.
+        
+        Args:
+            predictions: LLM predictions to save
+            filepath: Path to save the predictions (JSON format)
+        """
+        import json
+        with open(filepath, 'w') as f:
+            json.dump(predictions, f, indent=2)
+        print(f"LLM predictions saved to {filepath}")
+    
+    def load_llm_predictions(self, filepath: str) -> List[Union[str, List[str]]]:
+        """Load LLM predictions from a file.
+        
+        Args:
+            filepath: Path to load predictions from (JSON format)
+            
+        Returns:
+            List of LLM predictions
+        """
+        import json
+        with open(filepath, 'r') as f:
+            predictions = json.load(f)
+        print(f"LLM predictions loaded from {filepath}")
+        return predictions
+    
+    def train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, llm_val_result, 
                                 text_column: str, label_columns: List[str]):
         """Public method to train the fusion MLP using validation set predictions from both ML and LLM models."""
-        return self._train_fusion_mlp_on_val(val_df, ml_val_result, val_llm_result, text_column, label_columns)
+        return self._train_fusion_mlp_on_val(val_df, ml_val_result, llm_val_result, text_column, label_columns)
 
-    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, val_llm_result, 
+    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, llm_val_result, 
                                 text_column: str, label_columns: List[str]):
         """Train the fusion MLP using validation set predictions from both ML and LLM models."""
         
@@ -280,8 +351,8 @@ class FusionEnsemble(BaseEnsemble):
         fusion_val_ml_predictions = ml_val_result.predictions[split_idx:]
         
         # Split LLM predictions
-        fusion_train_llm_predictions = val_llm_result.predictions[:split_idx]
-        fusion_val_llm_predictions = val_llm_result.predictions[split_idx:]
+        fusion_train_llm_predictions = llm_val_result.predictions[:split_idx]
+        fusion_val_llm_predictions = llm_val_result.predictions[split_idx:]
         
         print(f"   🔧 Fusion training: {len(fusion_train_df)} samples")
         print(f"   🔧 Fusion validation: {len(fusion_val_df)} samples")
@@ -414,12 +485,15 @@ class FusionEnsemble(BaseEnsemble):
         
         return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
     
-    def predict(self, test_df: pd.DataFrame, true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+    def predict(self, test_df: pd.DataFrame, true_labels: Optional[List[List[int]]] = None,
+                test_llm_predictions: Optional[List[Union[str, List[str]]]] = None) -> ClassificationResult:
         """Predict using fusion ensemble on test DataFrame.
         
         Args:
             test_df: Test DataFrame with text and optionally label columns
             true_labels: Optional true labels for evaluation (deprecated, will be extracted from DataFrame)
+            test_llm_predictions: Optional pre-computed LLM predictions for test set.
+                                  If provided, skips LLM inference on test data.
             
         Returns:
             ClassificationResult with predictions and metrics
@@ -442,24 +516,31 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 1: Get ML predictions on test data
         print("Getting ML predictions on test data...")
-        ml_test_result = self.ml_model.predict(
-            texts=texts,
-            true_labels=extracted_labels
-        )
+        ml_test_result = self.ml_model.predict(test_df)
         
         # Step 2: Get LLM predictions on test data
-        print("Getting LLM predictions on test data...")
-        # Use cached training data for few-shot examples
-        train_df_for_llm = getattr(self, 'train_df_cache', None)
-        if train_df_for_llm is None:
-            # Fallback: use test_df as both train and test (not ideal but functional)
-            print("Warning: No cached training data found, using test data for LLM few-shot")
-            train_df_for_llm = test_df
-        
-        llm_test_result = self.llm_model.predict(
-            train_df=train_df_for_llm,  # Few-shot examples
-            test_df=test_df             # Test data
-        )
+        if test_llm_predictions is not None:
+            print("Using provided LLM predictions for test set...")
+            # Create a mock ClassificationResult with the provided predictions
+            from ..core.types import ClassificationResult
+            llm_test_result = ClassificationResult(
+                predictions=test_llm_predictions,
+                model_name="llm_model_cached",
+                classification_type=self.classification_type
+            )
+        else:
+            print("Getting LLM predictions on test data...")
+            # Use cached training data for few-shot examples
+            train_df_for_llm = getattr(self, 'train_df_cache', None)
+            if train_df_for_llm is None:
+                # Fallback: use test_df as both train and test (not ideal but functional)
+                print("Warning: No cached training data found, using test data for LLM few-shot")
+                train_df_for_llm = test_df
+            
+            llm_test_result = self.llm_model.predict(
+                train_df=train_df_for_llm,  # Few-shot examples
+                test_df=test_df             # Test data
+            )
         
         # Step 3: Use fusion MLP to combine predictions
         print("Generating fusion predictions...")
