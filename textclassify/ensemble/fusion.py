@@ -128,6 +128,10 @@ class FusionEnsemble(BaseEnsemble):
         self.calibrator = None
         self.test_performance = {}  # Store test set performance
         
+        # LLM prediction cache file paths from ensemble config
+        self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', '')
+        self.test_llm_cache_path = ensemble_config.parameters.get('test_llm_cache_path', '')
+        
         # Initialize training state
         self.is_trained = False
         
@@ -216,21 +220,21 @@ class FusionEnsemble(BaseEnsemble):
         ml_val_result = self.ml_model.predict(val_df)
         
         # Step 3: Get LLM predictions on validation set
-        if val_llm_predictions is not None:
-            print("Using provided LLM predictions for validation set...")
-            # Create a mock ClassificationResult with the provided predictions
-            from ..core.types import ClassificationResult
-            llm_val_result = ClassificationResult(
-                predictions=val_llm_predictions,
-                model_name="llm_model_cached",
-                classification_type=self.classification_type
-            )
-        else:
-            print("Getting LLM predictions on validation set...")
-            llm_val_result = self.llm_model.predict(
-                train_df=train_df,  # Few-shot examples
-                test_df=val_df      # Validation texts
-            )
+        llm_val_predictions = self._get_or_generate_llm_predictions(
+            df=val_df,
+            train_df=train_df,
+            cache_path=self.val_llm_cache_path,
+            dataset_type="validation",
+            provided_predictions=val_llm_predictions
+        )
+        
+        # Create ClassificationResult for validation predictions
+        from ..core.types import ClassificationResult
+        llm_val_result = ClassificationResult(
+            predictions=llm_val_predictions,
+            model_name="llm_model" if val_llm_predictions is None else "llm_model_cached",
+            classification_type=self.classification_type
+        )
         
         # Step 4: Create fusion wrapper
         print("Creating fusion wrapper...")
@@ -300,6 +304,129 @@ class FusionEnsemble(BaseEnsemble):
         )
         
         return llm_result.predictions
+    
+    def _get_or_generate_llm_predictions(self, df: pd.DataFrame, train_df: pd.DataFrame, 
+                                       cache_path: str, dataset_type: str,
+                                       provided_predictions: Optional[List[Union[str, List[str]]]] = None) -> List[Union[str, List[str]]]:
+        """Get LLM predictions either from cache, provided predictions, or generate new ones.
+        
+        Args:
+            df: DataFrame to get predictions for
+            train_df: Training DataFrame for few-shot examples
+            cache_path: Base path for caching (without datetime extension)
+            dataset_type: Type of dataset ("validation" or "test") for logging
+            provided_predictions: Optional pre-computed predictions
+            
+        Returns:
+            List of LLM predictions
+        """
+        # If predictions are provided directly, use them
+        if provided_predictions is not None:
+            print(f"Using provided LLM predictions for {dataset_type} set...")
+            return provided_predictions
+        
+        # If cache path is empty, generate predictions on the fly
+        if not cache_path or cache_path.strip() == '':
+            print(f"No cache path specified, generating LLM predictions for {dataset_type} set on the fly...")
+            return self._generate_llm_predictions(df, train_df)
+        
+        # Try to load from cache first
+        cached_predictions = self._load_cached_llm_predictions(cache_path)
+        if cached_predictions is not None:
+            print(f"Loaded cached LLM predictions for {dataset_type} set from {cache_path}")
+            return cached_predictions
+        
+        # Generate new predictions and save to cache
+        print(f"Generating new LLM predictions for {dataset_type} set...")
+        predictions = self._generate_llm_predictions(df, train_df)
+        
+        # Save to cache with datetime stamp
+        self._save_cached_llm_predictions(predictions, cache_path)
+        
+        return predictions
+    
+    def _generate_llm_predictions(self, df: pd.DataFrame, train_df: pd.DataFrame) -> List[Union[str, List[str]]]:
+        """Generate LLM predictions for a DataFrame."""
+        if self.llm_model is None:
+            raise EnsembleError("LLM model must be added before generating predictions")
+        
+        llm_result = self.llm_model.predict(
+            train_df=train_df,
+            test_df=df
+        )
+        return llm_result.predictions
+    
+    def _load_cached_llm_predictions(self, base_cache_path: str) -> Optional[List[Union[str, List[str]]]]:
+        """Try to load cached LLM predictions from file.
+        
+        Args:
+            base_cache_path: Base path without datetime extension
+            
+        Returns:
+            Cached predictions if found, None otherwise
+        """
+        if not base_cache_path or not base_cache_path.strip():
+            return None
+        
+        try:
+            import json
+            import os
+            
+            # Check if the file exists (user might have provided full path)
+            if os.path.exists(base_cache_path):
+                with open(base_cache_path, 'r') as f:
+                    predictions = json.load(f)
+                return predictions
+            
+            # If not found, try to find the most recent file with datetime pattern
+            import glob
+            pattern = f"{base_cache_path}_*.json"
+            matching_files = glob.glob(pattern)
+            
+            if matching_files:
+                # Get the most recent file
+                latest_file = max(matching_files, key=os.path.getctime)
+                with open(latest_file, 'r') as f:
+                    predictions = json.load(f)
+                return predictions
+            
+            return None
+        except Exception as e:
+            print(f"Warning: Could not load cached predictions from {base_cache_path}: {e}")
+            return None
+    
+    def _save_cached_llm_predictions(self, predictions: List[Union[str, List[str]]], base_cache_path: str):
+        """Save LLM predictions to cache file with datetime stamp.
+        
+        Args:
+            predictions: LLM predictions to save
+            base_cache_path: Base path for the cache file
+        """
+        if not base_cache_path or not base_cache_path.strip():
+            return
+        
+        try:
+            import json
+            import os
+            from datetime import datetime
+            
+            # Create directory if it doesn't exist
+            cache_dir = os.path.dirname(base_cache_path)
+            if cache_dir and not os.path.exists(cache_dir):
+                os.makedirs(cache_dir, exist_ok=True)
+            
+            # Create filename with datetime stamp
+            timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+            cache_filename = f"{base_cache_path}_{timestamp}.json"
+            
+            # Save predictions
+            with open(cache_filename, 'w') as f:
+                json.dump(predictions, f, indent=2)
+            
+            print(f"LLM predictions saved to {cache_filename}")
+            
+        except Exception as e:
+            print(f"Warning: Could not save predictions to cache {base_cache_path}: {e}")
     
     def save_llm_predictions(self, predictions: List[Union[str, List[str]]], filepath: str):
         """Save LLM predictions to a file for later reuse.
@@ -519,28 +646,21 @@ class FusionEnsemble(BaseEnsemble):
         ml_test_result = self.ml_model.predict(test_df)
         
         # Step 2: Get LLM predictions on test data
-        if test_llm_predictions is not None:
-            print("Using provided LLM predictions for test set...")
-            # Create a mock ClassificationResult with the provided predictions
-            from ..core.types import ClassificationResult
-            llm_test_result = ClassificationResult(
-                predictions=test_llm_predictions,
-                model_name="llm_model_cached",
-                classification_type=self.classification_type
-            )
-        else:
-            print("Getting LLM predictions on test data...")
-            # Use cached training data for few-shot examples
-            train_df_for_llm = getattr(self, 'train_df_cache', None)
-            if train_df_for_llm is None:
-                # Fallback: use test_df as both train and test (not ideal but functional)
-                print("Warning: No cached training data found, using test data for LLM few-shot")
-                train_df_for_llm = test_df
-            
-            llm_test_result = self.llm_model.predict(
-                train_df=train_df_for_llm,  # Few-shot examples
-                test_df=test_df             # Test data
-            )
+        llm_test_predictions = self._get_or_generate_llm_predictions(
+            df=test_df,
+            train_df=getattr(self, 'train_df_cache', test_df),
+            cache_path=self.test_llm_cache_path,
+            dataset_type="test",
+            provided_predictions=test_llm_predictions
+        )
+        
+        # Create ClassificationResult for test predictions
+        from ..core.types import ClassificationResult
+        llm_test_result = ClassificationResult(
+            predictions=llm_test_predictions,
+            model_name="llm_model" if test_llm_predictions is None else "llm_model_cached",
+            classification_type=self.classification_type
+        )
         
         # Step 3: Use fusion MLP to combine predictions
         print("Generating fusion predictions...")
