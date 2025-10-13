@@ -13,6 +13,7 @@ from pathlib import Path
 
 from ..core.types import ClassificationResult, ClassificationType, ModelType
 from ..core.exceptions import ModelTrainingError, PredictionError, ValidationError
+from ..utils.results_manager import ResultsManager, ModelResultsManager
 from .base import BaseMLClassifier
 from .preprocessing import TextPreprocessor, clean_text, normalize_text
 
@@ -90,7 +91,10 @@ class RoBERTaClassifier(BaseMLClassifier):
         label_columns: Optional[List[str]] = None,
         multi_label: bool = False,
         enable_validation: bool = True,
-        auto_save_path: Optional[str] = None
+        auto_save_path: Optional[str] = None,
+        auto_save_results: bool = True,
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None
     ):
         """Initialize RoBERTa classifier.
         
@@ -101,6 +105,9 @@ class RoBERTaClassifier(BaseMLClassifier):
             multi_label: Whether this is a multi-label classifier
             enable_validation: Whether to evaluate on validation data during training
             auto_save_path: Optional path to automatically save model after training
+            auto_save_results: Whether to automatically save training/prediction results
+            output_dir: Base directory for saving results
+            experiment_name: Name for the experiment (for results organization)
         """
         if not TRANSFORMERS_AVAILABLE:
             raise ImportError(
@@ -116,6 +123,22 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.multi_label = multi_label
         self.enable_validation = enable_validation
         self.auto_save_path = auto_save_path
+        
+        # Results management
+        self.auto_save_results = auto_save_results
+        self.results_manager = None
+        self.model_results_manager = None
+        
+        if self.auto_save_results:
+            exp_name = experiment_name or f"roberta_{self.config.model_name}"
+            self.results_manager = ResultsManager(
+                base_output_dir=output_dir,
+                experiment_name=exp_name
+            )
+            self.model_results_manager = ModelResultsManager(
+                self.results_manager,
+                f"roberta_{self.config.model_name}"
+            )
         
         # Set up classes
         self.classes_ = label_columns if label_columns else []
@@ -300,8 +323,8 @@ class RoBERTaClassifier(BaseMLClassifier):
         if self.auto_save_path:
             self.save_model(self.auto_save_path)
         
-        # Return training information
-        return {
+        # Prepare training result
+        training_result = {
             "model_name": self.model_name,
             "num_labels": self.num_labels,
             "classes": self.classes_,
@@ -309,6 +332,43 @@ class RoBERTaClassifier(BaseMLClassifier):
             "validation_samples": len(val_df) if val_df is not None else 0,
             "device": str(self.device)
         }
+        
+        # Save training results using ResultsManager
+        if self.results_manager:
+            try:
+                # Save model configuration
+                model_config_dict = {
+                    'model_name': self.model_name,
+                    'max_length': self.max_length,
+                    'batch_size': self.batch_size,
+                    'learning_rate': self.learning_rate,
+                    'num_epochs': self.num_epochs,
+                    'multi_label': self.multi_label,
+                    'num_labels': self.num_labels,
+                    'classes': self.classes_,
+                    'text_column': self.text_column,
+                    'label_columns': self.label_columns
+                }
+                
+                self.results_manager.save_model_config(
+                    model_config_dict, 
+                    "roberta_classifier"
+                )
+                
+                # Save training summary
+                self.results_manager.save_experiment_summary(training_result)
+                
+                # Get experiment info
+                exp_info = self.results_manager.get_experiment_info()
+                training_result['experiment_info'] = exp_info
+                training_result['output_directory'] = exp_info['experiment_dir']
+                
+                print(f"📁 Training results saved to: {exp_info['experiment_dir']}")
+                
+            except Exception as e:
+                print(f"Warning: Could not save training results: {e}")
+        
+        return training_result
     
     def predict(
         self,
@@ -340,6 +400,10 @@ class RoBERTaClassifier(BaseMLClassifier):
         true_labels = None
         if all(col in test_df.columns for col in self.label_columns):
             true_labels = test_df[self.label_columns].values.tolist()
+        
+        # Store DataFrame reference for results saving
+        if self.results_manager:
+            self._current_test_df = test_df
         
         # Make predictions using the internal text method
         return self._predict_texts_internal(texts, true_labels)
@@ -427,10 +491,39 @@ class RoBERTaClassifier(BaseMLClassifier):
                         all_predictions.append(active_classes)
         
         # Calculate metrics if true labels are provided
-        return self._create_result(
+        result = self._create_result(
             predictions=all_predictions, 
             true_labels=true_labels if true_labels is not None else None
         )
+        
+        # Save prediction results using ResultsManager (if it's the main predict call)
+        if self.results_manager and hasattr(self, '_current_test_df'):
+            try:
+                saved_files = self.results_manager.save_predictions(
+                    result, "test", self._current_test_df
+                )
+                
+                # Save metrics if available
+                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                    metrics_file = self.results_manager.save_metrics(
+                        result.metadata['metrics'], "test", "roberta_classifier"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                print(f"📁 Prediction results saved: {saved_files}")
+                
+                # Add file paths to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['saved_files'] = saved_files
+                
+                # Clean up temporary reference
+                delattr(self, '_current_test_df')
+                
+            except Exception as e:
+                print(f"Warning: Could not save prediction results: {e}")
+        
+        return result
     
     def _create_result(
         self,
