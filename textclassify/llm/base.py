@@ -133,6 +133,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if self.verbose:
                 exp_info = self.results_manager.get_experiment_info()
                 self.logger.info(f"📁 Results will be saved to: {exp_info['experiment_dir']}")
+                self.logger.info(f"🔬 Experiment ID: {self.results_manager.experiment_id}")
         
         self._setup_config()
 
@@ -278,6 +279,35 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 
                 print(f"\nProcess completed in {total_time:.2f} seconds")
                 print(f"Average: {total_time/len(prepared_test_df):.3f} seconds per sample")
+            
+            # Save experiment summary if results manager is available
+            if self.results_manager:
+                try:
+                    experiment_summary = {
+                        'model_type': 'llm',
+                        'provider': self.provider,
+                        'model_name': self.config.parameters.get("model", "unknown"),
+                        'prediction_samples': len(prepared_test_df),
+                        'training_samples': len(prepared_train_df) if prepared_train_df is not None else 0,
+                        'processing_time_seconds': total_time,
+                        'avg_time_per_sample': total_time/len(prepared_test_df),
+                        'multi_label': self.multi_label,
+                        'few_shot_mode': self.few_shot_mode,
+                        'text_column': self.text_column,
+                        'label_columns': self.label_columns,
+                        'accuracy': metrics.get('accuracy') if metrics else None,
+                        'completed': True
+                    }
+                    
+                    self.results_manager.save_experiment_summary(experiment_summary)
+                    
+                    if self.verbose:
+                        exp_info = self.results_manager.get_experiment_info()
+                        self.logger.info(f"📋 Experiment summary saved to: {exp_info['experiment_dir']}")
+                        
+                except Exception as e:
+                    if self.verbose:
+                        self.logger.warning(f"Could not save experiment summary: {e}")
             
             return self._create_result(
                 predictions=predictions, 

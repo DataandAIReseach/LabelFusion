@@ -18,7 +18,11 @@ class DeepSeekClassifier(BaseLLMClassifier):
         text_column: str = 'text',
         label_columns: Optional[List[str]] = None,
         multi_label: bool = False,
-        few_shot_mode: str = "few_shot"
+        few_shot_mode: str = "few_shot",
+        # Results management parameters
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None,
+        auto_save_results: bool = True
     ):
         """Initialize DeepSeek classifier.
         
@@ -28,15 +32,23 @@ class DeepSeekClassifier(BaseLLMClassifier):
             label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier
             few_shot_mode: Mode for few-shot learning
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
         """
         # Set provider before calling super().__init__
         config.provider = 'deepseek'
         
         super().__init__(
             config=config,
+            text_column=text_column,
+            label_columns=label_columns,
             multi_label=multi_label,
             few_shot_mode=few_shot_mode,
-            label_columns=label_columns
+            provider='deepseek',
+            output_dir=output_dir,
+            experiment_name=experiment_name,
+            auto_save_results=auto_save_results
         )
         
         # Set up classes and prompt engineer configuration

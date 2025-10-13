@@ -11,13 +11,28 @@ from .base import BaseEnsemble
 class ClassRoutingEnsemble(BaseEnsemble):
     """Ensemble that routes different classes to different models."""
     
-    def __init__(self, ensemble_config):
+    def __init__(
+        self, 
+        ensemble_config,
+        # Results management parameters
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None,
+        auto_save_results: bool = True
+    ):
         """Initialize class routing ensemble.
         
         Args:
             ensemble_config: Configuration for the ensemble
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
         """
-        super().__init__(ensemble_config)
+        super().__init__(
+            ensemble_config,
+            output_dir=output_dir,
+            experiment_name=experiment_name,
+            auto_save_results=auto_save_results
+        )
         
         # Set up routing rules
         self.routing_rules = ensemble_config.routing_rules or {}

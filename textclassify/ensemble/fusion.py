@@ -106,13 +106,28 @@ class FusionWrapper(nn.Module):
 class FusionEnsemble(BaseEnsemble):
     """Ensemble that fuses ML and LLM classifiers with trainable MLP."""
     
-    def __init__(self, ensemble_config):
+    def __init__(
+        self, 
+        ensemble_config,
+        # Results management parameters
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None,
+        auto_save_results: bool = True
+    ):
         """Initialize fusion ensemble.
         
         Args:
             ensemble_config: Configuration for the ensemble
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
         """
-        super().__init__(ensemble_config)
+        super().__init__(
+            ensemble_config,
+            output_dir=output_dir,
+            experiment_name=experiment_name,
+            auto_save_results=auto_save_results
+        )
         
         # Fusion-specific parameters
         self.fusion_hidden_dims = ensemble_config.parameters.get('fusion_hidden_dims', [64, 32])
