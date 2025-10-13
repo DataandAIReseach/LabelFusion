@@ -7,16 +7,27 @@ from typing import Any, Dict, List, Optional, Union
 from ..core.base import BaseClassifier, AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType, TrainingData, EnsembleConfig
 from ..core.exceptions import EnsembleError, PredictionError, ValidationError
+from ..utils.results_manager import ResultsManager, ModelResultsManager
 
 
 class BaseEnsemble(BaseClassifier):
     """Base class for ensemble methods."""
     
-    def __init__(self, ensemble_config: EnsembleConfig):
+    def __init__(
+        self, 
+        ensemble_config: EnsembleConfig,
+        # Results management parameters
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None,
+        auto_save_results: bool = True
+    ):
         """Initialize ensemble with configuration.
         
         Args:
             ensemble_config: Configuration for the ensemble
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
         """
         # Create a dummy config for the base class
         from ..core.types import ModelConfig
@@ -29,6 +40,23 @@ class BaseEnsemble(BaseClassifier):
         self.ensemble_config = ensemble_config
         self.models = []
         self.model_names = []
+        
+        # Setup results management
+        self.results_manager = None
+        self.model_results_manager = None
+        
+        if auto_save_results:
+            if not experiment_name:
+                experiment_name = f"{ensemble_config.ensemble_method}_ensemble"
+            
+            self.results_manager = ResultsManager(
+                base_output_dir=output_dir,
+                experiment_name=experiment_name
+            )
+            self.model_results_manager = ModelResultsManager(
+                self.results_manager,
+                f"{ensemble_config.ensemble_method}_ensemble_{self.results_manager.experiment_id}"
+            )
         
         # Validate ensemble configuration
         if not ensemble_config.models:
@@ -99,7 +127,7 @@ class BaseEnsemble(BaseClassifier):
         # Combine predictions using ensemble method
         ensemble_predictions = self._combine_predictions(model_results, texts)
         
-        return self._create_result(predictions=ensemble_predictions)
+        return self._create_result(predictions=ensemble_predictions, texts=texts)
     
     def predict_proba(self, texts: List[str]) -> ClassificationResult:
         """Predict probabilities using ensemble method.
@@ -126,7 +154,8 @@ class BaseEnsemble(BaseClassifier):
         return self._create_result(
             predictions=ensemble_predictions,
             probabilities=ensemble_probabilities,
-            confidence_scores=ensemble_confidence
+            confidence_scores=ensemble_confidence,
+            texts=texts
         )
     
     def _get_model_predictions(self, texts: List[str], with_probabilities: bool = False) -> List[ClassificationResult]:
@@ -246,6 +275,205 @@ class BaseEnsemble(BaseClassifier):
         
         return model_results
     
+    def _create_result(
+        self,
+        predictions: List[Union[str, List[str]]],
+        probabilities: Optional[List[Dict[str, float]]] = None,
+        confidence_scores: Optional[List[float]] = None,
+        texts: Optional[List[str]] = None,
+        true_labels: Optional[List[List[int]]] = None
+    ) -> ClassificationResult:
+        """Create a ClassificationResult object with ensemble predictions and save results.
+        
+        Args:
+            predictions: List of predictions
+            probabilities: Optional list of probability dictionaries
+            confidence_scores: Optional list of confidence scores
+            texts: Optional list of input texts
+            true_labels: Optional list of true labels for evaluation
+            
+        Returns:
+            ClassificationResult object
+        """
+        # Calculate metrics if true labels are provided
+        metrics = None
+        if true_labels is not None:
+            # Convert string predictions to binary vectors for metric calculation
+            binary_predictions = []
+            for pred in predictions:
+                if isinstance(pred, str):
+                    # Single-label: create binary vector
+                    binary_vec = [0] * len(self.classes_)
+                    if pred in self.classes_:
+                        idx = self.classes_.index(pred)
+                        binary_vec[idx] = 1
+                    binary_predictions.append(binary_vec)
+                else:
+                    # Multi-label: create binary vector
+                    binary_vec = [0] * len(self.classes_)
+                    for label in pred:
+                        if label in self.classes_:
+                            idx = self.classes_.index(label)
+                            binary_vec[idx] = 1
+                    binary_predictions.append(binary_vec)
+            
+            metrics = self._calculate_metrics(binary_predictions, true_labels)
+        
+        # Create metadata with metrics and ensemble info
+        metadata = {
+            "metrics": metrics or {},
+            "ensemble_method": self.ensemble_config.ensemble_method,
+            "num_models": len(self.models),
+            "model_names": self.model_names
+        }
+        
+        result = ClassificationResult(
+            predictions=predictions,
+            probabilities=probabilities,
+            confidence_scores=confidence_scores,
+            model_name=f"{self.ensemble_config.ensemble_method}_ensemble",
+            model_type=ModelType.ENSEMBLE,
+            classification_type=self.classification_type,
+            metadata=metadata
+        )
+        
+        # Save results using ResultsManager
+        if self.results_manager and texts is not None:
+            try:
+                # Determine dataset type
+                dataset_type = "test" if true_labels is not None else "prediction"
+                
+                # Create DataFrame for saving
+                import pandas as pd
+                df = pd.DataFrame({
+                    'text': texts,
+                    'prediction': predictions
+                })
+                if true_labels is not None:
+                    df['true_labels'] = [','.join(map(str, labels)) for labels in true_labels]
+                
+                # Save predictions
+                saved_files = self.results_manager.save_predictions(
+                    result, dataset_type, df
+                )
+                
+                # Save metrics if available
+                if metrics:
+                    metrics_file = self.results_manager.save_metrics(
+                        metrics, dataset_type, f"{self.ensemble_config.ensemble_method}_ensemble"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                # Save ensemble configuration
+                ensemble_config = {
+                    'ensemble_method': self.ensemble_config.ensemble_method,
+                    'num_models': len(self.models),
+                    'model_names': self.model_names,
+                    'require_all_models': self.ensemble_config.require_all_models,
+                    'classification_type': self.classification_type.value if self.classification_type else 'unknown'
+                }
+                
+                config_file = self.results_manager.save_model_config(
+                    ensemble_config, f"{self.ensemble_config.ensemble_method}_ensemble"
+                )
+                saved_files["config"] = config_file
+                
+                # Save experiment summary
+                experiment_summary = {
+                    'model_name': f"{self.ensemble_config.ensemble_method}_ensemble",
+                    'model_type': 'ensemble',
+                    'classification_type': self.classification_type.value if self.classification_type else 'unknown',
+                    'num_predictions': len(predictions),
+                    'ensemble_method': self.ensemble_config.ensemble_method,
+                    'num_models': len(self.models),
+                    'accuracy': metrics.get('accuracy', 0.0) if metrics else 0.0,
+                    'completed': True
+                }
+                
+                if self.results_manager:
+                    self.results_manager.save_experiment_summary(experiment_summary)
+                
+                # Add file paths to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['saved_files'] = saved_files
+                
+            except Exception as e:
+                print(f"Warning: Could not save ensemble results: {e}")
+        
+        return result
+    
+    def _calculate_metrics(
+        self,
+        predictions: List[List[int]],
+        true_labels: List[List[int]]
+    ) -> Dict[str, float]:
+        """Calculate metrics for ensemble predictions.
+        
+        Args:
+            predictions: Binary prediction vectors
+            true_labels: Binary true label vectors
+            
+        Returns:
+            Dictionary of metrics
+        """
+        if self.classification_type == ClassificationType.MULTI_CLASS:
+            return self._calculate_single_label_metrics(predictions, true_labels)
+        else:
+            return self._calculate_multi_label_metrics(predictions, true_labels)
+    
+    def _calculate_single_label_metrics(
+        self,
+        predictions: List[List[int]],
+        true_labels: List[List[int]]
+    ) -> Dict[str, float]:
+        """Calculate metrics for single-label classification."""
+        from sklearn.metrics import accuracy_score, precision_recall_fscore_support, classification_report
+        import numpy as np
+        
+        # Convert binary vectors to class indices
+        pred_classes = [np.argmax(pred) if sum(pred) > 0 else 0 for pred in predictions]
+        true_classes = [np.argmax(true) if sum(true) > 0 else 0 for true in true_labels]
+        
+        # Calculate metrics
+        accuracy = accuracy_score(true_classes, pred_classes)
+        precision, recall, f1, _ = precision_recall_fscore_support(
+            true_classes, pred_classes, average='weighted', zero_division=0
+        )
+        
+        return {
+            'accuracy': float(accuracy),
+            'precision': float(precision),
+            'recall': float(recall),
+            'f1': float(f1)
+        }
+    
+    def _calculate_multi_label_metrics(
+        self,
+        predictions: List[List[int]],
+        true_labels: List[List[int]]
+    ) -> Dict[str, float]:
+        """Calculate metrics for multi-label classification."""
+        from sklearn.metrics import hamming_loss, jaccard_score
+        import numpy as np
+        
+        pred_array = np.array(predictions)
+        true_array = np.array(true_labels)
+        
+        # Calculate metrics
+        hamming = hamming_loss(true_array, pred_array)
+        jaccard = jaccard_score(true_array, pred_array, average='weighted', zero_division=0)
+        
+        # Calculate accuracy (exact match ratio)
+        exact_match = np.all(pred_array == true_array, axis=1).mean()
+        
+        return {
+            'hamming_loss': float(hamming),
+            'jaccard_score': float(jaccard),
+            'exact_match_ratio': float(exact_match),
+            'accuracy': float(exact_match)  # For consistency
+        }
+
     @property
     def model_info(self) -> Dict[str, Any]:
         """Get ensemble information."""
