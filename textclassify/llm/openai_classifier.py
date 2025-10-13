@@ -20,7 +20,11 @@ class OpenAIClassifier(BaseLLMClassifier):
         multi_label: bool = False,
         few_shot_mode: str = "few_shot",
         enable_cache: bool = True,
-        cache_dir: str = "cache/llm"
+        cache_dir: str = "cache/llm",
+        # Results management parameters
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None,
+        auto_save_results: bool = True
     ):
         """Initialize OpenAI classifier.
         
@@ -32,6 +36,9 @@ class OpenAIClassifier(BaseLLMClassifier):
             few_shot_mode: Mode for few-shot learning
             enable_cache: Whether to enable prediction caching
             cache_dir: Directory for caching prediction results
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
         """
         super().__init__(
             config=config,
@@ -39,7 +46,10 @@ class OpenAIClassifier(BaseLLMClassifier):
             label_columns=label_columns,
             multi_label=multi_label,
             few_shot_mode=few_shot_mode,
-            provider='openai'
+            provider='openai',
+            output_dir=output_dir,
+            experiment_name=experiment_name,
+            auto_save_results=auto_save_results
         )
         
         # Handle caching parameters locally since BaseLLMClassifier doesn't support them

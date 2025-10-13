@@ -375,10 +375,10 @@ class TestPackageImports:
         
         # Configure LLM model (OpenAI)
         llm_config = ModelConfig(
-            model_name="gpt-4o-mini",
+            model_name="gpt-3.5-turbo",
             model_type=ModelType.LLM,
             parameters={
-                "model": "gpt-4o-mini",
+                "model": "gpt-3.5-turbo",
                 "temperature": 0.1,
                 "max_completion_tokens": 150,
                 "top_p": 1.0
