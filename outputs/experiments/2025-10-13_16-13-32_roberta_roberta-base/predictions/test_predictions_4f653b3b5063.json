@@ -1,29 +1,29 @@
 {
   "metadata": {
-    "experiment_id": "2025-10-13_15-57-38_roberta_roberta-base",
+    "experiment_id": "2025-10-13_16-13-32_roberta_roberta-base",
     "model_name": "roberta-base",
     "model_type": "traditional_ml",
     "classification_type": "multi_class",
-    "timestamp": "2025-10-13T16:02:07.390101",
+    "timestamp": "2025-10-13T16:14:33.013496",
     "dataset_name": "test",
-    "dataset_hash": "64e4192bb20c",
+    "dataset_hash": "4f653b3b5063",
     "num_predictions": 5,
-    "git_commit": "19adfd9a7037c8fd8dca5cd406913b067074a890"
+    "git_commit": "cc0a740a7decb24bc865fe8417139e436b097a01"
   },
   "predictions": [
-    "label_3",
-    "label_3",
-    "label_3",
-    "label_3",
-    "label_3"
+    "label_4",
+    "label_4",
+    "label_4",
+    "label_4",
+    "label_4"
   ],
   "probabilities": null,
   "confidence_scores": null,
   "metrics": {
-    "accuracy": 0.4,
-    "precision_weighted": 0.16,
-    "recall_weighted": 0.4,
-    "f1_weighted": 0.22857142857142856,
+    "accuracy": 0.0,
+    "precision_weighted": 0.0,
+    "recall_weighted": 0.0,
+    "f1_weighted": 0.0,
     "classification_report": {
       "label_1": {
         "precision": 0.0,
@@ -38,9 +38,9 @@
         "support": 1.0
       },
       "label_3": {
-        "precision": 0.4,
-        "recall": 1.0,
-        "f1-score": 0.5714285714285714,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
         "support": 2.0
       },
       "label_4": {
@@ -49,17 +49,17 @@
         "f1-score": 0.0,
         "support": 0.0
       },
-      "accuracy": 0.4,
+      "accuracy": 0.0,
       "macro avg": {
-        "precision": 0.1,
-        "recall": 0.25,
-        "f1-score": 0.14285714285714285,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
         "support": 5.0
       },
       "weighted avg": {
-        "precision": 0.16,
-        "recall": 0.4,
-        "f1-score": 0.22857142857142856,
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
         "support": 5.0
       }
     }

@@ -15,6 +15,7 @@ from ..core.exceptions import PredictionError, ValidationError, APIError
 from ..prompt_engineer.base import PromptEngineer
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
+from ..utils.results_manager import ResultsManager, ModelResultsManager
 
 class BaseLLMClassifier(AsyncBaseClassifier):
     """Base class for all LLM-based text classifiers."""
@@ -27,7 +28,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         multi_label: bool = False,
         few_shot_mode: str = "few_shot",
         verbose: bool = True,
-        provider: Optional[str] = None
+        provider: Optional[str] = None,
+        # Results management parameters
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None,
+        auto_save_results: bool = True
     ):
         """Initialize the LLM classifier.
         
@@ -39,6 +44,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             few_shot_mode: Mode for few-shot learning (default: "few_shot")
             verbose: Whether to show detailed progress (default: True)
             provider: LLM provider to use ('openai', 'gemini', 'deepseek', etc.)
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
         """
         super().__init__(config)
         self.config.model_type = ModelType.LLM
@@ -105,6 +113,26 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             self.logger.info(f"PromptEngineer initialized with model: {self.config.parameters['model']}")
             self.logger.info(f"LLM generator initialized with provider: {self.provider}")
             self.logger.info(f"Using API key for: {self.provider}")
+        
+        # Initialize results management
+        self.results_manager = None
+        if auto_save_results:
+            model_name = self.config.parameters.get("model", "unknown")
+            if not experiment_name:
+                experiment_name = f"{self.provider}_{model_name.replace('/', '_').replace('-', '_')}"
+            
+            self.results_manager = ResultsManager(
+                base_output_dir=output_dir,
+                experiment_name=experiment_name
+            )
+            self.model_results_manager = ModelResultsManager(
+                self.results_manager, 
+                f"{self.provider}_classifier_{self.results_manager.experiment_id}"
+            )
+            
+            if self.verbose:
+                exp_info = self.results_manager.get_experiment_info()
+                self.logger.info(f"📁 Results will be saved to: {exp_info['experiment_dir']}")
         
         self._setup_config()
 
@@ -251,7 +279,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 print(f"\nProcess completed in {total_time:.2f} seconds")
                 print(f"Average: {total_time/len(prepared_test_df):.3f} seconds per sample")
             
-            return self._create_result(predictions=predictions, metrics=metrics)
+            return self._create_result(
+                predictions=predictions, 
+                metrics=metrics,
+                test_df=test_df,
+                train_df=train_df
+            )
             
         except Exception as e:
             if self.verbose:
@@ -917,7 +950,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
     def _create_result(
         self,
         predictions: List[List[int]],
-        metrics: Optional[Dict[str, float]] = None
+        metrics: Optional[Dict[str, float]] = None,
+        test_df: Optional[pd.DataFrame] = None,
+        train_df: Optional[pd.DataFrame] = None
     ) -> ClassificationResult:
         """Create a ClassificationResult object with binary vector predictions."""
         # Convert binary vectors to string predictions for compatibility with ClassificationResult
@@ -943,10 +978,59 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Create metadata with metrics
         metadata = {"metrics": metrics or {}}
         
-        return ClassificationResult(
+        result = ClassificationResult(
             predictions=string_predictions,
             model_name=self.config.parameters.get("model", "unknown"),
             model_type=ModelType.LLM,
             classification_type=ClassificationType.MULTI_LABEL if self.multi_label else ClassificationType.SINGLE_LABEL,
             metadata=metadata
         )
+        
+        # Save results using ResultsManager
+        if self.results_manager and test_df is not None:
+            try:
+                # Determine dataset type based on presence of train_df
+                dataset_type = "test" if train_df is not None else "prediction"
+                
+                # Save predictions
+                saved_files = self.results_manager.save_predictions(
+                    result, dataset_type, test_df
+                )
+                
+                # Save metrics if available
+                if metrics:
+                    metrics_file = self.results_manager.save_metrics(
+                        metrics, dataset_type, f"{self.provider}_classifier"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                # Save model configuration
+                model_config = {
+                    'provider': self.provider,
+                    'model_name': self.config.parameters.get("model", "unknown"),
+                    'multi_label': self.multi_label,
+                    'few_shot_mode': self.few_shot_mode,
+                    'text_column': self.text_column,
+                    'label_columns': self.label_columns,
+                    'batch_size': self.batch_size,
+                    'threshold': self.threshold
+                }
+                
+                config_file = self.results_manager.save_model_config(
+                    model_config, f"{self.provider}_classifier"
+                )
+                saved_files["config"] = config_file
+                
+                if self.verbose:
+                    self.logger.info(f"📁 Results saved: {saved_files}")
+                
+                # Add file paths to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['saved_files'] = saved_files
+                
+            except Exception as e:
+                if self.verbose:
+                    self.logger.warning(f"Could not save results: {e}")
+        
+        return result

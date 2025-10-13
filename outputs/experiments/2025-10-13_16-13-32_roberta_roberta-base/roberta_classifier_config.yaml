@@ -14,6 +14,6 @@ config:
   num_labels: 4
   text_column: description
 metadata:
-  experiment_id: 2025-10-13_15-57-38_roberta_roberta-base
+  experiment_id: 2025-10-13_16-13-32_roberta_roberta-base
   model_name: roberta_classifier
-  timestamp: '2025-10-13T15:58:40.030676'
+  timestamp: '2025-10-13T16:14:31.853111'

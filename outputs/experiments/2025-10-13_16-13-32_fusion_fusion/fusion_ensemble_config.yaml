@@ -15,6 +15,6 @@ config:
   num_epochs: 5
   num_labels: 4
 metadata:
-  experiment_id: 2025-10-13_15-57-38_fusion_fusion
+  experiment_id: 2025-10-13_16-13-32_fusion_fusion
   model_name: fusion_ensemble
-  timestamp: '2025-10-13T16:02:06.414615'
+  timestamp: '2025-10-13T16:14:33.041965'
