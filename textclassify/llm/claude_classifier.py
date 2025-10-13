@@ -3,7 +3,7 @@
 import asyncio
 import aiohttp
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from ..core.exceptions import APIError, ConfigurationError
 from .base import BaseLLMClassifier
@@ -12,13 +12,41 @@ from .base import BaseLLMClassifier
 class ClaudeClassifier(BaseLLMClassifier):
     """Text classifier using Anthropic's Claude models."""
     
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        text_column: str = 'text',
+        label_columns: Optional[List[str]] = None,
+        multi_label: bool = False,
+        few_shot_mode: str = "few_shot",
+        # Results management parameters
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None,
+        auto_save_results: bool = True
+    ):
         """Initialize Claude classifier.
         
         Args:
             config: Model configuration with Claude-specific parameters
+            text_column: Name of the column containing text data
+            label_columns: List of column names containing labels
+            multi_label: Whether this is a multi-label classifier
+            few_shot_mode: Mode for few-shot learning
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
         """
-        super().__init__(config)
+        super().__init__(
+            config=config,
+            text_column=text_column,
+            label_columns=label_columns,
+            multi_label=multi_label,
+            few_shot_mode=few_shot_mode,
+            provider='claude',
+            output_dir=output_dir,
+            experiment_name=experiment_name,
+            auto_save_results=auto_save_results
+        )
         
         # Validate required configuration
         if not self.config.api_key:

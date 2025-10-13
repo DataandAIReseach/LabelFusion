@@ -1,7 +1,7 @@
 """Voting ensemble for combining multiple classifiers."""
 
 from collections import Counter
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Optional
 import numpy as np
 
 from ..core.types import ClassificationResult, ClassificationType
@@ -11,13 +11,28 @@ from .base import BaseEnsemble
 class VotingEnsemble(BaseEnsemble):
     """Ensemble that combines predictions through voting."""
     
-    def __init__(self, ensemble_config):
+    def __init__(
+        self, 
+        ensemble_config,
+        # Results management parameters
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None,
+        auto_save_results: bool = True
+    ):
         """Initialize voting ensemble.
         
         Args:
             ensemble_config: Configuration for the ensemble
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
         """
-        super().__init__(ensemble_config)
+        super().__init__(
+            ensemble_config,
+            output_dir=output_dir,
+            experiment_name=experiment_name,
+            auto_save_results=auto_save_results
+        )
         self.voting_strategy = ensemble_config.ensemble_method
         
         # Validate voting strategy
