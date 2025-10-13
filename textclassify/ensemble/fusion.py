@@ -12,6 +12,7 @@ from sklearn.calibration import CalibratedClassifierCV
 
 from ..core.types import ClassificationResult, ClassificationType, EnsembleConfig
 from ..core.exceptions import EnsembleError, ModelTrainingError
+from ..utils.results_manager import ResultsManager, ModelResultsManager
 from .base import BaseEnsemble
 
 
@@ -131,6 +132,22 @@ class FusionEnsemble(BaseEnsemble):
         # LLM prediction cache file paths from ensemble config
         self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', '')
         self.test_llm_cache_path = ensemble_config.parameters.get('test_llm_cache_path', '')
+        
+        # Results management
+        output_dir = ensemble_config.parameters.get('output_dir', 'outputs')
+        experiment_name = ensemble_config.parameters.get('experiment_name', f'fusion_{ensemble_config.ensemble_method}')
+        auto_save_results = ensemble_config.parameters.get('auto_save_results', True)
+        
+        self.results_manager = None
+        if auto_save_results:
+            self.results_manager = ResultsManager(
+                base_output_dir=output_dir,
+                experiment_name=experiment_name
+            )
+            self.model_results_manager = ModelResultsManager(
+                self.results_manager, 
+                f"fusion_ensemble_{self.results_manager.experiment_id}"
+            )
         
         # Initialize training state
         self.is_trained = False
@@ -269,6 +286,40 @@ class FusionEnsemble(BaseEnsemble):
             'used_cached_val_llm_predictions': val_llm_predictions is not None
         }
         
+        # Save training results using ResultsManager
+        if self.results_manager:
+            try:
+                # Save model configuration
+                ensemble_config_dict = {
+                    'ensemble_method': 'fusion',
+                    'fusion_hidden_dims': self.fusion_hidden_dims,
+                    'ml_lr': self.ml_lr,
+                    'fusion_lr': self.fusion_lr,
+                    'num_epochs': self.num_epochs,
+                    'batch_size': self.batch_size,
+                    'classification_type': str(self.classification_type),
+                    'num_labels': self.num_labels,
+                    'classes': self.classes_
+                }
+                
+                self.results_manager.save_model_config(
+                    ensemble_config_dict, 
+                    "fusion_ensemble"
+                )
+                
+                # Save training summary
+                self.results_manager.save_experiment_summary(training_result)
+                
+                # Get experiment info for user
+                exp_info = self.results_manager.get_experiment_info()
+                training_result['experiment_info'] = exp_info
+                training_result['output_directory'] = exp_info['experiment_dir']
+                
+                print(f"📁 Results saved to: {exp_info['experiment_dir']}")
+                
+            except Exception as e:
+                print(f"Warning: Could not save training results: {e}")
+        
         print("✅ Fusion ensemble training completed!")
         return training_result
     
@@ -328,7 +379,10 @@ class FusionEnsemble(BaseEnsemble):
         # If cache path is empty, generate predictions on the fly
         if not cache_path or cache_path.strip() == '':
             print(f"No cache path specified, generating LLM predictions for {dataset_type} set on the fly...")
-            return self._generate_llm_predictions(df, train_df)
+            predictions = self._generate_llm_predictions(df, train_df)
+            # Still save to experiments directory even if no cache path
+            self._save_llm_predictions_to_experiments(predictions, df, dataset_type)
+            return predictions
         
         # Try to load from cache first (with dataset validation)
         cached_predictions = self._load_cached_llm_predictions(cache_path, df)
@@ -342,6 +396,9 @@ class FusionEnsemble(BaseEnsemble):
 
         # Save to cache with datetime stamp and dataset hash
         self._save_cached_llm_predictions(predictions, cache_path, df)
+
+        # Also save to experiments directory if ResultsManager is available
+        self._save_llm_predictions_to_experiments(predictions, df, dataset_type)
 
         return predictions
     
@@ -373,6 +430,11 @@ class FusionEnsemble(BaseEnsemble):
         ).hexdigest()[:8]  # Only first 8 characters
         
         return df_hash
+    
+    def _get_timestamp(self) -> str:
+        """Get current timestamp in ISO format."""
+        from datetime import datetime
+        return datetime.now().isoformat()
     
     def _load_cached_llm_predictions(self, base_cache_path: str, df: pd.DataFrame) -> Optional[List[Union[str, List[str]]]]:
         """Try to load cached LLM predictions from file with dataset validation.
@@ -504,6 +566,48 @@ class FusionEnsemble(BaseEnsemble):
             
         except Exception as e:
             print(f"Warning: Could not save predictions to cache {base_cache_path}: {e}")
+    
+    def _save_llm_predictions_to_experiments(self, predictions: List[Union[str, List[str]]], 
+                                           df: pd.DataFrame, dataset_type: str):
+        """Save LLM predictions to the experiments directory structure.
+        
+        Args:
+            predictions: LLM predictions to save
+            df: DataFrame used for predictions (for metadata)
+            dataset_type: Type of dataset ("validation" or "test")
+        """
+        if not self.results_manager:
+            return
+            
+        try:
+            # Create a ClassificationResult for the LLM predictions
+            from ..core.types import ClassificationResult
+            
+            llm_result = ClassificationResult(
+                predictions=predictions,
+                model_name="llm_model",
+                classification_type=self.classification_type,
+                metadata={
+                    'dataset_type': dataset_type,
+                    'num_samples': len(df),
+                    'dataset_hash': self._create_dataset_hash(df),
+                    'timestamp': self._get_timestamp(),
+                    'llm_model_info': {
+                        'type': type(self.llm_model).__name__ if self.llm_model else 'unknown',
+                        'model_name': getattr(self.llm_model, 'model_name', 'unknown')
+                    }
+                }
+            )
+            
+            # Save LLM predictions using ResultsManager
+            saved_files = self.results_manager.save_predictions(
+                llm_result, f"llm_{dataset_type}", df
+            )
+            
+            print(f"📁 LLM {dataset_type} predictions saved to experiments: {saved_files}")
+            
+        except Exception as e:
+            print(f"Warning: Could not save LLM predictions to experiments: {e}")
     
     def save_llm_predictions(self, predictions: List[Union[str, List[str]]], filepath: str):
         """Save LLM predictions to a file for later reuse.
@@ -741,7 +845,33 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 3: Use fusion MLP to combine predictions
         print("Generating fusion predictions...")
-        return self._predict_with_fusion(ml_test_result, llm_test_result, texts, extracted_labels)
+        result = self._predict_with_fusion(ml_test_result, llm_test_result, texts, extracted_labels)
+        
+        # Save test results using ResultsManager
+        if self.results_manager:
+            try:
+                saved_files = self.results_manager.save_predictions(
+                    result, "test", test_df
+                )
+                
+                # Save metrics if available
+                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                    metrics_file = self.results_manager.save_metrics(
+                        result.metadata['metrics'], "test", "fusion_ensemble"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                print(f"📁 Test results saved: {saved_files}")
+                
+                # Add file paths to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['saved_files'] = saved_files
+                
+            except Exception as e:
+                print(f"Warning: Could not save test results: {e}")
+        
+        return result
     
     def _predict_with_fusion(self, ml_result, llm_result, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Generate fusion predictions using trained MLP."""
