@@ -330,19 +330,19 @@ class FusionEnsemble(BaseEnsemble):
             print(f"No cache path specified, generating LLM predictions for {dataset_type} set on the fly...")
             return self._generate_llm_predictions(df, train_df)
         
-        # Try to load from cache first
-        cached_predictions = self._load_cached_llm_predictions(cache_path)
+        # Try to load from cache first (with dataset validation)
+        cached_predictions = self._load_cached_llm_predictions(cache_path, df)
         if cached_predictions is not None:
             print(f"Loaded cached LLM predictions for {dataset_type} set from {cache_path}")
             return cached_predictions
-        
+
         # Generate new predictions and save to cache
         print(f"Generating new LLM predictions for {dataset_type} set...")
         predictions = self._generate_llm_predictions(df, train_df)
-        
-        # Save to cache with datetime stamp
-        self._save_cached_llm_predictions(predictions, cache_path)
-        
+
+        # Save to cache with datetime stamp and dataset hash
+        self._save_cached_llm_predictions(predictions, cache_path, df)
+
         return predictions
     
     def _generate_llm_predictions(self, df: pd.DataFrame, train_df: pd.DataFrame) -> List[Union[str, List[str]]]:
@@ -356,14 +356,33 @@ class FusionEnsemble(BaseEnsemble):
         )
         return llm_result.predictions
     
-    def _load_cached_llm_predictions(self, base_cache_path: str) -> Optional[List[Union[str, List[str]]]]:
-        """Try to load cached LLM predictions from file.
+    def _create_dataset_hash(self, df: pd.DataFrame) -> str:
+        """Create a hash of the DataFrame for cache validation.
+        
+        Args:
+            df: DataFrame to hash
+            
+        Returns:
+            8-character hash string
+        """
+        import hashlib
+        
+        # Create hash based on DataFrame content
+        df_hash = hashlib.md5(
+            pd.util.hash_pandas_object(df, index=True).values
+        ).hexdigest()[:8]  # Only first 8 characters
+        
+        return df_hash
+    
+    def _load_cached_llm_predictions(self, base_cache_path: str, df: pd.DataFrame) -> Optional[List[Union[str, List[str]]]]:
+        """Try to load cached LLM predictions from file with dataset validation.
         
         Args:
             base_cache_path: Base path without datetime extension
+            df: DataFrame to validate against
             
         Returns:
-            Cached predictions if found, None otherwise
+            Cached predictions if found and valid, None otherwise
         """
         if not base_cache_path or not base_cache_path.strip():
             return None
@@ -371,36 +390,79 @@ class FusionEnsemble(BaseEnsemble):
         try:
             import json
             import os
-            
-            # Check if the file exists (user might have provided full path)
-            if os.path.exists(base_cache_path):
-                with open(base_cache_path, 'r') as f:
-                    predictions = json.load(f)
-                return predictions
-            
-            # If not found, try to find the most recent file with datetime pattern
             import glob
-            pattern = f"{base_cache_path}_*.json"
+            
+            # Calculate current dataset hash
+            current_hash = self._create_dataset_hash(df)
+            
+            # First, try to find files with matching hash
+            pattern = f"{base_cache_path}_*_{current_hash}.json"
             matching_files = glob.glob(pattern)
             
             if matching_files:
-                # Get the most recent file
+                # Get the most recent file with matching hash
                 latest_file = max(matching_files, key=os.path.getctime)
+                
                 with open(latest_file, 'r') as f:
-                    predictions = json.load(f)
-                return predictions
+                    cache_data = json.load(f)
+                
+                # Handle both new format (with metadata) and old format (just predictions)
+                if isinstance(cache_data, dict) and 'predictions' in cache_data:
+                    predictions = cache_data['predictions']
+                    metadata = cache_data.get('metadata', {})
+                    
+                    # Validate sample count
+                    if metadata.get('num_samples') == len(df):
+                        print(f"✅ Loaded matching cached predictions: {latest_file} (Hash: {current_hash})")
+                        return predictions
+                    else:
+                        print(f"⚠️ Sample count mismatch in cache: {latest_file}")
+                elif isinstance(cache_data, list):
+                    # Old format - just validate sample count
+                    if len(cache_data) == len(df):
+                        print(f"✅ Loaded compatible cached predictions: {latest_file} (Hash: {current_hash})")
+                        return cache_data
             
+            # Fallback: Look for old files without hash (backward compatibility)
+            print(f"🔍 No hash-matched cache found, checking backward compatibility...")
+            old_pattern = f"{base_cache_path}_*.json"
+            old_files = [f for f in glob.glob(old_pattern) if not f.endswith(f"_{current_hash}.json")]
+            
+            for file_path in sorted(old_files, key=os.path.getctime, reverse=True):
+                try:
+                    with open(file_path, 'r') as f:
+                        data = json.load(f)
+                    
+                    # Handle both old and new formats
+                    if isinstance(data, list):
+                        predictions = data
+                    elif isinstance(data, dict) and 'predictions' in data:
+                        predictions = data['predictions']
+                    else:
+                        continue
+                    
+                    # Validate sample count
+                    if len(predictions) == len(df):
+                        print(f"⚠️ Using backward-compatible cache: {file_path} (no hash validation)")
+                        return predictions
+                        
+                except Exception:
+                    continue
+            
+            print(f"❌ No compatible cache found for dataset (Hash: {current_hash})")
             return None
+            
         except Exception as e:
             print(f"Warning: Could not load cached predictions from {base_cache_path}: {e}")
             return None
     
-    def _save_cached_llm_predictions(self, predictions: List[Union[str, List[str]]], base_cache_path: str):
-        """Save LLM predictions to cache file with datetime stamp.
+    def _save_cached_llm_predictions(self, predictions: List[Union[str, List[str]]], base_cache_path: str, df: pd.DataFrame):
+        """Save LLM predictions to cache file with datetime stamp and dataset hash.
         
         Args:
             predictions: LLM predictions to save
             base_cache_path: Base path for the cache file
+            df: DataFrame for hash calculation and metadata
         """
         if not base_cache_path or not base_cache_path.strip():
             return
@@ -415,15 +477,30 @@ class FusionEnsemble(BaseEnsemble):
             if cache_dir and not os.path.exists(cache_dir):
                 os.makedirs(cache_dir, exist_ok=True)
             
-            # Create filename with datetime stamp
+            # Calculate dataset hash
+            dataset_hash = self._create_dataset_hash(df)
+            
+            # Create filename with datetime stamp and hash
             timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-            cache_filename = f"{base_cache_path}_{timestamp}.json"
+            cache_filename = f"{base_cache_path}_{timestamp}_{dataset_hash}.json"
             
-            # Save predictions
+            # Create cache data with metadata
+            cache_data = {
+                'predictions': predictions,
+                'metadata': {
+                    'timestamp': timestamp,
+                    'num_samples': len(df),
+                    'dataset_hash': dataset_hash,
+                    'columns': list(df.columns),
+                    'created_at': datetime.now().isoformat()
+                }
+            }
+            
+            # Save predictions with metadata
             with open(cache_filename, 'w') as f:
-                json.dump(predictions, f, indent=2)
+                json.dump(cache_data, f, indent=2)
             
-            print(f"LLM predictions saved to {cache_filename}")
+            print(f"✅ LLM predictions saved to {cache_filename} (Hash: {dataset_hash})")
             
         except Exception as e:
             print(f"Warning: Could not save predictions to cache {base_cache_path}: {e}")

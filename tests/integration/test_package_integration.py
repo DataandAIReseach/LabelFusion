@@ -405,7 +405,9 @@ class TestPackageImports:
                 "fusion_lr": 1e-3,
                 "num_epochs": 5,  # Fewer epochs for testing
                 "batch_size": 8,
-                "classification_type": "multi_class"
+                "classification_type": "multi_class",
+                "val_llm_cache_path": "cache/fusion_openai_cache/val",
+                "test_llm_cache_path": "cache/fusion_openai_cache/test"
             }
         )
         
