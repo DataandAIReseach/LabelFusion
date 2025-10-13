@@ -1,0 +1,33 @@
+created_at: '2025-10-13T15:58:40.036802'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: michaelschlee
+    platform: Linux-6.8.0-85-generic-x86_64-with-glibc2.39
+    python_version: 3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0]
+    working_directory: /home/michaelschlee/ownCloud/GIT/classifyfusion
+  experiment_id: 2025-10-13_15-57-38_roberta_roberta-base
+  git_commit: 19adfd9a7037c8fd8dca5cd406913b067074a890
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-10-13T15:57:38.564422'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics: []
+  models: []
+  plots: []
+  predictions: []
+test_results: null
+training_results:
+  classes:
+  - label_1
+  - label_2
+  - label_3
+  - label_4
+  device: cpu
+  model_name: roberta-base
+  num_labels: 4
+  training_samples: 50
+  validation_samples: 5
