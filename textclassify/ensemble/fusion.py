@@ -406,6 +406,10 @@ class FusionEnsemble(BaseEnsemble):
                                        provided_predictions: Optional[List[Union[str, List[str]]]] = None) -> List[Union[str, List[str]]]:
         """Get LLM predictions either from cache, provided predictions, or generate new ones.
         
+        Even when using cached/provided predictions, this method ensures that the individual
+        LLM classifier is called to generate comprehensive metrics and save all results
+        to the experiments folder.
+        
         Args:
             df: DataFrame to get predictions for
             train_df: Training DataFrame for few-shot examples
@@ -416,38 +420,85 @@ class FusionEnsemble(BaseEnsemble):
         Returns:
             List of LLM predictions
         """
-        # If predictions are provided directly, use them
+        final_predictions = None
+        predictions_source = "generated"
+        
+        # STEP 1: Determine prediction source and get predictions
         if provided_predictions is not None:
             print(f"Using provided LLM predictions for {dataset_type} set...")
-            return provided_predictions
-        
-        # If cache path is empty, generate predictions on the fly
-        if not cache_path or cache_path.strip() == '':
+            final_predictions = provided_predictions
+            predictions_source = "provided"
+        elif not cache_path or cache_path.strip() == '':
             print(f"No cache path specified, generating LLM predictions for {dataset_type} set on the fly...")
-            predictions = self._generate_llm_predictions(df, train_df)
-            # Still save to experiments directory even if no cache path
-            self._save_llm_predictions_to_experiments(predictions, df, dataset_type)
-            return predictions
+            final_predictions = self._generate_llm_predictions(df, train_df)
+            predictions_source = "generated"
+        else:
+            # Try to load from cache first (with dataset validation)
+            cached_predictions = self._load_cached_llm_predictions(cache_path, df)
+            if cached_predictions is not None:
+                print(f"Loaded cached LLM predictions for {dataset_type} set from {cache_path}")
+                final_predictions = cached_predictions
+                predictions_source = "cached"
+            else:
+                # Generate new predictions and save to cache
+                print(f"Generating new LLM predictions for {dataset_type} set...")
+                final_predictions = self._generate_llm_predictions(df, train_df)
+                predictions_source = "generated"
+                
+                # Save to cache with datetime stamp and dataset hash
+                self._save_cached_llm_predictions(final_predictions, cache_path, df)
         
-        # Try to load from cache first (with dataset validation)
-        cached_predictions = self._load_cached_llm_predictions(cache_path, df)
-        if cached_predictions is not None:
-            print(f"Loaded cached LLM predictions for {dataset_type} set from {cache_path}")
-            # Also save cached predictions to experiments directory for consistency
-            self._save_llm_predictions_to_experiments(cached_predictions, df, dataset_type)
-            return cached_predictions
-
-        # Generate new predictions and save to cache
-        print(f"Generating new LLM predictions for {dataset_type} set...")
-        predictions = self._generate_llm_predictions(df, train_df)
-
-        # Save to cache with datetime stamp and dataset hash
-        self._save_cached_llm_predictions(predictions, cache_path, df)
-
-        # Also save to experiments directory if ResultsManager is available
-        self._save_llm_predictions_to_experiments(predictions, df, dataset_type)
-
-        return predictions
+        # STEP 2: Always call LLM classifier for comprehensive results (metrics, YAML files, etc.)
+        if self.llm_model is not None and final_predictions is not None:
+            try:
+                # Extract label columns from DataFrame
+                text_column = self.ml_model.text_column if self.ml_model else 'text'
+                label_columns = self.ml_model.label_columns if self.ml_model else [col for col in df.columns if col != text_column]
+                
+                # Check if we have true labels for metrics calculation
+                has_true_labels = all(col in df.columns for col in label_columns)
+                
+                if has_true_labels:
+                    print(f"🔄 Calling LLM classifier for comprehensive results and metrics ({predictions_source} predictions)...")
+                    
+                    # Extract true labels in the format expected by LLM classifier
+                    true_labels = df[label_columns].values.tolist()
+                    texts = df[text_column].tolist()
+                    
+                    # Call the LLM classifier's predict_texts method to get comprehensive results
+                    llm_result = self.llm_model.predict_texts(
+                        texts=texts, 
+                        true_labels=true_labels
+                    )
+                    
+                    # Override the predictions with our cached/provided ones but keep all other results
+                    llm_result.predictions = final_predictions
+                    
+                    # Update model name to indicate the prediction source
+                    if predictions_source == "cached":
+                        llm_result.model_name = f"{llm_result.model_name}_cached"
+                    elif predictions_source == "provided":
+                        llm_result.model_name = f"{llm_result.model_name}_provided"
+                    
+                    # Add source information to metadata
+                    if not llm_result.metadata:
+                        llm_result.metadata = {}
+                    llm_result.metadata['prediction_source'] = predictions_source
+                    llm_result.metadata['dataset_type'] = dataset_type
+                    
+                    print(f"✅ LLM classifier results saved to experiments folder (source: {predictions_source})")
+                    
+                else:
+                    print(f"ℹ️ No true labels available in DataFrame - skipping LLM classifier metrics calculation")
+                    
+            except Exception as e:
+                print(f"⚠️ Warning: Could not call LLM classifier for comprehensive results: {e}")
+                print(f"   Continuing with {predictions_source} predictions only...")
+        
+        # STEP 3: Save predictions to experiments directory (fallback if LLM classifier call failed)
+        self._save_llm_predictions_to_experiments(final_predictions, df, dataset_type)
+        
+        return final_predictions
     
     def _generate_llm_predictions(self, df: pd.DataFrame, train_df: pd.DataFrame) -> List[Union[str, List[str]]]:
         """Generate LLM predictions for a DataFrame."""

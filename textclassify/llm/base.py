@@ -1064,3 +1064,89 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                     self.logger.warning(f"Could not save results: {e}")
         
         return result
+    
+    def predict_texts(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Predict labels for a list of texts (compatibility method for FusionEnsemble).
+        
+        This method is provided for compatibility with FusionEnsemble which calls 
+        LLM models with text lists. It handles metrics calculation and results saving
+        automatically when true_labels are provided.
+        
+        Args:
+            texts: List of texts to classify
+            true_labels: Optional true labels in binary format for evaluation metrics
+            
+        Returns:
+            ClassificationResult with predictions and optional metrics
+        """
+        # Convert texts to DataFrame format
+        import pandas as pd
+        test_df = pd.DataFrame({self.text_column: texts})
+        
+        # Add label columns if true_labels provided (for metrics calculation)
+        if true_labels is not None and self.label_columns:
+            for i, label_col in enumerate(self.label_columns):
+                if i < len(true_labels[0]) if true_labels else 0:
+                    test_df[label_col] = [labels[i] if i < len(labels) else 0 for labels in true_labels]
+                else:
+                    test_df[label_col] = 0
+        
+        # Call the regular predict method
+        result = self.predict(test_df=test_df)
+        
+        # If metrics weren't calculated yet but we have true labels, calculate them
+        if (true_labels is not None and 
+            (not hasattr(result, 'metadata') or not result.metadata or 'metrics' not in result.metadata)):
+            
+            try:
+                # Convert string predictions back to binary format for metric calculation
+                predicted_labels = []
+                for pred in result.predictions:
+                    if self.multi_label:
+                        # Multi-label: convert list of class names to binary vector
+                        binary_pred = [0] * len(self.classes_)
+                        if isinstance(pred, list):
+                            for class_name in pred:
+                                if class_name in self.classes_:
+                                    binary_pred[self.classes_.index(class_name)] = 1
+                        predicted_labels.append(binary_pred)
+                    else:
+                        # Single-label: convert class name to binary vector
+                        binary_pred = [0] * len(self.classes_)
+                        if pred in self.classes_:
+                            binary_pred[self.classes_.index(pred)] = 1
+                        else:
+                            # Default to first class if prediction not in classes
+                            binary_pred[0] = 1 if self.classes_ else 0
+                        predicted_labels.append(binary_pred)
+                
+                # Calculate metrics using the class method
+                metrics = self._calculate_metrics(predicted_labels, true_labels)
+                
+                # Add metrics to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['metrics'] = metrics
+                
+                # Save metrics to file if results_manager is available
+                if self.results_manager:
+                    try:
+                        metrics_file = self.results_manager.save_metrics(
+                            metrics, "test", f"{self.provider}_classifier"
+                        )
+                        if 'saved_files' not in result.metadata:
+                            result.metadata['saved_files'] = {}
+                        result.metadata['saved_files']['metrics'] = metrics_file
+                        
+                        if self.verbose:
+                            print(f"📁 {self.provider.title()} classifier metrics saved: {metrics_file}")
+                            
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"Warning: Could not save {self.provider} classifier metrics: {e}")
+                
+            except Exception as e:
+                if self.verbose:
+                    print(f"Warning: Could not calculate metrics for {self.provider} classifier: {e}")
+        
+        return result
