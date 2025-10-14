@@ -261,12 +261,42 @@ class FusionEnsemble(BaseEnsemble):
         )
         
         # Create ClassificationResult for validation predictions
-        from ..core.types import ClassificationResult
-        llm_val_result = ClassificationResult(
-            predictions=llm_val_predictions,
-            model_name="llm_model" if val_llm_predictions is None else "llm_model_cached",
-            classification_type=self.classification_type
-        )
+        # Extract true labels from validation DataFrame
+        val_true_labels = None
+        if all(col in val_df.columns for col in label_columns):
+            val_true_labels = val_df[label_columns].values.tolist()
+        
+        # If we have true labels, call the LLM classifier's predict_texts method to get proper metrics
+        if val_true_labels is not None and self.llm_model is not None:
+            try:
+                # Call the LLM classifier's predict_texts method with cached predictions
+                # This ensures metrics are calculated and individual results are saved
+                llm_val_result = self.llm_model.predict_texts(
+                    texts=val_df[text_column].tolist(), 
+                    true_labels=val_true_labels
+                )
+                # Override predictions with cached ones if they were used
+                if val_llm_predictions is not None or self.val_llm_cache_path:
+                    llm_val_result.predictions = llm_val_predictions
+                    # Update model name to indicate cached predictions were used
+                    llm_val_result.model_name = "llm_model_cached"
+            except Exception as e:
+                print(f"Warning: Could not call LLM classifier predict_texts for metrics: {e}")
+                # Fallback to simple ClassificationResult
+                from ..core.types import ClassificationResult
+                llm_val_result = ClassificationResult(
+                    predictions=llm_val_predictions,
+                    model_name="llm_model" if val_llm_predictions is None else "llm_model_cached",
+                    classification_type=self.classification_type
+                )
+        else:
+            # No true labels available, create simple ClassificationResult
+            from ..core.types import ClassificationResult
+            llm_val_result = ClassificationResult(
+                predictions=llm_val_predictions,
+                model_name="llm_model" if val_llm_predictions is None else "llm_model_cached",
+                classification_type=self.classification_type
+            )
         
         # Step 4: Create fusion wrapper
         print("Creating fusion wrapper...")
@@ -403,6 +433,8 @@ class FusionEnsemble(BaseEnsemble):
         cached_predictions = self._load_cached_llm_predictions(cache_path, df)
         if cached_predictions is not None:
             print(f"Loaded cached LLM predictions for {dataset_type} set from {cache_path}")
+            # Also save cached predictions to experiments directory for consistency
+            self._save_llm_predictions_to_experiments(cached_predictions, df, dataset_type)
             return cached_predictions
 
         # Generate new predictions and save to cache
@@ -851,12 +883,37 @@ class FusionEnsemble(BaseEnsemble):
         )
         
         # Create ClassificationResult for test predictions
-        from ..core.types import ClassificationResult
-        llm_test_result = ClassificationResult(
-            predictions=llm_test_predictions,
-            model_name="llm_model" if test_llm_predictions is None else "llm_model_cached",
-            classification_type=self.classification_type
-        )
+        # If we have true labels, call the LLM classifier's predict_texts method to get proper metrics
+        if extracted_labels is not None and self.llm_model is not None:
+            try:
+                # Call the LLM classifier's predict_texts method with cached predictions
+                # This ensures metrics are calculated and individual results are saved
+                llm_test_result = self.llm_model.predict_texts(
+                    texts=texts, 
+                    true_labels=extracted_labels
+                )
+                # Override predictions with cached ones if they were used
+                if test_llm_predictions is not None or self.test_llm_cache_path:
+                    llm_test_result.predictions = llm_test_predictions
+                    # Update model name to indicate cached predictions were used
+                    llm_test_result.model_name = "llm_model_cached"
+            except Exception as e:
+                print(f"Warning: Could not call LLM classifier predict_texts for metrics: {e}")
+                # Fallback to simple ClassificationResult
+                from ..core.types import ClassificationResult
+                llm_test_result = ClassificationResult(
+                    predictions=llm_test_predictions,
+                    model_name="llm_model" if test_llm_predictions is None else "llm_model_cached",
+                    classification_type=self.classification_type
+                )
+        else:
+            # No true labels available, create simple ClassificationResult
+            from ..core.types import ClassificationResult
+            llm_test_result = ClassificationResult(
+                predictions=llm_test_predictions,
+                model_name="llm_model" if test_llm_predictions is None else "llm_model_cached",
+                classification_type=self.classification_type
+            )
         
         # Step 3: Use fusion MLP to combine predictions
         print("Generating fusion predictions...")

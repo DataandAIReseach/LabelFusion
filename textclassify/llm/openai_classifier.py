@@ -70,6 +70,131 @@ class OpenAIClassifier(BaseLLMClassifier):
         
         # No need to create separate client - use the service layer from BaseLLMClassifier
     
+    def predict(
+        self,
+        train_df: Optional[pd.DataFrame] = None,
+        test_df: Optional[pd.DataFrame] = None,
+        texts: Optional[List[str]] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
+    ) -> ClassificationResult:
+        """Predict using OpenAI classifier with explicit results saving.
+        
+        This method overrides the base class to add comprehensive results saving
+        similar to RoBERTa classifier.
+        
+        Args:
+            train_df: Optional training DataFrame for few-shot examples
+            test_df: Test DataFrame with text and optionally label columns
+            texts: Optional list of texts (alternative to test_df)
+            context: Optional context for classification
+            label_definitions: Optional label definitions
+            
+        Returns:
+            ClassificationResult with predictions, metrics, and saved files info
+        """
+        # Store test_df reference for results saving
+        if test_df is not None:
+            self._current_test_df = test_df
+        
+        # Call parent prediction method
+        result = super().predict(
+            train_df=train_df,
+            test_df=test_df,
+            texts=texts,
+            context=context,
+            label_definitions=label_definitions
+        )
+        
+        # 🚀 EXPLICIT RESULTS SAVING (like RoBERTa)
+        if self.results_manager and hasattr(self, '_current_test_df'):
+            try:
+                # 1. Save predictions (CSV + JSON)
+                saved_files = self.results_manager.save_predictions(
+                    result, "test", self._current_test_df
+                )
+                
+                # 2. Save metrics YAML (if available)
+                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                    metrics_file = self.results_manager.save_metrics(
+                        result.metadata['metrics'], "test", "openai_classifier"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                # 3. Save model configuration YAML
+                model_config_dict = {
+                    'provider': 'openai',
+                    'model_name': self.model,
+                    'temperature': self.temperature,
+                    'max_completion_tokens': self.max_completion_tokens,
+                    'multi_label': self.multi_label,
+                    'text_column': self.text_column,
+                    'label_columns': self.label_columns,
+                    'classes': self.classes_,
+                    'batch_size': getattr(self, 'batch_size', 32),
+                    'threshold': getattr(self, 'threshold', 0.5),
+                    'few_shot_mode': self.few_shot_mode,
+                    'classification_type': 'multi_label' if self.multi_label else 'single_label',
+                    'enable_cache': self.enable_cache,
+                    'cache_dir': self.cache_dir
+                }
+                
+                config_file = self.results_manager.save_model_config(
+                    model_config_dict, 
+                    "openai_classifier"
+                )
+                saved_files["config"] = config_file
+                
+                # 4. Save experiment summary
+                experiment_summary = {
+                    'model_type': 'llm',
+                    'provider': 'openai',
+                    'model_name': self.model,
+                    'num_labels': len(self.classes_),
+                    'classes': self.classes_,
+                    'test_samples': len(self._current_test_df),
+                    'train_samples': len(train_df) if train_df is not None else 0,
+                    'classification_type': 'multi_label' if self.multi_label else 'single_label',
+                    'metrics': result.metadata.get('metrics', {}) if result.metadata else {},
+                    'temperature': self.temperature,
+                    'max_completion_tokens': self.max_completion_tokens,
+                    'batch_size': getattr(self, 'batch_size', 32),
+                    'completed': True
+                }
+                
+                self.results_manager.save_experiment_summary(experiment_summary)
+                
+                # 5. Detailed logging (like RoBERTa)
+                if getattr(self, 'verbose', True):
+                    exp_info = self.results_manager.get_experiment_info()
+                    if hasattr(self, 'logger'):
+                        self.logger.info(f"📁 OpenAI prediction results saved to: {exp_info['experiment_dir']}")
+                        self.logger.info(f"💾 Files saved:")
+                        for file_type, file_path in saved_files.items():
+                            self.logger.info(f"   - {file_type}: {file_path}")
+                
+                print(f"📁 OpenAI prediction results saved: {saved_files}")
+                
+                # 6. Add file paths to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['saved_files'] = saved_files
+                
+                # Clean up temporary reference
+                delattr(self, '_current_test_df')
+                
+            except Exception as e:
+                if getattr(self, 'verbose', True):
+                    if hasattr(self, 'logger'):
+                        self.logger.error(f"Warning: Could not save OpenAI prediction results: {e}")
+                print(f"Warning: Could not save OpenAI prediction results: {e}")
+                
+                # Clean up temporary reference even if saving failed
+                if hasattr(self, '_current_test_df'):
+                    delattr(self, '_current_test_df')
+        
+        return result
+
     async def _call_llm(self, prompt: str) -> str:
         """Call OpenAI API with the given prompt using the service layer.
         
@@ -92,3 +217,149 @@ class OpenAIClassifier(BaseLLMClassifier):
             
         except Exception as e:
             raise APIError(f"LLM service call failed: {str(e)}")
+    
+    def _predict_texts_internal(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Internal method to predict labels for a list of texts.
+        
+        This method provides compatibility with RoBERTa classifier interface while using
+        the async LLM prediction pipeline.
+        
+        Args:
+            texts: List of texts to classify
+            true_labels: Optional true labels in binary format for evaluation metrics
+            
+        Returns:
+            ClassificationResult with predictions and optional metrics
+        """
+        # Convert texts to DataFrame format expected by async predict method
+        import pandas as pd
+        test_df = pd.DataFrame({self.text_column: texts})
+        
+        # Add dummy labels if true_labels provided (for compatibility)
+        if true_labels is not None and self.label_columns:
+            for i, label_col in enumerate(self.label_columns):
+                if i < len(true_labels[0]) if true_labels else 0:
+                    test_df[label_col] = [labels[i] if i < len(labels) else 0 for labels in true_labels]
+                else:
+                    test_df[label_col] = 0
+        
+        # Store test_df reference for results saving
+        if self.results_manager:
+            self._current_test_df = test_df
+        
+        # Call the async prediction method
+        result = self.predict(test_df=test_df)
+        
+        # Extract predictions in the format expected by RoBERTa-style interface
+        if hasattr(result, 'predictions'):
+            # Convert predictions to the format expected by downstream components
+            if self.multi_label:
+                # For multi-label: predictions should be list of lists of class names
+                formatted_predictions = result.predictions
+            else:
+                # For single-label: predictions should be list of class names
+                formatted_predictions = result.predictions
+            
+            # Create new result with formatted predictions
+            result.predictions = formatted_predictions
+        
+        # Calculate metrics if true labels are provided
+        if true_labels is not None:
+            try:
+                # Convert string predictions back to binary format for metric calculation
+                predicted_labels = []
+                for pred in result.predictions:
+                    if self.multi_label:
+                        # Multi-label: convert list of class names to binary vector
+                        binary_pred = [0] * len(self.classes_)
+                        if isinstance(pred, list):
+                            for class_name in pred:
+                                if class_name in self.classes_:
+                                    binary_pred[self.classes_.index(class_name)] = 1
+                        predicted_labels.append(binary_pred)
+                    else:
+                        # Single-label: convert class name to binary vector
+                        binary_pred = [0] * len(self.classes_)
+                        if pred in self.classes_:
+                            binary_pred[self.classes_.index(pred)] = 1
+                        else:
+                            # Default to first class if prediction not in classes
+                            binary_pred[0] = 1
+                        predicted_labels.append(binary_pred)
+                
+                # Calculate metrics using the parent class method from BaseLLMClassifier
+                metrics = self._calculate_metrics(predicted_labels, true_labels)
+                
+                # Add metrics to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['metrics'] = metrics
+                
+            except Exception as e:
+                if getattr(self, 'verbose', True):
+                    print(f"Warning: Could not calculate metrics: {e}")
+        
+        # Save prediction results using ResultsManager (if it's the main predict call)
+        if self.results_manager and hasattr(self, '_current_test_df'):
+            try:
+                saved_files = self.results_manager.save_predictions(
+                    result, "test", self._current_test_df
+                )
+                
+                # Save metrics if available
+                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                    metrics_file = self.results_manager.save_metrics(
+                        result.metadata['metrics'], "test", "openai_classifier"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                print(f"📁 OpenAI prediction results saved: {saved_files}")
+                
+                # Add file paths to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['saved_files'] = saved_files
+                
+                # Clean up temporary reference
+                delattr(self, '_current_test_df')
+                
+            except Exception as e:
+                print(f"Warning: Could not save OpenAI prediction results: {e}")
+                
+                # Clean up temporary reference even if saving failed
+                if hasattr(self, '_current_test_df'):
+                    delattr(self, '_current_test_df')
+        
+        return result
+    
+    def predict_texts(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Predict labels for a list of texts (compatibility method for FusionEnsemble).
+        
+        This method is provided for compatibility with FusionEnsemble which calls 
+        LLM models with text lists. For regular usage, use predict(test_df) instead.
+        
+        Args:
+            texts: List of texts to classify
+            true_labels: Optional true labels in binary format for evaluation metrics
+            
+        Returns:
+            ClassificationResult with predictions and optional metrics
+        """
+        return self._predict_texts_internal(texts, true_labels)
+    
+    @property
+    def model_info(self) -> Dict[str, any]:
+        """Get OpenAI model information."""
+        return {
+            "provider": "openai",
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_completion_tokens": self.max_completion_tokens,
+            "multi_label": self.multi_label,
+            "text_column": self.text_column,
+            "label_columns": self.label_columns,
+            "classes": self.classes_,
+            "classification_type": "multi_label" if self.multi_label else "single_label",
+            "enable_cache": self.enable_cache,
+            "cache_dir": self.cache_dir
+        }

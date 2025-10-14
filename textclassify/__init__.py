@@ -21,7 +21,6 @@ from .core.exceptions import TextClassifyError, ModelNotFoundError, Configuratio
 
 # LLM Classifiers (require API keys but no additional dependencies)
 from .llm.openai_classifier import OpenAIClassifier
-from .llm.claude_classifier import ClaudeClassifier
 from .llm.gemini_classifier import GeminiClassifier
 from .llm.deepseek_classifier import DeepSeekClassifier
 
@@ -79,7 +78,6 @@ __all__ = [
     
     # LLM Classifiers
     "OpenAIClassifier",
-    "ClaudeClassifier", 
     "GeminiClassifier",
     "DeepSeekClassifier",
     
