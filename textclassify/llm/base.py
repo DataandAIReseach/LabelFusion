@@ -1091,8 +1091,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 else:
                     test_df[label_col] = 0
         
-        # Call the regular predict method
-        result = self.predict(test_df=test_df)
+        # Create an empty train_df to avoid prompt engineering issues when using cached predictions
+        train_df = pd.DataFrame(columns=test_df.columns)
+        
+        # Call the regular predict method with both train_df and test_df
+        result = self.predict(train_df=train_df, test_df=test_df)
         
         # If metrics weren't calculated yet but we have true labels, calculate them
         if (true_labels is not None and 
