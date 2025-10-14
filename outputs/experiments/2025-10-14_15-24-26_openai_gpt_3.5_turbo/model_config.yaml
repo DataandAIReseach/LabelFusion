@@ -1,0 +1,21 @@
+config: !!python/object:textclassify.core.types.ModelConfig
+  api_base: null
+  api_key: null
+  batch_size: 32
+  enable_caching: true
+  max_retries: 3
+  model_name: gpt-3.5-turbo
+  model_type: !!python/object/apply:textclassify.core.types.ModelType
+  - llm
+  parameters:
+    max_completion_tokens: 150
+    model: gpt-3.5-turbo
+    temperature: 0.1
+    top_p: 1.0
+  provider: openai
+  timeout: 30.0
+  training_config: {}
+metadata:
+  experiment_id: 2025-10-14_15-24-26_openai_gpt_3.5_turbo
+  model_name: ''
+  timestamp: '2025-10-14T15:26:37.944614'
