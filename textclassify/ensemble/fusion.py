@@ -465,28 +465,91 @@ class FusionEnsemble(BaseEnsemble):
                     true_labels = df[label_columns].values.tolist()
                     texts = df[text_column].tolist()
                     
-                    # Call the LLM classifier's predict_texts method to get comprehensive results
-                    llm_result = self.llm_model.predict_texts(
-                        texts=texts, 
-                        true_labels=true_labels
-                    )
-                    
-                    # Override the predictions with our cached/provided ones but keep all other results
-                    llm_result.predictions = final_predictions
-                    
-                    # Update model name to indicate the prediction source
-                    if predictions_source == "cached":
-                        llm_result.model_name = f"{llm_result.model_name}_cached"
-                    elif predictions_source == "provided":
-                        llm_result.model_name = f"{llm_result.model_name}_provided"
-                    
-                    # Add source information to metadata
-                    if not llm_result.metadata:
-                        llm_result.metadata = {}
-                    llm_result.metadata['prediction_source'] = predictions_source
-                    llm_result.metadata['dataset_type'] = dataset_type
-                    
-                    print(f"✅ LLM classifier results saved to experiments folder (source: {predictions_source})")
+                    # For cached/provided predictions, create a result directly instead of calling predict_texts
+                    # to avoid unnecessary LLM API calls and prompt engineering
+                    if predictions_source in ["cached", "provided"]:
+                        # Create result manually with metrics calculation
+                        from ..core.types import ClassificationResult, ClassificationType, ModelType
+                        
+                        # Create basic result
+                        llm_result = ClassificationResult(
+                            predictions=final_predictions,
+                            model_name=f"{type(self.llm_model).__name__}_{predictions_source}",
+                            model_type=ModelType.LLM,
+                            classification_type=ClassificationType.MULTI_LABEL if self.llm_model.multi_label else ClassificationType.SINGLE_LABEL,
+                            metadata={}
+                        )
+                        
+                        # Calculate metrics manually using the LLM model's method
+                        binary_predictions = []
+                        for pred in final_predictions:
+                            if self.llm_model.multi_label:
+                                # Multi-label: convert list of class names to binary vector
+                                binary_pred = [0] * len(self.llm_model.classes_)
+                                if isinstance(pred, list):
+                                    for class_name in pred:
+                                        if class_name in self.llm_model.classes_:
+                                            binary_pred[self.llm_model.classes_.index(class_name)] = 1
+                                binary_predictions.append(binary_pred)
+                            else:
+                                # Single-label: convert class name to binary vector
+                                binary_pred = [0] * len(self.llm_model.classes_)
+                                if pred in self.llm_model.classes_:
+                                    binary_pred[self.llm_model.classes_.index(pred)] = 1
+                                else:
+                                    # Default to first class if prediction not in classes
+                                    binary_pred[0] = 1
+                                binary_predictions.append(binary_pred)
+                        
+                        # Calculate metrics
+                        metrics = self.llm_model._calculate_metrics(binary_predictions, true_labels)
+                        llm_result.metadata['metrics'] = metrics
+                        llm_result.metadata['prediction_source'] = predictions_source
+                        llm_result.metadata['dataset_type'] = dataset_type
+                        
+                        # Save results using the LLM model's results manager
+                        if self.llm_model.results_manager:
+                            try:
+                                # Save predictions
+                                saved_files = self.llm_model.results_manager.save_predictions(
+                                    llm_result, dataset_type, df
+                                )
+                                
+                                # Save metrics YAML
+                                metrics_file = self.llm_model.results_manager.save_metrics(
+                                    metrics, dataset_type, f"{type(self.llm_model).__name__.lower()}"
+                                )
+                                saved_files["metrics"] = metrics_file
+                                
+                                # Save model config
+                                model_config = getattr(self.llm_model, 'model_info', {})
+                                if model_config:
+                                    config_file = self.llm_model.results_manager.save_model_config(
+                                        model_config, f"{type(self.llm_model).__name__.lower()}"
+                                    )
+                                    saved_files["config"] = config_file
+                                
+                                print(f"✅ LLM classifier results saved to experiments folder (source: {predictions_source})")
+                                
+                            except Exception as save_error:
+                                print(f"⚠️ Warning: Could not save LLM results: {save_error}")
+                    else:
+                        # For generated predictions, use the normal predict_texts method
+                        llm_result = self.llm_model.predict_texts(
+                            texts=texts, 
+                            true_labels=true_labels
+                        )
+                        
+                        # Override predictions with our final_predictions (should be the same, but just in case)
+                        llm_result.predictions = final_predictions
+                        
+                        # Add source information to metadata
+                        if not llm_result.metadata:
+                            llm_result.metadata = {}
+                        llm_result.metadata['prediction_source'] = predictions_source
+                        llm_result.metadata['dataset_type'] = dataset_type
+                        
+                        print(f"✅ LLM classifier results saved to experiments folder (source: {predictions_source})")
                     
                 else:
                     print(f"ℹ️ No true labels available in DataFrame - skipping LLM classifier metrics calculation")
