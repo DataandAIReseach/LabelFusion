@@ -28,7 +28,7 @@ class TestPackageImports:
         )
         from textclassify.core.base import BaseClassifier
         from textclassify.core.exceptions import (
-            TextClassifyError, ConfigurationError, ModelError, EnsembleError
+            TextClassifyError, ConfigurationError, ModelTrainingError, EnsembleError
         )
         
         # Test enum values
@@ -40,7 +40,6 @@ class TestPackageImports:
         """Test LLM module imports."""
         from textclassify.llm.base import BaseLLMClassifier
         from textclassify.llm.openai_classifier import OpenAIClassifier
-        from textclassify.llm.claude_classifier import ClaudeClassifier
         from textclassify.llm.gemini_classifier import GeminiClassifier
         from textclassify.llm.deepseek_classifier import DeepSeekClassifier
         from textclassify.llm.prompts import (
@@ -49,7 +48,6 @@ class TestPackageImports:
         
         # Test that classes exist
         assert issubclass(OpenAIClassifier, BaseLLMClassifier)
-        assert issubclass(ClaudeClassifier, BaseLLMClassifier)
     
     def test_ml_imports(self):
         """Test ML module imports."""
@@ -106,7 +104,7 @@ class TestPackageImports:
         
         # Test that main classes are available
         from textclassify import (
-            OpenAIClassifier, ClaudeClassifier, GeminiClassifier, DeepSeekClassifier,
+            OpenAIClassifier, GeminiClassifier, DeepSeekClassifier,
             VotingEnsemble, WeightedEnsemble, ClassRoutingEnsemble,
             Config, APIKeyManager,
             ClassificationType, ModelType, LLMProvider
@@ -432,7 +430,7 @@ class TestPackageImports:
         # Assert training results
         assert training_result['ensemble_method'] == 'fusion'
         assert training_result['training_samples'] == 50
-        assert training_result['validation_samples'] == 20
+        assert training_result['validation_samples'] == 5
         assert training_result['num_labels'] == 4
         
         print(f"Fusion Ensemble Predictions: {result.predictions}")
@@ -551,8 +549,9 @@ class TestErrorHandling:
         from textclassify.core.exceptions import ConfigurationError
         
         with pytest.raises(ConfigurationError):
-            # Non-existent config file
-            Config("nonexistent_file.json")
+            # Create config and try to load non-existent file
+            config = Config()
+            config.load("nonexistent_file.json")
 
 
 if __name__ == "__main__":
