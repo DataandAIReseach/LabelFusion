@@ -1,0 +1,6 @@
+title,description,word_count,label_1,label_2,label_3,label_4,predicted
+Martha has a jailhouse flock - nun,"popular with prisoners and guards who give her  quot;kid-glove quot; treatment, a new report says. In the seven weeks since the diva of ",23,False,False,True,False,label_2
+Commander: Osama Probably Not in Pakistan Region (Reuters),"Reuters - Osama bin Laden is unlikely\to be hiding in Pakistan's tribal region near the Afghan\border, the top military commander in the area said on Tuesday.",26,True,False,False,False,label_2
+YUKOS #39; Hollow Victory,"Yesterday, Russia #39;s erstwhile largest oil company, YUKOS (OTC BB: YUKOY), won a single legal skirmish in a land far from home.",22,False,False,True,False,label_3
+Angels climb into tie for first,"Vladimir Guerrero says he #39;s not trying to win a MVP award, that he #39;s merely trying to drive the Angels to the postseason. But it #39;s uncanny how in striving for one goal, sometimes another appears on the horizon.",40,False,True,False,False,label_1
+Cuba Frees Dissident Writer,"Cuba's communist government freed writer Raul Rivero and another dissident from prison Tuesday, the latest in a series of releases apparently aimed at cleaning up the island's human rights record.",30,True,False,False,False,label_1
