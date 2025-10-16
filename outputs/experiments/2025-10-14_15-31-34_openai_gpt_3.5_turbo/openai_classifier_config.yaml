@@ -1,9 +1,0 @@
-config:
-  max_completion_tokens: 150
-  model: gpt-3.5-turbo
-  temperature: 0.1
-  top_p: 1.0
-metadata:
-  experiment_id: 2025-10-14_15-31-34_openai_gpt_3.5_turbo
-  model_name: openai_classifier
-  timestamp: '2025-10-14T15:32:23.087223'

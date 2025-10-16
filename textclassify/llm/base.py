@@ -5,6 +5,7 @@ import json
 import re
 import logging
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Tuple, Iterator
 import pandas as pd
 from tqdm import tqdm
@@ -32,7 +33,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Results management parameters
         output_dir: str = "outputs",
         experiment_name: Optional[str] = None,
-        auto_save_results: bool = True
+        auto_save_results: bool = True,
+        # Cache management parameters
+        auto_use_cache: bool = False,
+        cache_dir: str = "cache"
     ):
         """Initialize the LLM classifier.
         
@@ -47,6 +51,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             output_dir: Base directory for saving results (default: "outputs")
             experiment_name: Name for this experiment (default: auto-generated)
             auto_save_results: Whether to automatically save results (default: True)
+            auto_use_cache: Whether to automatically check and reuse cached predictions (default: False)
+            cache_dir: Directory to search for cached predictions (default: "cache")
         """
         super().__init__(config)
         self.config.model_type = ModelType.LLM
@@ -58,6 +64,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self.provider = provider or getattr(self.config, 'provider', 'openai')
         # Also set it on config for consistency
         self.config.provider = self.provider
+        
+        # Cache management settings
+        self.auto_use_cache = auto_use_cache
+        self.cache_dir = cache_dir
         
         # Setup logging
         if self.verbose:
@@ -175,6 +185,37 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         """Asynchronously predict labels for texts with detailed progress tracking."""
         
         start_time = time.time()
+        
+        # 🚀 AUTO-CACHE: Check for cached predictions if enabled
+        if self.auto_use_cache:
+            if self.verbose:
+                print("\n🔍 Auto-cache enabled, checking for cached predictions...")
+            
+            discovered = self.discover_cached_predictions(self.cache_dir)
+            
+            # Try to find a matching cache file for test predictions
+            if 'test_predictions' in discovered and discovered['test_predictions']:
+                cache_file = discovered['test_predictions'][0]  # Use most recent
+                
+                if self.verbose:
+                    print(f"✅ Found cached predictions: {Path(cache_file).name}")
+                    print("📥 Loading from cache (1000-5000x faster than inference)...")
+                
+                try:
+                    # Load and return cached predictions
+                    result = self.predict_with_cached_predictions(test_df, cache_file, train_df)
+                    
+                    if self.verbose:
+                        print(f"⚡ Cache load completed in {time.time() - start_time:.2f} seconds")
+                    
+                    return result
+                    
+                except Exception as e:
+                    if self.verbose:
+                        print(f"⚠️  Cache load failed: {e}")
+                        print("🔄 Falling back to normal inference...")
+            elif self.verbose:
+                print("ℹ️  No cached predictions found, running inference...")
         
         try:
             if self.verbose:
@@ -1153,3 +1194,271 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                     print(f"Warning: Could not calculate metrics for {self.provider} classifier: {e}")
         
         return result
+    
+    # ========================================================================
+    # Cache Management Methods
+    # ========================================================================
+    
+    @classmethod
+    def discover_cached_predictions(cls, cache_dir: str = "cache") -> Dict[str, List[str]]:
+        """Discover all cached prediction files in the specified directory.
+        
+        This class method scans a directory for cached prediction files and groups them
+        by dataset type (train, validation, test).
+        
+        Args:
+            cache_dir: Directory to search for cache files (default: "cache")
+            
+        Returns:
+            Dictionary mapping dataset types to lists of cache file paths
+            Example: {'validation_predictions': ['/path/to/val_file.json'], 
+                     'test_predictions': ['/path/to/test_file.json']}
+        """
+        from pathlib import Path
+        import re
+        
+        cache_path = Path(cache_dir)
+        if not cache_path.exists():
+            print(f"⚠️  Cache directory not found: {cache_dir}")
+            return {}
+        
+        discovered = {}
+        
+        # Patterns to match different cache file types
+        # Supports both formats: YYYY-MM-DD-HH-MM-SS and YYYY_MM_DD_HH_MM_SS
+        patterns = {
+            'train_predictions': r'train[_-](?:predictions[_-])?\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+\.json',
+            'validation_predictions': r'val(?:idation)?[_-](?:predictions[_-])?\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+\.json',
+            'test_predictions': r'test[_-](?:predictions[_-])?\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+\.json'
+        }
+        
+        for dataset_type, pattern in patterns.items():
+            matching_files = []
+            for file_path in cache_path.rglob("*.json"):
+                if re.match(pattern, file_path.name):
+                    matching_files.append(str(file_path))
+            
+            if matching_files:
+                # Sort by timestamp (most recent first)
+                matching_files.sort(reverse=True)
+                discovered[dataset_type] = matching_files
+        
+        if discovered:
+            print(f"📁 Discovered {sum(len(v) for v in discovered.values())} cached prediction files")
+            for dataset_type, files in discovered.items():
+                print(f"  • {dataset_type}: {len(files)} file(s)")
+        else:
+            print(f"ℹ️  No cached prediction files found in {cache_dir}")
+        
+        return discovered
+    
+    def load_cached_predictions_for_dataset(
+        self, 
+        cache_file: str,
+        dataset_type: str = "validation"
+    ) -> Optional[Dict[str, Any]]:
+        """Load cached predictions from a specific file.
+        
+        Args:
+            cache_file: Path to the cache file (JSON format)
+            dataset_type: Type of dataset ('train', 'validation', or 'test')
+            
+        Returns:
+            Dictionary with cached predictions or None if loading fails
+        """
+        from pathlib import Path
+        
+        cache_path = Path(cache_file)
+        if not cache_path.exists():
+            print(f"❌ Cache file not found: {cache_file}")
+            return None
+        
+        try:
+            with open(cache_path, 'r') as f:
+                cached_data = json.load(f)
+            
+            if self.verbose:
+                print(f"✅ Loaded {len(cached_data.get('predictions', []))} cached predictions from {cache_file}")
+            
+            return cached_data
+            
+        except Exception as e:
+            print(f"❌ Error loading cache file {cache_file}: {e}")
+            return None
+    
+    def get_cached_predictions_summary(
+        self, 
+        cache_file: Optional[str] = None,
+        cache_dir: str = "cache"
+    ) -> Dict[str, Any]:
+        """Get a summary of cached predictions.
+        
+        Args:
+            cache_file: Specific cache file to analyze (optional)
+            cache_dir: Directory to search if cache_file not provided
+            
+        Returns:
+            Dictionary with summary statistics about cached predictions
+        """
+        if cache_file:
+            cached_data = self.load_cached_predictions_for_dataset(cache_file)
+            if not cached_data:
+                return {}
+        else:
+            # Discover all cache files
+            discovered = self.discover_cached_predictions(cache_dir)
+            if not discovered:
+                return {}
+            
+            # Use the most recent validation cache by default
+            if 'validation_predictions' in discovered:
+                cache_file = discovered['validation_predictions'][0]
+            elif 'test_predictions' in discovered:
+                cache_file = discovered['test_predictions'][0]
+            else:
+                cache_file = list(discovered.values())[0][0]
+            
+            cached_data = self.load_cached_predictions_for_dataset(cache_file)
+            if not cached_data:
+                return {}
+        
+        predictions = cached_data.get('predictions', [])
+        
+        summary = {
+            'cache_file': cache_file,
+            'total_predictions': len(predictions),
+            'provider': cached_data.get('provider', 'unknown'),
+            'model': cached_data.get('model', 'unknown'),
+            'timestamp': cached_data.get('timestamp', 'unknown'),
+            'has_metrics': 'metrics' in cached_data
+        }
+        
+        if 'metrics' in cached_data:
+            summary['metrics'] = cached_data['metrics']
+        
+        return summary
+    
+    def predict_with_cached_predictions(
+        self,
+        test_df: pd.DataFrame,
+        cache_file: str,
+        train_df: Optional[pd.DataFrame] = None
+    ) -> ClassificationResult:
+        """Load predictions from cache file instead of running inference.
+        
+        This method is useful for quickly testing ensemble combinations without
+        re-running expensive LLM inference.
+        
+        Args:
+            test_df: Test DataFrame (used for structure and labels)
+            cache_file: Path to cached predictions JSON file
+            train_df: Optional training DataFrame (not used with cached predictions)
+            
+        Returns:
+            ClassificationResult with cached predictions
+        """
+        cached_data = self.load_cached_predictions_for_dataset(cache_file)
+        if not cached_data:
+            raise ValueError(f"Could not load cache file: {cache_file}")
+        
+        predictions = cached_data.get('predictions', [])
+        
+        if len(predictions) != len(test_df):
+            raise ValueError(
+                f"Cache file has {len(predictions)} predictions but test_df has {len(test_df)} rows"
+            )
+        
+        # Convert cached predictions to the expected format
+        # Predictions might be stored as binary vectors or class names
+        formatted_predictions = []
+        for pred in predictions:
+            if isinstance(pred, list) and all(isinstance(x, int) for x in pred):
+                # Already in binary format
+                formatted_predictions.append(pred)
+            else:
+                # Convert to binary format
+                binary_pred = [0] * len(self.label_columns)
+                if isinstance(pred, str):
+                    if pred in self.label_columns:
+                        binary_pred[self.label_columns.index(pred)] = 1
+                elif isinstance(pred, list):
+                    for label in pred:
+                        if label in self.label_columns:
+                            binary_pred[self.label_columns.index(label)] = 1
+                formatted_predictions.append(binary_pred)
+        
+        # Calculate metrics if test_df has labels
+        metrics = None
+        if all(col in test_df.columns for col in self.label_columns):
+            true_labels = test_df[self.label_columns].values.tolist()
+            metrics = self._calculate_metrics(formatted_predictions, true_labels)
+            
+            if self.verbose:
+                print(f"📊 Metrics from cached predictions:")
+                for metric, value in metrics.items():
+                    print(f"  • {metric}: {value:.4f}")
+        
+        # Create result object
+        result = self._create_result(
+            predictions=formatted_predictions,
+            metrics=metrics,
+            test_df=test_df,
+            train_df=train_df
+        )
+        
+        # Add cache metadata
+        if not result.metadata:
+            result.metadata = {}
+        result.metadata['from_cache'] = True
+        result.metadata['cache_file'] = cache_file
+        result.metadata['cache_timestamp'] = cached_data.get('timestamp', 'unknown')
+        
+        return result
+    
+    def print_cache_status(self, cache_dir: str = "cache") -> None:
+        """Print a formatted summary of available cached predictions.
+        
+        Args:
+            cache_dir: Directory to search for cache files
+        """
+        print("\n" + "="*60)
+        print("📦 LLM CACHE STATUS")
+        print("="*60)
+        
+        discovered = self.discover_cached_predictions(cache_dir)
+        
+        if not discovered:
+            print("\n❌ No cached predictions found")
+            print(f"   Cache directory: {cache_dir}")
+            print("\n💡 TIP: Run predictions with caching enabled to create cache files")
+            return
+        
+        print(f"\n📁 Cache directory: {cache_dir}")
+        print(f"✅ Found {sum(len(v) for v in discovered.values())} cached prediction file(s)\n")
+        
+        for dataset_type, files in discovered.items():
+            print(f"\n{dataset_type.upper().replace('_', ' ')}:")
+            print("-" * 60)
+            
+            for i, file_path in enumerate(files[:3], 1):  # Show up to 3 most recent
+                summary = self.get_cached_predictions_summary(file_path)
+                if summary:
+                    print(f"\n  {i}. {Path(file_path).name}")
+                    print(f"     Provider: {summary.get('provider', 'unknown')}")
+                    print(f"     Model: {summary.get('model', 'unknown')}")
+                    print(f"     Predictions: {summary.get('total_predictions', 0)}")
+                    print(f"     Timestamp: {summary.get('timestamp', 'unknown')}")
+                    
+                    if summary.get('has_metrics') and 'metrics' in summary:
+                        metrics = summary['metrics']
+                        if 'accuracy' in metrics:
+                            print(f"     Accuracy: {metrics['accuracy']:.4f}")
+                        if 'f1_macro' in metrics:
+                            print(f"     F1 (macro): {metrics['f1_macro']:.4f}")
+            
+            if len(files) > 3:
+                print(f"\n  ... and {len(files) - 3} more file(s)")
+        
+        print("\n" + "="*60)
+        print("💡 Use load_cached_predictions_for_dataset() to load a specific file")
+        print("="*60 + "\n")

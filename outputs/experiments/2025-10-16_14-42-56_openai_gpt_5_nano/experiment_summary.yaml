@@ -1,0 +1,41 @@
+created_at: '2025-10-16T14:46:57.961410'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq002
+    platform: Linux-4.18.0-553.74.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /mnt/vast-standard/home/schlee2/u19147/repos/LabelFusion
+  experiment_id: 2025-10-16_14-42-56_openai_gpt_5_nano
+  git_commit: e5f8bb8cee1ed3dcdd92621adc1f517948d73daf
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-10-16T14:42:56.981960'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/openai_classifier_test_metrics.yaml
+  - metrics/openai_classifier_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/test_predictions_e9f7f5d54e06.csv
+  - predictions/test_predictions_e9f7f5d54e06.json
+  - predictions/validation_predictions_9cec6c126ef6.csv
+  - predictions/validation_predictions_9cec6c126ef6.json
+test_results: null
+training_results:
+  dataset_type: test
+  metrics:
+    accuracy: 0.82
+    auc: 0.88
+    f1: 0.8173032460682437
+    precision: 0.8214543965312626
+    recall: 0.82
+  model_name: gpt-5-nano
+  predictions_source: cached
+  timestamp: '2025-10-16T14:46:57.952189'
+  total_samples: 500

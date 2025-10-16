@@ -22,7 +22,10 @@ class GeminiClassifier(BaseLLMClassifier):
         # Results management parameters
         output_dir: str = "outputs",
         experiment_name: Optional[str] = None,
-        auto_save_results: bool = True
+        auto_save_results: bool = True,
+        # Cache management parameters
+        auto_use_cache: bool = False,
+        cache_dir: str = "cache"
     ):
         """Initialize Gemini classifier.
         
@@ -35,6 +38,8 @@ class GeminiClassifier(BaseLLMClassifier):
             output_dir: Base directory for saving results (default: "outputs")
             experiment_name: Name for this experiment (default: auto-generated)
             auto_save_results: Whether to automatically save results (default: True)
+            auto_use_cache: Whether to automatically check and reuse cached predictions (default: False)
+            cache_dir: Directory to search for cached predictions (default: "cache")
         """
         # Set provider before calling super().__init__
         config.provider = 'gemini'
@@ -48,7 +53,9 @@ class GeminiClassifier(BaseLLMClassifier):
             provider='gemini',
             output_dir=output_dir,
             experiment_name=experiment_name,
-            auto_save_results=auto_save_results
+            auto_save_results=auto_save_results,
+            auto_use_cache=auto_use_cache,
+            cache_dir=cache_dir
         )
         
         # Set up classes and prompt engineer configuration
