@@ -36,7 +36,7 @@ class FusionMLP(nn.Module):
             layers.extend([
                 nn.Linear(prev_dim, hidden_dim),
                 nn.ReLU(),
-                nn.Dropout(0.1)
+                nn.Dropout(0.3)  # Higher dropout to prevent overfitting
             ])
             prev_dim = hidden_dim
         
@@ -51,10 +51,10 @@ class FusionMLP(nn.Module):
 
 
 class FusionWrapper(nn.Module):
-    """Wrapper that combines ML model with frozen LLM scores via Fusion MLP."""
+    """Wrapper that combines ML hidden states with LLM scores via Fusion MLP."""
     
     def __init__(self, ml_model, num_labels: int, task: str = "multiclass", 
-                 hidden_dims: List[int] = [64, 32]):
+                 hidden_dims: List[int] = [64, 32], use_hidden_states: bool = True):
         """Initialize Fusion Wrapper.
         
         Args:
@@ -62,42 +62,55 @@ class FusionWrapper(nn.Module):
             num_labels: Number of output labels
             task: "multiclass" or "multilabel"
             hidden_dims: Hidden dimensions for fusion MLP
+            use_hidden_states: If True, use RoBERTa hidden states (768-dim) + LLM scores;
+                              If False, use only probabilities (8-dim for 4 classes)
         """
         super().__init__()
         self.ml_model = ml_model
         self.num_labels = num_labels
         self.task = task
+        self.use_hidden_states = use_hidden_states
         
-        # Fusion MLP takes ML logits + LLM scores
-        fusion_input_dim = num_labels * 2  # ML logits + LLM scores
+        # Determine input dimension for fusion MLP
+        if use_hidden_states:
+            # RoBERTa hidden state (768) + LLM scores (num_labels)
+            roberta_hidden_size = 768  # Standard RoBERTa hidden size
+            fusion_input_dim = roberta_hidden_size + num_labels
+        else:
+            # Only probabilities: ML probs + LLM probs
+            fusion_input_dim = num_labels * 2
+        
         self.fusion_mlp = FusionMLP(fusion_input_dim, num_labels, hidden_dims)
         
         # Device management
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
     
-    def forward(self, ml_predictions: torch.Tensor, llm_predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """Forward pass combining ML and LLM predictions.
+    def forward(self, ml_hidden_or_probs: torch.Tensor, llm_predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Forward pass combining ML features (hidden states or probs) with LLM predictions.
         
         Args:
-            ml_predictions: Pre-computed ML predictions/logits
-            llm_predictions: Pre-computed LLM predictions/scores
+            ml_hidden_or_probs: RoBERTa hidden states (768-dim) or probabilities (4-dim)
+            llm_predictions: LLM predictions/probabilities
             
         Returns:
-            Dict containing ML predictions, LLM predictions, and fused logits
+            Dict containing fused logits
         """
-        # Ensure predictions are detached (no gradient flow to original models)
-        ml_predictions = ml_predictions.detach()
+        # Ensure inputs are detached (no gradient flow to original models)
+        ml_hidden_or_probs = ml_hidden_or_probs.detach()
         llm_predictions = llm_predictions.detach()
         
-        # Concatenate ML and LLM predictions
-        fusion_input = torch.cat([ml_predictions, llm_predictions], dim=1)
+        # Concatenate ML features and LLM predictions
+        # ml_hidden_or_probs: (batch, 768) or (batch, 4)
+        # llm_predictions: (batch, 4)
+        # fusion_input: (batch, 772) or (batch, 8)
+        fusion_input = torch.cat([ml_hidden_or_probs, llm_predictions], dim=1)
         
         # Generate fused predictions through MLP
         fused_logits = self.fusion_mlp(fusion_input)
         
         return {
-            "ml_predictions": ml_predictions,
+            "ml_features": ml_hidden_or_probs,
             "llm_predictions": llm_predictions,
             "fused_logits": fused_logits
         }
@@ -112,7 +125,11 @@ class FusionEnsemble(BaseEnsemble):
         # Results management parameters
         output_dir: str = "outputs",
         experiment_name: Optional[str] = None,
-        auto_save_results: bool = True
+        auto_save_results: bool = True,
+        save_intermediate_llm_predictions: bool = False,
+        # Cache management parameters
+        auto_use_cache: bool = False,
+        cache_dir: str = "cache"
     ):
         """Initialize fusion ensemble.
         
@@ -121,12 +138,15 @@ class FusionEnsemble(BaseEnsemble):
             output_dir: Base directory for saving results (default: "outputs")
             experiment_name: Name for this experiment (default: auto-generated)
             auto_save_results: Whether to automatically save results (default: True)
+            save_intermediate_llm_predictions: Whether to save intermediate LLM predictions (default: False)
+            auto_use_cache: Whether to automatically check and reuse cached LLM predictions (default: False)
+            cache_dir: Directory to search for cached predictions (default: "cache")
         """
         super().__init__(
             ensemble_config,
             output_dir=output_dir,
             experiment_name=experiment_name,
-            auto_save_results=auto_save_results
+            auto_save_results=False  # Disable base ensemble results manager to prevent duplicate directories
         )
         
         # Fusion-specific parameters
@@ -135,6 +155,11 @@ class FusionEnsemble(BaseEnsemble):
         self.fusion_lr = ensemble_config.parameters.get('fusion_lr', 1e-3)  # Larger LR for fusion MLP
         self.num_epochs = ensemble_config.parameters.get('num_epochs', 10)
         self.batch_size = ensemble_config.parameters.get('batch_size', 16)
+        self.save_intermediate_llm_predictions = save_intermediate_llm_predictions
+        
+        # Cache management settings
+        self.auto_use_cache = auto_use_cache
+        self.cache_dir = cache_dir
         
         # Model components
         self.ml_model = None
@@ -150,7 +175,7 @@ class FusionEnsemble(BaseEnsemble):
         
         # Results management
         output_dir = ensemble_config.parameters.get('output_dir', 'outputs')
-        experiment_name = ensemble_config.parameters.get('experiment_name', f'fusion_{ensemble_config.ensemble_method}')
+        experiment_name = ensemble_config.parameters.get('experiment_name', 'fusion_ensemble')
         auto_save_results = ensemble_config.parameters.get('auto_save_results', True)
         
         self.results_manager = None
@@ -196,8 +221,19 @@ class FusionEnsemble(BaseEnsemble):
         self.model_names.append("ml_model")
     
     def add_llm_model(self, llm_model):
-        """Add LLM model to the fusion ensemble."""
+        """Add LLM model to the fusion ensemble.
+        
+        If auto_use_cache is enabled in the ensemble, it will be propagated to the LLM model.
+        """
         self.llm_model = llm_model
+        
+        # Propagate cache settings to LLM model if supported
+        if hasattr(llm_model, 'auto_use_cache') and hasattr(llm_model, 'cache_dir'):
+            llm_model.auto_use_cache = self.auto_use_cache
+            llm_model.cache_dir = self.cache_dir
+            if self.auto_use_cache and hasattr(llm_model, 'verbose') and llm_model.verbose:
+                print(f"🔗 FusionEnsemble: Propagated auto_use_cache={self.auto_use_cache} to LLM model")
+        
         self.models.append(llm_model)
         self.model_names.append("llm_model")
     
@@ -249,7 +285,7 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 2: Get ML predictions on validation set
         print("Getting ML predictions on validation set...")
-        ml_val_result = self.ml_model.predict(val_df)
+        ml_val_result = self.ml_model.predict_without_saving(val_df)
         
         # Step 3: Get LLM predictions on validation set
         llm_val_predictions = self._get_or_generate_llm_predictions(
@@ -269,17 +305,28 @@ class FusionEnsemble(BaseEnsemble):
         # If we have true labels, call the LLM classifier's predict_texts method to get proper metrics
         if val_true_labels is not None and self.llm_model is not None:
             try:
-                # Call the LLM classifier's predict_texts method with cached predictions
-                # This ensures metrics are calculated and individual results are saved
-                llm_val_result = self.llm_model.predict_texts(
-                    texts=val_df[text_column].tolist(), 
-                    true_labels=val_true_labels
-                )
-                # Override predictions with cached ones if they were used
-                if val_llm_predictions is not None or self.val_llm_cache_path:
-                    llm_val_result.predictions = llm_val_predictions
-                    # Update model name to indicate cached predictions were used
-                    llm_val_result.model_name = "llm_model_cached"
+                # Temporarily disable LLM results saving if intermediate saving is disabled
+                original_llm_results_manager = None
+                if not self.save_intermediate_llm_predictions and hasattr(self.llm_model, 'results_manager'):
+                    original_llm_results_manager = self.llm_model.results_manager
+                    self.llm_model.results_manager = None
+                
+                try:
+                    # Call the LLM classifier's predict_texts method with cached predictions
+                    # This ensures metrics are calculated and individual results are saved
+                    llm_val_result = self.llm_model.predict_texts(
+                        texts=val_df[text_column].tolist(), 
+                        true_labels=val_true_labels
+                    )
+                    # Override predictions with cached ones if they were used
+                    if val_llm_predictions is not None or self.val_llm_cache_path:
+                        llm_val_result.predictions = llm_val_predictions
+                        # Update model name to indicate cached predictions were used
+                        llm_val_result.model_name = "llm_model_cached"
+                finally:
+                    # Restore the original results manager
+                    if original_llm_results_manager is not None:
+                        self.llm_model.results_manager = original_llm_results_manager
             except Exception as e:
                 print(f"Warning: Could not call LLM classifier predict_texts for metrics: {e}")
                 # Fallback to simple ClassificationResult
@@ -300,17 +347,48 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 4: Create fusion wrapper
         print("Creating fusion wrapper...")
+        print("   Using RoBERTa hidden states (768-dim) + LLM probabilities for rich fusion")
         task = "multilabel" if self.classification_type == ClassificationType.MULTI_LABEL else "multiclass"
         self.fusion_wrapper = FusionWrapper(
             ml_model=self.ml_model,
             num_labels=self.num_labels,
             task=task,
-            hidden_dims=self.fusion_hidden_dims
+            hidden_dims=self.fusion_hidden_dims,
+            use_hidden_states=True  # Use RoBERTa hidden states for better fusion
         )
         
         # Step 5: Train fusion MLP on validation set predictions
         print("Training fusion MLP on validation predictions...")
         self._train_fusion_mlp_on_val(val_df, ml_val_result, llm_val_result, text_column, label_columns)
+        
+        # Step 6: Generate and save fusion predictions on full validation set
+        print("Generating fusion predictions on validation set...")
+        val_true_labels = val_df[label_columns].values.tolist() if all(col in val_df.columns for col in label_columns) else None
+        fusion_val_result = self._predict_with_fusion(
+            ml_val_result, 
+            llm_val_result, 
+            val_df[text_column].tolist(), 
+            val_true_labels
+        )
+        
+        # Save fusion validation predictions to experiments directory
+        if self.results_manager and fusion_val_result:
+            try:
+                saved_files = self.results_manager.save_predictions(
+                    fusion_val_result, "validation", val_df
+                )
+                
+                # Save metrics if available
+                if hasattr(fusion_val_result, 'metadata') and fusion_val_result.metadata and 'metrics' in fusion_val_result.metadata:
+                    metrics_file = self.results_manager.save_metrics(
+                        fusion_val_result.metadata['metrics'], "validation", "fusion_ensemble"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                print(f"📁 Validation results saved: {saved_files}")
+                
+            except Exception as e:
+                print(f"Warning: Could not save validation results: {e}")
         
         # Cache training data for later LLM predictions
         self.train_df_cache = train_df.copy()
@@ -551,11 +629,26 @@ class FusionEnsemble(BaseEnsemble):
                     else:
                         # For fresh predictions: use the normal LLM classifier workflow (with API calls)
                         print(f"🔄 Using LLM classifier predict_texts for fresh predictions...")
-                        llm_result = self.llm_model.predict_texts(
-                            texts=texts, 
-                            true_labels=true_labels
-                        )
-                        print(f"✅ Fresh LLM prediction results saved to experiments folder")
+                        
+                        # Temporarily disable LLM results saving if intermediate saving is disabled
+                        original_llm_results_manager = None
+                        if not self.save_intermediate_llm_predictions and hasattr(self.llm_model, 'results_manager'):
+                            original_llm_results_manager = self.llm_model.results_manager
+                            self.llm_model.results_manager = None
+                        
+                        try:
+                            llm_result = self.llm_model.predict_texts(
+                                texts=texts, 
+                                true_labels=true_labels
+                            )
+                            if not self.save_intermediate_llm_predictions:
+                                print(f"✅ Fresh LLM predictions generated (intermediate saving disabled)")
+                            else:
+                                print(f"✅ Fresh LLM prediction results saved to experiments folder")
+                        finally:
+                            # Restore the original results manager
+                            if original_llm_results_manager is not None:
+                                self.llm_model.results_manager = original_llm_results_manager
                     
                 else:
                     print(f"ℹ️ No true labels available in DataFrame - skipping metrics calculation")
@@ -565,7 +658,11 @@ class FusionEnsemble(BaseEnsemble):
                 print(f"   Continuing with {predictions_source} predictions only...")
         
         # STEP 3: Save predictions to experiments directory (fallback)
-        self._save_llm_predictions_to_experiments(final_predictions, df, dataset_type)
+        # Only save as fallback if predictions were cached/provided (not freshly generated)
+        # AND if intermediate LLM prediction saving is enabled
+        # Fresh predictions already get saved by predict_texts() above
+        if predictions_source in ["cached", "provided"] and self.save_intermediate_llm_predictions:
+            self._save_llm_predictions_to_experiments(final_predictions, df, dataset_type)
         
         return final_predictions
     
@@ -803,6 +900,247 @@ class FusionEnsemble(BaseEnsemble):
         print(f"LLM predictions loaded from {filepath}")
         return predictions
     
+    def load_cached_predictions_for_dataset(self, df: pd.DataFrame, dataset_type: str = "auto") -> Optional[List[Union[str, List[str]]]]:
+        """Load cached LLM predictions for a specific dataset (validation or test).
+        
+        This function provides a convenient way to load cached LLM predictions without
+        having to train the fusion ensemble. It automatically determines which cache
+        to use based on dataset_type or attempts to match the dataset.
+        
+        Args:
+            df: DataFrame to load predictions for
+            dataset_type: Type of dataset - "validation", "test", or "auto" (default)
+                         If "auto", tries both validation and test caches
+            
+        Returns:
+            List of cached LLM predictions if found, None otherwise
+        """
+        if dataset_type == "validation" or dataset_type == "auto":
+            if self.val_llm_cache_path:
+                cached_predictions = self._load_cached_llm_predictions(self.val_llm_cache_path, df)
+                if cached_predictions is not None:
+                    print(f"✅ Found cached validation predictions for {len(df)} samples")
+                    return cached_predictions
+                elif dataset_type == "validation":
+                    print(f"❌ No cached validation predictions found for {len(df)} samples")
+                    return None
+        
+        if dataset_type == "test" or dataset_type == "auto":
+            if self.test_llm_cache_path:
+                cached_predictions = self._load_cached_llm_predictions(self.test_llm_cache_path, df)
+                if cached_predictions is not None:
+                    print(f"✅ Found cached test predictions for {len(df)} samples")
+                    return cached_predictions
+                elif dataset_type == "test":
+                    print(f"❌ No cached test predictions found for {len(df)} samples")
+                    return None
+        
+        if dataset_type == "auto":
+            print(f"❌ No cached predictions found for {len(df)} samples in either validation or test cache")
+        
+        return None
+    
+    def get_cached_predictions_summary(self) -> Dict[str, Any]:
+        """Get a summary of available cached predictions.
+        
+        Returns:
+            Dictionary with information about cached predictions
+        """
+        import glob
+        import os
+        from pathlib import Path
+        
+        summary = {
+            "validation_cache": {
+                "path": self.val_llm_cache_path,
+                "files": [],
+                "latest_file": None,
+                "available": False
+            },
+            "test_cache": {
+                "path": self.test_llm_cache_path,
+                "files": [],
+                "latest_file": None,
+                "available": False
+            }
+        }
+        
+        # Check validation cache
+        if self.val_llm_cache_path and self.val_llm_cache_path.strip():
+            pattern = f"{self.val_llm_cache_path}_*.json"
+            files = glob.glob(pattern)
+            if files:
+                summary["validation_cache"]["files"] = files
+                summary["validation_cache"]["latest_file"] = max(files, key=os.path.getctime)
+                summary["validation_cache"]["available"] = True
+        
+        # Check test cache
+        if self.test_llm_cache_path and self.test_llm_cache_path.strip():
+            pattern = f"{self.test_llm_cache_path}_*.json"
+            files = glob.glob(pattern)
+            if files:
+                summary["test_cache"]["files"] = files
+                summary["test_cache"]["latest_file"] = max(files, key=os.path.getctime)
+                summary["test_cache"]["available"] = True
+        
+        return summary
+    
+    def fit_with_cached_predictions(self, train_df: pd.DataFrame, val_df: pd.DataFrame,
+                                   val_llm_predictions: Optional[List[Union[str, List[str]]]] = None,
+                                   force_load_from_cache: bool = False) -> Dict[str, Any]:
+        """Train fusion ensemble with automatic cache loading for validation predictions.
+        
+        This is a convenience method that automatically tries to load cached LLM predictions
+        for the validation set before training, reducing the need to regenerate them.
+        
+        Args:
+            train_df: Training DataFrame
+            val_df: Validation DataFrame
+            val_llm_predictions: Optional pre-computed validation predictions.
+                                If None, will try to load from cache first.
+            force_load_from_cache: If True, only use cached predictions and fail if not found
+            
+        Returns:
+            Training results dictionary
+        """
+        # Try to load cached validation predictions if not provided
+        if val_llm_predictions is None:
+            print("🔍 Attempting to load cached validation LLM predictions...")
+            cached_val_predictions = self.load_cached_predictions_for_dataset(val_df, "validation")
+            
+            if cached_val_predictions is not None:
+                val_llm_predictions = cached_val_predictions
+                print(f"✅ Using cached validation predictions ({len(cached_val_predictions)} samples)")
+            elif force_load_from_cache:
+                raise EnsembleError(
+                    "force_load_from_cache=True but no cached validation predictions found",
+                    "FusionEnsemble"
+                )
+            else:
+                print("⚠️ No cached validation predictions found, will generate new ones during training")
+        
+        # Call the regular fit method
+        return self.fit(train_df, val_df, val_llm_predictions)
+    
+    def predict_with_cached_predictions(self, test_df: pd.DataFrame, 
+                                       true_labels: Optional[List[List[int]]] = None,
+                                       test_llm_predictions: Optional[List[Union[str, List[str]]]] = None,
+                                       force_load_from_cache: bool = False) -> ClassificationResult:
+        """Make predictions with automatic cache loading for test predictions.
+        
+        This is a convenience method that automatically tries to load cached LLM predictions
+        for the test set before making predictions.
+        
+        Args:
+            test_df: Test DataFrame
+            true_labels: Optional true labels for evaluation
+            test_llm_predictions: Optional pre-computed test predictions.
+                                 If None, will try to load from cache first.
+            force_load_from_cache: If True, only use cached predictions and fail if not found
+            
+        Returns:
+            ClassificationResult with predictions and metrics
+        """
+        # Try to load cached test predictions if not provided
+        if test_llm_predictions is None:
+            print("🔍 Attempting to load cached test LLM predictions...")
+            cached_test_predictions = self.load_cached_predictions_for_dataset(test_df, "test")
+            
+            if cached_test_predictions is not None:
+                test_llm_predictions = cached_test_predictions
+                print(f"✅ Using cached test predictions ({len(cached_test_predictions)} samples)")
+            elif force_load_from_cache:
+                raise EnsembleError(
+                    "force_load_from_cache=True but no cached test predictions found",
+                    "FusionEnsemble"
+                )
+            else:
+                print("⚠️ No cached test predictions found, will generate new ones during prediction")
+        
+        # Call the regular predict method
+        return self.predict(test_df, true_labels, test_llm_predictions)
+    
+    @classmethod
+    def discover_cached_predictions(cls, cache_directory: str) -> Dict[str, List[str]]:
+        """Discover all cached LLM prediction files in a directory.
+        
+        This is a utility function to help find cached prediction files that can be used
+        for training or prediction without regenerating LLM outputs.
+        
+        Args:
+            cache_directory: Directory to search for cached prediction files
+            
+        Returns:
+            Dictionary mapping cache file patterns to list of matching files
+        """
+        import glob
+        import os
+        from pathlib import Path
+        
+        cache_dir = Path(cache_directory)
+        if not cache_dir.exists():
+            print(f"Cache directory does not exist: {cache_directory}")
+            return {}
+        
+        # Look for all JSON files that match the cache pattern
+        pattern = str(cache_dir / "*_*.json")
+        all_files = glob.glob(pattern)
+        
+        # Group files by base name (without timestamp and hash)
+        grouped_files = {}
+        for file_path in all_files:
+            file_name = os.path.basename(file_path)
+            # Extract base name by removing timestamp and hash parts
+            parts = file_name.split('_')
+            if len(parts) >= 3:  # base_timestamp_hash.json
+                base_name = '_'.join(parts[:-2]) if len(parts) > 3 else parts[0]
+                if base_name not in grouped_files:
+                    grouped_files[base_name] = []
+                grouped_files[base_name].append(file_path)
+        
+        # Sort files within each group by creation time (newest first)
+        for base_name in grouped_files:
+            grouped_files[base_name].sort(key=os.path.getctime, reverse=True)
+        
+        return grouped_files
+    
+    def print_cache_status(self):
+        """Print a detailed status of cached predictions for this fusion ensemble."""
+        import os
+        
+        print("\n" + "="*60)
+        print("🗂️  FUSION ENSEMBLE CACHE STATUS")
+        print("="*60)
+        
+        summary = self.get_cached_predictions_summary()
+        
+        # Validation cache status
+        val_cache = summary["validation_cache"]
+        print(f"\n📊 VALIDATION CACHE:")
+        print(f"   Path: {val_cache['path'] or 'Not configured'}")
+        if val_cache["available"]:
+            print(f"   Status: ✅ Available ({len(val_cache['files'])} files)")
+            print(f"   Latest: {os.path.basename(val_cache['latest_file'])}")
+        else:
+            print(f"   Status: ❌ No cached files found")
+        
+        # Test cache status
+        test_cache = summary["test_cache"]
+        print(f"\n🧪 TEST CACHE:")
+        print(f"   Path: {test_cache['path'] or 'Not configured'}")
+        if test_cache["available"]:
+            print(f"   Status: ✅ Available ({len(test_cache['files'])} files)")
+            print(f"   Latest: {os.path.basename(test_cache['latest_file'])}")
+        else:
+            print(f"   Status: ❌ No cached files found")
+        
+        print("\n💡 USAGE TIPS:")
+        print("   • Use fit_with_cached_predictions() to automatically load cached validation predictions")
+        print("   • Use predict_with_cached_predictions() to automatically load cached test predictions")
+        print("   • Use load_cached_predictions_for_dataset() for manual cache loading")
+        print("   • Set force_load_from_cache=True to ensure cached predictions are used")
+        print("="*60)
+    
     def train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, llm_val_result, 
                                 text_column: str, label_columns: List[str]):
         """Public method to train the fusion MLP using validation set predictions from both ML and LLM models."""
@@ -821,29 +1159,52 @@ class FusionEnsemble(BaseEnsemble):
         # Split both ML and LLM results accordingly
         split_idx = len(fusion_train_df)
         
-        # Split ML predictions
-        fusion_train_ml_predictions = ml_val_result.predictions[:split_idx]
-        fusion_val_ml_predictions = ml_val_result.predictions[split_idx:]
+        # Create split ClassificationResults for train and validation
+        from ..core.types import ClassificationResult
         
-        # Split LLM predictions
-        fusion_train_llm_predictions = llm_val_result.predictions[:split_idx]
-        fusion_val_llm_predictions = llm_val_result.predictions[split_idx:]
+        # Split ML results
+        fusion_train_ml_result = ClassificationResult(
+            predictions=ml_val_result.predictions[:split_idx],
+            probabilities=ml_val_result.probabilities[:split_idx] if ml_val_result.probabilities else None,
+            model_name=ml_val_result.model_name,
+            classification_type=ml_val_result.classification_type
+        )
+        fusion_val_ml_result = ClassificationResult(
+            predictions=ml_val_result.predictions[split_idx:],
+            probabilities=ml_val_result.probabilities[split_idx:] if ml_val_result.probabilities else None,
+            model_name=ml_val_result.model_name,
+            classification_type=ml_val_result.classification_type
+        )
+        
+        # Split LLM results
+        fusion_train_llm_result = ClassificationResult(
+            predictions=llm_val_result.predictions[:split_idx],
+            probabilities=llm_val_result.probabilities[:split_idx] if llm_val_result.probabilities else None,
+            model_name=llm_val_result.model_name,
+            classification_type=llm_val_result.classification_type
+        )
+        fusion_val_llm_result = ClassificationResult(
+            predictions=llm_val_result.predictions[split_idx:],
+            probabilities=llm_val_result.probabilities[split_idx:] if llm_val_result.probabilities else None,
+            model_name=llm_val_result.model_name,
+            classification_type=llm_val_result.classification_type
+        )
         
         print(f"   🔧 Fusion training: {len(fusion_train_df)} samples")
         print(f"   🔧 Fusion validation: {len(fusion_val_df)} samples")
         
-        # Create data loaders using both ML and LLM predictions
+        # Create data loaders using full ClassificationResults (with probabilities!)
         train_dataset = self._create_fusion_dataset(
             fusion_train_df[text_column].tolist(), 
             fusion_train_df[label_columns].values.tolist(), 
-            fusion_train_ml_predictions,
-            fusion_train_llm_predictions
+            fusion_train_ml_result,
+            fusion_train_llm_result
         )
         val_dataset = self._create_fusion_dataset(
             fusion_val_df[text_column].tolist(), 
             fusion_val_df[label_columns].values.tolist(), 
-            fusion_val_ml_predictions,
-            fusion_val_llm_predictions
+            fusion_val_ml_result,
+            fusion_val_llm_result
         )
         
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
@@ -863,9 +1224,12 @@ class FusionEnsemble(BaseEnsemble):
         else:
             criterion = nn.BCEWithLogitsLoss()
         
-        # Training loop with validation monitoring
+        # Training loop with validation monitoring and early stopping
         self.fusion_wrapper.train()
         best_val_loss = float('inf')
+        best_model_state = None
+        patience = 3  # Stop if no improvement for 3 epochs
+        patience_counter = 0
         
         for epoch in range(self.num_epochs):
             # Training phase
@@ -914,51 +1278,129 @@ class FusionEnsemble(BaseEnsemble):
             
             print(f"   Epoch {epoch + 1}/{self.num_epochs} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
             
-            # Save best model based on validation loss
+            # Early stopping logic
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                # Could save model state here if needed
+                # Save best model state
+                best_model_state = {
+                    'fusion_mlp': self.fusion_wrapper.fusion_mlp.state_dict(),
+                    'epoch': epoch + 1
+                }
+                patience_counter = 0
+                print(f"   ✅ New best validation loss: {best_val_loss:.4f}")
+            else:
+                patience_counter += 1
+                print(f"   ⚠️  No improvement for {patience_counter} epoch(s)")
+                
+                if patience_counter >= patience:
+                    print(f"   🛑 Early stopping triggered at epoch {epoch + 1}")
+                    print(f"   📊 Best validation loss: {best_val_loss:.4f} at epoch {best_model_state['epoch']}")
+                    break
             
             self.fusion_wrapper.train()  # Back to training mode
+        
+        # Restore best model state
+        if best_model_state is not None:
+            self.fusion_wrapper.fusion_mlp.load_state_dict(best_model_state['fusion_mlp'])
+            print(f"   🔄 Restored best model from epoch {best_model_state['epoch']}")
+        
+        self.fusion_wrapper.eval()  # Set to evaluation mode
     
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
-                              ml_predictions: List, llm_predictions: List):
-        """Create dataset for fusion training using pre-computed ML and LLM predictions."""
+                              ml_result, llm_result):
+        """Create dataset for fusion training using texts to extract RoBERTa hidden states + LLM probabilities.
         
-        # Convert ML predictions to tensor format (binary vectors)
-        ml_tensor = torch.zeros(len(ml_predictions), self.num_labels)
-        for i, prediction in enumerate(ml_predictions):
-            if isinstance(prediction, list) and len(prediction) == self.num_labels:
-                # Already in binary vector format
-                ml_tensor[i] = torch.tensor(prediction, dtype=torch.float)
-            elif isinstance(prediction, str):
-                # Convert class name to binary vector
-                if prediction in self.classes_:
-                    class_idx = self.classes_.index(prediction)
-                    ml_tensor[i, class_idx] = 1.0
+        Args:
+            texts: List of texts (needed to extract RoBERTa hidden states)
+            labels: True labels as binary vectors
+            ml_result: ClassificationResult from ML model
+            llm_result: ClassificationResult from LLM model
+        """
         
-        # Convert LLM predictions to tensor format (binary vectors)
-        llm_tensor = torch.zeros(len(llm_predictions), self.num_labels)
-        for i, prediction in enumerate(llm_predictions):
-            if isinstance(prediction, list) and len(prediction) == self.num_labels:
-                # Already in binary vector format
-                llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
-            elif isinstance(prediction, str):
-                # Convert class name to binary vector
-                if prediction in self.classes_:
-                    class_idx = self.classes_.index(prediction)
-                    llm_tensor[i, class_idx] = 1.0
-            elif isinstance(prediction, list):
-                # List of class names (multi-label)
-                for pred_class in prediction:
-                    if pred_class in self.classes_:
-                        class_idx = self.classes_.index(pred_class)
+        # Store texts for on-the-fly hidden state extraction during training
+        # We'll create a custom dataset that extracts hidden states on __getitem__
+        
+        # Extract LLM probabilities
+        llm_tensor = torch.zeros(len(texts), self.num_labels)
+        if hasattr(llm_result, 'probabilities') and llm_result.probabilities:
+            # Use probability distributions from LLM
+            print(f"   ✅ Using LLM probability distributions (soft predictions)")
+            for i, prob_dict in enumerate(llm_result.probabilities):
+                for class_name in self.classes_:
+                    class_idx = self.classes_.index(class_name)
+                    llm_tensor[i, class_idx] = prob_dict.get(class_name, 0.0)
+            # Show example
+            if len(llm_result.probabilities) > 0:
+                print(f"   📊 Example LLM probabilities: {llm_result.probabilities[0]}")
+        else:
+            # Fallback: Convert LLM predictions to binary vectors
+            print(f"   ⚠️  LLM has no probabilities - using binary vectors (hard predictions)")
+            print(f"   📊 Example: 'label_2' → [0, 1, 0, 0]")
+            for i, prediction in enumerate(llm_result.predictions):
+                if isinstance(prediction, str):
+                    if prediction in self.classes_:
+                        class_idx = self.classes_.index(prediction)
                         llm_tensor[i, class_idx] = 1.0
+                elif isinstance(prediction, list):
+                    # Multi-label or already binary
+                    if len(prediction) == self.num_labels and all(isinstance(x, (int, float)) for x in prediction):
+                        llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+                    else:
+                        # List of class names
+                        for pred_class in prediction:
+                            if pred_class in self.classes_:
+                                class_idx = self.classes_.index(pred_class)
+                                llm_tensor[i, class_idx] = 1.0
         
-        # Create tensor dataset with predictions only (no tokenization needed)
+        # Create labels tensor
         labels_tensor = torch.FloatTensor(labels)
         
-        return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
+        # Create custom dataset that extracts RoBERTa hidden states on-the-fly
+        class FusionDatasetWithHiddenStates(torch.utils.data.Dataset):
+            def __init__(self, texts, llm_probs, labels, ml_model, tokenizer, max_length, device):
+                self.texts = texts
+                self.llm_probs = llm_probs
+                self.labels = labels
+                self.ml_model = ml_model
+                self.tokenizer = tokenizer
+                self.max_length = max_length
+                self.device = device
+                
+            def __len__(self):
+                return len(self.texts)
+            
+            def __getitem__(self, idx):
+                # Tokenize text
+                text = str(self.texts[idx])
+                encoding = self.tokenizer(
+                    text,
+                    truncation=True,
+                    padding='max_length',
+                    max_length=self.max_length,
+                    return_tensors='pt'
+                )
+                
+                # Extract hidden states from RoBERTa (frozen, no gradient)
+                with torch.no_grad():
+                    outputs = self.ml_model.model(
+                        input_ids=encoding['input_ids'].to(self.device),
+                        attention_mask=encoding['attention_mask'].to(self.device),
+                        output_hidden_states=True
+                    )
+                    # Use [CLS] token hidden state (first token of last hidden layer)
+                    hidden_state = outputs.hidden_states[-1][:, 0, :].squeeze(0)  # Shape: (768,)
+                
+                return hidden_state.cpu(), self.llm_probs[idx], self.labels[idx]
+        
+        return FusionDatasetWithHiddenStates(
+            texts=texts,
+            llm_probs=llm_tensor,
+            labels=labels_tensor,
+            ml_model=self.ml_model,
+            tokenizer=self.ml_model.tokenizer,
+            max_length=self.ml_model.max_length,
+            device=self.device
+        )
     
     def predict(self, test_df: pd.DataFrame, true_labels: Optional[List[List[int]]] = None,
                 test_llm_predictions: Optional[List[Union[str, List[str]]]] = None) -> ClassificationResult:
@@ -1006,17 +1448,28 @@ class FusionEnsemble(BaseEnsemble):
         # If we have true labels, call the LLM classifier's predict_texts method to get proper metrics
         if extracted_labels is not None and self.llm_model is not None:
             try:
-                # Call the LLM classifier's predict_texts method with cached predictions
-                # This ensures metrics are calculated and individual results are saved
-                llm_test_result = self.llm_model.predict_texts(
-                    texts=texts, 
-                    true_labels=extracted_labels
-                )
-                # Override predictions with cached ones if they were used
-                if test_llm_predictions is not None or self.test_llm_cache_path:
-                    llm_test_result.predictions = llm_test_predictions
-                    # Update model name to indicate cached predictions were used
-                    llm_test_result.model_name = "llm_model_cached"
+                # Temporarily disable LLM results saving if intermediate saving is disabled
+                original_llm_results_manager = None
+                if not self.save_intermediate_llm_predictions and hasattr(self.llm_model, 'results_manager'):
+                    original_llm_results_manager = self.llm_model.results_manager
+                    self.llm_model.results_manager = None
+                
+                try:
+                    # Call the LLM classifier's predict_texts method with cached predictions
+                    # This ensures metrics are calculated and individual results are saved
+                    llm_test_result = self.llm_model.predict_texts(
+                        texts=texts, 
+                        true_labels=extracted_labels
+                    )
+                    # Override predictions with cached ones if they were used
+                    if test_llm_predictions is not None or self.test_llm_cache_path:
+                        llm_test_result.predictions = llm_test_predictions
+                        # Update model name to indicate cached predictions were used
+                        llm_test_result.model_name = "llm_model_cached"
+                finally:
+                    # Restore the original results manager
+                    if original_llm_results_manager is not None:
+                        self.llm_model.results_manager = original_llm_results_manager
             except Exception as e:
                 print(f"Warning: Could not call LLM classifier predict_texts for metrics: {e}")
                 # Fallback to simple ClassificationResult
@@ -1067,9 +1520,9 @@ class FusionEnsemble(BaseEnsemble):
     
     def _predict_with_fusion(self, ml_result, llm_result, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Generate fusion predictions using trained MLP."""
-        # Create dataset using both ML and LLM predictions
+        # Create dataset using both ML and LLM ClassificationResults (with probabilities!)
         dummy_labels = [[0] * self.num_labels] * len(texts)
-        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_result.predictions, llm_result.predictions)
+        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_result, llm_result)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         
         # Generate predictions

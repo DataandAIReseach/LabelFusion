@@ -1,0 +1,12 @@
+metadata:
+  dataset_name: validation
+  experiment_id: 2025-10-16_15-20-09_openai_gpt_5_nano
+  git_commit: e5f8bb8cee1ed3dcdd92621adc1f517948d73daf
+  model_name: openai_classifier
+  timestamp: '2025-10-16T15:23:24.087823'
+metrics:
+  accuracy: 0.844
+  auc: 0.896
+  f1: 0.8419450543197396
+  precision: 0.847793422540654
+  recall: 0.8439999999999999
