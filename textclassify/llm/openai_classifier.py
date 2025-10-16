@@ -24,7 +24,9 @@ class OpenAIClassifier(BaseLLMClassifier):
         # Results management parameters
         output_dir: str = "outputs",
         experiment_name: Optional[str] = None,
-        auto_save_results: bool = True
+        auto_save_results: bool = True,
+        # Cache management parameters
+        auto_use_cache: bool = False
     ):
         """Initialize OpenAI classifier.
         
@@ -34,11 +36,12 @@ class OpenAIClassifier(BaseLLMClassifier):
             label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier
             few_shot_mode: Mode for few-shot learning
-            enable_cache: Whether to enable prediction caching
+            enable_cache: Whether to enable prediction caching (legacy parameter)
             cache_dir: Directory for caching prediction results
             output_dir: Base directory for saving results (default: "outputs")
             experiment_name: Name for this experiment (default: auto-generated)
             auto_save_results: Whether to automatically save results (default: True)
+            auto_use_cache: Whether to automatically check and reuse cached predictions (default: False)
         """
         super().__init__(
             config=config,
@@ -49,12 +52,13 @@ class OpenAIClassifier(BaseLLMClassifier):
             provider='openai',
             output_dir=output_dir,
             experiment_name=experiment_name,
-            auto_save_results=auto_save_results
+            auto_save_results=auto_save_results,
+            auto_use_cache=auto_use_cache,
+            cache_dir=cache_dir
         )
         
-        # Handle caching parameters locally since BaseLLMClassifier doesn't support them
+        # Handle legacy caching parameter
         self.enable_cache = enable_cache
-        self.cache_dir = cache_dir
         
         # Set up classes and prompt engineer configuration
         self.classes_ = label_columns if label_columns else []

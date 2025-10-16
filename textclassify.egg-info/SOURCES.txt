@@ -11,7 +11,9 @@ tests/integration/test_package_integration.py
 tests/unit/__init__.py
 tests/unit/test_config.py
 tests/unit/test_core_types.py
+textclassify/__init__ (SFConflict michaelschlee@gmx.de 2025-08-14-09-41-07).py
 textclassify/__init__.py
+textclassify/auto_fusion.py
 textclassify.egg-info/PKG-INFO
 textclassify.egg-info/SOURCES.txt
 textclassify.egg-info/dependency_links.txt
@@ -24,9 +26,14 @@ textclassify/config/settings.py
 textclassify/core/__init__.py
 textclassify/core/base.py
 textclassify/core/exceptions.py
+textclassify/core/types (SFConflict michaelschlee@gmx.de 2025-08-14-09-41-07).py
 textclassify/core/types.py
+textclassify/ensemble/__init__ (SFConflict michaelschlee@gmx.de 2025-08-14-09-41-07).py
 textclassify/ensemble/__init__.py
+textclassify/ensemble/auto_fusion.py
 textclassify/ensemble/base.py
+textclassify/ensemble/fusion.py
+textclassify/ensemble/fusion_refactored.py
 textclassify/ensemble/routing.py
 textclassify/ensemble/voting.py
 textclassify/ensemble/weighted.py
@@ -37,21 +44,27 @@ textclassify/examples/multi_class_example.py
 textclassify/examples/multi_label_example.py
 textclassify/llm/__init__.py
 textclassify/llm/base.py
-textclassify/llm/claude_classifier.py
+textclassify/llm/base_corrupted.py
 textclassify/llm/deepseek_classifier.py
 textclassify/llm/gemini_classifier.py
 textclassify/llm/openai_classifier.py
+textclassify/llm/prediction_cache.py
 textclassify/llm/prompts.py
 textclassify/ml/__init__.py
 textclassify/ml/base.py
 textclassify/ml/preprocessing.py
+textclassify/ml/roberta_classifier (SFConflict michaelschlee@gmx.de 2025-08-14-09-41-06).py
 textclassify/ml/roberta_classifier.py
+textclassify/ml/roberta_classifier_backup.py
 textclassify/prompt_engineer/base.py
 textclassify/prompt_engineer/prompt.py
 textclassify/prompt_engineer/prompt_collection.py
 textclassify/prompt_engineer/prompt_warehouse.py
 textclassify/services/llm_content_generator.py
+textclassify/utils/__init__ (SFConflict michaelschlee@gmx.de 2025-08-14-09-41-06).py
 textclassify/utils/__init__.py
 textclassify/utils/data.py
+textclassify/utils/fusion_utils.py
 textclassify/utils/logging.py
 textclassify/utils/metrics.py
+textclassify/utils/results_manager.py
