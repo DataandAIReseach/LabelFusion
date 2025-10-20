@@ -155,6 +155,17 @@ class LLMPredictionCache:
             "timestamp": datetime.now().isoformat(),
             "metadata": metadata or {}
         }
+
+        # If an identifier was provided inside metadata (common keys: id, index, row_id),
+        # lift it to a top-level 'id' field for easier consumption by CSV/JSON exports.
+        id_value = None
+        if metadata:
+            for key in ("id", "index", "row_id", "uid"):
+                if key in metadata:
+                    id_value = metadata.get(key)
+                    break
+        if id_value is not None:
+            prediction_data["id"] = id_value
         
         # Store in cache
         self.predictions_cache[text_hash] = prediction_data
@@ -207,6 +218,8 @@ class LLMPredictionCache:
         csv_data = []
         for text_hash, pred_data in self.predictions_cache.items():
             row = {
+                # include id if available to make it easy to map back to original rows
+                "id": pred_data.get("id", ""),
                 "text_hash": text_hash,
                 "text": pred_data["text"][:500] + "..." if len(pred_data["text"]) > 500 else pred_data["text"],  # Truncate for CSV
                 "prediction": json.dumps(pred_data["prediction"]),
@@ -257,6 +270,8 @@ class LLMPredictionCache:
         export_data = []
         for pred_data in self.predictions_cache.values():
             row = {
+                # include id if present
+                "id": pred_data.get("id"),
                 "text": pred_data["text"],
                 "prediction": pred_data["prediction"],
                 "response_text": pred_data["response_text"],
