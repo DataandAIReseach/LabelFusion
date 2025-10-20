@@ -6,9 +6,9 @@ from textclassify.core.types import ModelConfig, ModelType, EnsembleConfig
 
 # Load your dataset (same as RoBERTa test)
 
-train_df = pd.read_csv("/user/schlee2/u19147/repos/LabelFusion/data/ag_news/ag_train_balanced.csv")
-val_df = pd.read_csv("/user/schlee2/u19147/repos/LabelFusion/data/ag_news/ag_val_balanced.csv")
-test_df = pd.read_csv("/user/schlee2/u19147/repos/LabelFusion/data/ag_news/ag_test_balanced.csv")
+train_df = pd.read_csv("/user/schlee2/u19147/repos/LabelFusion/data/ag_news/ag_train_balanced.csv").sample(frac=1, random_state=42).reset_index(drop=True)
+val_df = pd.read_csv("/user/schlee2/u19147/repos/LabelFusion/data/ag_news/ag_val_balanced.csv").sample(frac=1, random_state=42).reset_index(drop=True)
+test_df = pd.read_csv("/user/schlee2/u19147/repos/LabelFusion/data/ag_news/ag_test_balanced.csv").sample(frac=1, random_state=42).reset_index(drop=True)
 
 # Configure ML model (RoBERTa)
 ml_config = ModelConfig(
