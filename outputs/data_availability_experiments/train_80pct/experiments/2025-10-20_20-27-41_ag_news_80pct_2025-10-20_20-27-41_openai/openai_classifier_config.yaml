@@ -1,0 +1,9 @@
+config:
+  max_completion_tokens: 150
+  model: gpt-5-nano
+  temperature: 0.1
+  top_p: 1.0
+metadata:
+  experiment_id: 2025-10-20_20-27-41_ag_news_80pct_2025-10-20_20-27-41_openai
+  model_name: openai_classifier
+  timestamp: '2025-10-20T20:30:49.654776'

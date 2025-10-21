@@ -203,8 +203,12 @@ class FusionEnsemble(BaseEnsemble):
         self.test_performance = {}  # Store test set performance
         
         # LLM prediction cache file paths from ensemble config
-        self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', '')
-        self.test_llm_cache_path = ensemble_config.parameters.get('test_llm_cache_path', '')
+        # Auto-generate cache paths if not provided and auto_use_cache is enabled
+        default_val_cache = f"{cache_dir}/fusion_val_llm" if auto_use_cache else ''
+        default_test_cache = f"{cache_dir}/fusion_test_llm" if auto_use_cache else ''
+        
+        self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', default_val_cache)
+        self.test_llm_cache_path = ensemble_config.parameters.get('test_llm_cache_path', default_test_cache)
         
         # Results management
         output_dir = ensemble_config.parameters.get('output_dir', 'outputs')

@@ -74,6 +74,14 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
             self.logger = logging.getLogger(self.__class__.__name__)
         
+        # Suppress HTTP request console output (but keep logging to file if configured)
+        # These loggers will still log to files, but not to console
+        for logger_name in ["httpx", "openai", "httpcore", "urllib3", "requests"]:
+            http_logger = logging.getLogger(logger_name)
+            http_logger.setLevel(logging.WARNING)
+            # Remove console handlers but keep file handlers
+            http_logger.propagate = False
+        
         # Set column specifications
         self.text_column = text_column
         self.label_columns = label_columns if label_columns else []
