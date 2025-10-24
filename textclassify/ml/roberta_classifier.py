@@ -5,6 +5,8 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
+import faulthandler
+import gc
 from typing import Any, Dict, List, Optional, Union
 import warnings
 import os
@@ -258,35 +260,68 @@ class RoBERTaClassifier(BaseMLClassifier):
             num_training_steps=total_steps
         )
         
+        # Ensure faulthandler is enabled to get Python-level tracebacks on crashes
+        try:
+            faulthandler.enable()
+        except Exception:
+            # faulthandler may already be enabled or not available in some envs
+            pass
+
         # Training loop
         for epoch in range(self.num_epochs):
             print(f"Epoch {epoch + 1}/{self.num_epochs}")
-            
+
             # Training phase
             self.model.train()
             total_train_loss = 0
             train_steps = 0
-            
-            for batch in train_loader:
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
-                labels = batch['labels'].to(self.device)
-                
-                optimizer.zero_grad()
-                
-                outputs = self.model(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    labels=labels
-                )
-                
-                loss = outputs.loss
-                loss.backward()
-                optimizer.step()
-                scheduler.step()
-                
-                total_train_loss += loss.item()
-                train_steps += 1
+
+            # Basic sanity prints
+            try:
+                print(f"Train loader batches: {len(train_loader)} | batch_size: {self.batch_size} | device: {self.device}")
+            except Exception:
+                print("Train loader length not available")
+
+            for batch_idx, batch in enumerate(train_loader):
+                # Periodic logging to trace progress and detect silent exits
+                if batch_idx % 10 == 0:
+                    print(f"  [epoch {epoch+1}] processing batch {batch_idx}")
+
+                try:
+                    input_ids = batch['input_ids'].to(self.device)
+                    attention_mask = batch['attention_mask'].to(self.device)
+                    labels = batch['labels'].to(self.device)
+
+                    optimizer.zero_grad()
+
+                    outputs = self.model(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        labels=labels
+                    )
+
+                    loss = outputs.loss
+                    loss.backward()
+                    optimizer.step()
+                    scheduler.step()
+
+                    total_train_loss += loss.item()
+                    train_steps += 1
+
+                except Exception as e:
+                    # Catch and log any exception during batch processing so we don't exit silently
+                    import traceback as _tb
+                    print(f"Exception while processing batch {batch_idx}: {e}")
+                    _tb.print_exc()
+                    # Try to free GPU memory and continue or re-raise depending on severity
+                    try:
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                    except Exception:
+                        pass
+                    gc.collect()
+                    # Re-raise to stop training after logging — caller can inspect logs
+                    raise
             
             avg_train_loss = total_train_loss / train_steps
             print(f"  Average training loss: {avg_train_loss:.4f}")
