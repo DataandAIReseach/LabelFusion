@@ -1370,11 +1370,68 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             raise ValueError(f"Could not load cache file: {cache_file}")
         
         predictions = cached_data.get('predictions', [])
-        
+
+        # If sizes match, we can use predictions directly. If not, try to resolve
+        # by matching IDs (if present in the cache and the test_df), otherwise
+        # raise a helpful error explaining how to proceed.
         if len(predictions) != len(test_df):
-            raise ValueError(
-                f"Cache file has {len(predictions)} predictions but test_df has {len(test_df)} rows"
-            )
+            # Attempt to match cached predictions by explicit ids stored in cache
+            cache_ids = cached_data.get('ids') or cached_data.get('id')
+            metadata = cached_data.get('metadata', {}) if isinstance(cached_data, dict) else {}
+
+            if cache_ids and isinstance(cache_ids, list):
+                # Try to find an id column in test_df that appears in cache metadata
+                id_col = None
+                if 'columns' in metadata and isinstance(metadata['columns'], list):
+                    # prefer exact match with one of the metadata columns
+                    for c in test_df.columns:
+                        if c in metadata['columns']:
+                            id_col = c
+                            break
+
+                # fallback common names
+                if id_col is None:
+                    for cand in ['id', 'ID', 'Id']: 
+                        if cand in test_df.columns:
+                            id_col = cand
+                            break
+
+                if id_col is not None:
+                    # build mapping and pick predictions for test_df rows
+                    id_to_pred = {cid: pred for cid, pred in zip(cache_ids, predictions)}
+                    resolved = []
+                    missing = 0
+                    for val in test_df[id_col].tolist():
+                        if val in id_to_pred:
+                            resolved.append(id_to_pred[val])
+                        else:
+                            # keep placeholder (all-zero or first-class fallback later)
+                            resolved.append(None)
+                            missing += 1
+
+                    if missing == 0:
+                        predictions = resolved
+                    else:
+                        # If many missing, raise to avoid silent mismatches
+                        raise ValueError(
+                            f"Cache file contains predictions for {len(cache_ids)} ids but {missing} "
+                            f"rows in test_df (using id column '{id_col}') could not be matched.\n"
+                            "To use cached predictions for a subset, ensure the test DataFrame contains an 'id' column "
+                            "matching the cached 'ids', or run inference on the full dataset."
+                        )
+                else:
+                    raise ValueError(
+                        f"Cache file has {len(predictions)} predictions but test_df has {len(test_df)} rows.\n"
+                        "The cache contains explicit ids but no matching id column was found in test_df.\n"
+                        "Possible fixes: add an 'id' column to test_df that matches the cached ids, or disable auto-cache."
+                    )
+            else:
+                raise ValueError(
+                    f"Cache file has {len(predictions)} predictions but test_df has {len(test_df)} rows.\n"
+                    "No explicit ids were found in the cache to allow mapping to a subset.\n"
+                    "Possible fixes: use the original dataset used to create the cache, or regenerate cache for your subset, "
+                    "or include an 'id' column in your test DataFrame and a matching 'ids' array in the cache file."
+                )
         
         # Convert cached predictions to the expected format
         # Predictions might be stored as binary vectors or class names
