@@ -104,14 +104,22 @@ def create_ml_model(text_column: str, label_columns: list, output_dir: str, expe
             "batch_size": 16,
             "num_epochs": 3,
             "learning_rate": 2e-5,
-            "classification_type": "multi_class"
+            "classification_type": "multi_label"
         }
     )
+    # Explicitly mark model config as multi-label so components that read
+    # `config.label_type` (e.g. PromptEngineer) detect the correct task.
+    try:
+        config.label_type = "multiple"
+    except Exception:
+        # Be defensive: if ModelConfig is immutable or doesn't accept new attrs,
+        # write into parameters as a fallback (already present above).
+        config.parameters["classification_type"] = "multi_label"
     return RoBERTaClassifier(
         config=config,
         text_column=text_column,
         label_columns=label_columns,
-        multi_label=False,  # Multiclass now
+        multi_label=True,  # Multiclass now
         output_dir=output_dir,
         experiment_name=experiment_name,
         auto_save_path=auto_save_path
@@ -122,8 +130,19 @@ def create_llm_model(text_column: str, label_columns: list,
                      provider: str = 'openai', 
                      output_dir: str = "outputs",
                      experiment_name: str = "llm",
-                     cache_dir: str = "cache"):
-    """Create LLM classifier for multi-label emotion classification."""
+                     cache_dir: str = "cache",
+                     multi_label: bool = True):
+    """Create LLM classifier for multi-label or multi-class emotion classification.
+
+    Args:
+        text_column: name of the text column
+        label_columns: list of label column names
+        provider: 'openai' or 'deepseek'
+        output_dir: output directory
+        experiment_name: experiment name
+        cache_dir: cache directory
+        multi_label: whether this is a multi-label task (True) or single-label/multi-class (False)
+    """
     config = Config()
     
     llm_config = ModelConfig(
@@ -134,16 +153,21 @@ def create_llm_model(text_column: str, label_columns: list,
             "temperature": 0.0,
             "max_tokens": 500,
             "few_shot_examples": 3,
-            "classification_type": "multi_class"
+            "classification_type": "multi_label" if multi_label else "multi_class"
         }
     )
+    # Ensure config exposes label_type for prompt engineering
+    try:
+        llm_config.label_type = "multiple" if multi_label else "single"
+    except Exception:
+        llm_config.parameters["classification_type"] = "multi_label" if multi_label else "multi_class"
     
     if provider == 'openai':
         return OpenAIClassifier(
             config=llm_config,
             text_column=text_column,
             label_columns=label_columns,
-            multi_label=False,  # Multiclass now
+            multi_label=multi_label,
             few_shot_mode="few_shot",
             output_dir=output_dir,
             experiment_name=experiment_name,
@@ -155,7 +179,7 @@ def create_llm_model(text_column: str, label_columns: list,
             config=llm_config,
             text_column=text_column,
             label_columns=label_columns,
-            multi_label=False,  # Multiclass now
+            multi_label=multi_label,
             few_shot_mode="few_shot",
             output_dir=output_dir,
             experiment_name=experiment_name,
@@ -182,7 +206,7 @@ def create_fusion_ensemble(ml_model, llm_model, output_dir: str, experiment_name
             "use_hidden_states": True,
             "val_llm_cache_path": val_llm_cache_path or "",
             "test_llm_cache_path": test_llm_cache_path or "",
-            "classification_type": "multi_class"
+            "classification_type": "multi_label"
         }
     )
     
@@ -326,7 +350,8 @@ def evaluate_with_data_percentage(
             provider=llm_provider,
             output_dir=os.path.join(output_dir, "llm_model"),
             experiment_name=f"llm_{experiment_name}",
-            cache_dir=cache_dir
+            cache_dir=cache_dir,
+            multi_label=True  # Multiclass now
         )
         
         # LLM prediction with auto-cache
