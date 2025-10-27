@@ -62,23 +62,51 @@ class TextDataset(Dataset):
             max_length=self.max_length,
             return_tensors='pt'
         )
-        
         # Use appropriate data type based on classification type
-        if self.classification_type == ClassificationType.MULTI_LABEL:
-            # Multi-label needs float for BCEWithLogitsLoss
-            label_tensor = torch.tensor(self.labels[idx], dtype=torch.float)
-        else:
-            # Multi-class: convert one-hot encoded vector to class index
-            # e.g., [0, 1, 0] -> 1 (index of the 1)
-            if isinstance(self.labels[idx], list):
-                class_idx = self.labels[idx].index(1)  # Find index of the 1 in one-hot vector
+        # Normalize label formats robustly to avoid crashes when label arrays contain no explicit 1
+        import numpy as _np
+
+        raw_label = self.labels[idx]
+
+        # Convert various possible label representations to a numpy array
+        try:
+            if isinstance(raw_label, list):
+                label_arr = _np.array(raw_label)
+            elif hasattr(raw_label, 'dtype') or hasattr(raw_label, 'shape'):
+                # numpy array or pandas-backed type
+                label_arr = _np.array(raw_label)
             else:
-                class_idx = int(np.argmax(self.labels[idx]))  # For numpy arrays
+                # scalar (class index) -> wrap into array
+                label_arr = _np.array([raw_label])
+        except Exception:
+            # Fallback: try to coerce to array
+            label_arr = _np.array(raw_label)
+
+        if self.classification_type == ClassificationType.MULTI_LABEL:
+            # Multi-label expects a binary vector
+            label_tensor = torch.tensor(label_arr.astype(float), dtype=torch.float)
+        else:
+            # MULTI_CLASS: prefer explicit one-hot (index of 1). If no 1 present, fallback to argmax.
+            if label_arr.size > 1:
+                ones = _np.where(label_arr == 1)[0]
+                if ones.size > 0:
+                    class_idx = int(ones[0])
+                else:
+                    # no explicit one-hot marker found -> fallback to argmax
+                    class_idx = int(_np.argmax(label_arr))
+            else:
+                # already a scalar class index
+                class_idx = int(label_arr.item())
+
             label_tensor = torch.tensor(class_idx, dtype=torch.long)
-        
+
+        # Remove leading batch dim from tokenizer outputs (tokenizers return tensors with batch dim)
+        input_ids = encoding['input_ids'].squeeze(0)
+        attention_mask = encoding['attention_mask'].squeeze(0)
+
         return {
-            'input_ids': encoding['input_ids'].flatten(),
-            'attention_mask': encoding['attention_mask'].flatten(),
+            'input_ids': input_ids,
+            'attention_mask': attention_mask,
             'labels': label_tensor
         }
 
