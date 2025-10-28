@@ -528,43 +528,58 @@ def run_data_availability_experiments(
 
 
 if __name__ == "__main__":
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='Evaluate Fusion Ensemble with different training data sizes')
-    parser.add_argument('--data-dir', type=str, default='data/ag_news', help='Directory containing AG News data')
-    parser.add_argument('--percentages', type=float, nargs='+', default=[0.2, 0.4, 0.6, 0.8, 1.0],
-                       help='Training data percentages to test (e.g., 0.2 0.4 0.6 0.8 1.0)')
-    parser.add_argument('--llm-provider', type=str, default='openai', choices=['deepseek', 'openai'],
-                       help='LLM provider to use')
-    parser.add_argument('--output-dir', type=str, default='outputs/data_availability_experiments',
-                       help='Base output directory')
-    parser.add_argument('--no-cache', action='store_true', help='Disable LLM prediction caching')
-    parser.add_argument('--cache-dir', type=str, default='cache', help='Cache directory for LLM predictions')
-    parser.add_argument('--no-baselines', action='store_true', help='Skip individual model evaluation (only Fusion)')
-    
-    args = parser.parse_args()
-    
+    # Environment-variable based runner (no argparse required).
+    # Supported env vars:
+    #   DATA_DIR - path to AG News data (default: data/ag_news)
+    #   PERCENTAGES - comma- or whitespace-separated list of percentages (e.g. "0.2,0.4,1.0")
+    #   LLM_PROVIDER - 'openai' or 'deepseek' (default: openai)
+    #   OUTPUT_DIR - base output directory (default: outputs/data_availability_experiments)
+    #   NO_CACHE - set to '1' or 'true' to disable cache (default: not set)
+    #   CACHE_DIR - cache directory (default: cache)
+    #   NO_BASELINES - set to '1' or 'true' to skip baseline evaluations
+
+    def _parse_percentages(s: str):
+        """Parse a comma- or whitespace-separated string of floats into a list of floats."""
+        import re
+        if not s:
+            return [0.2, 0.4, 0.6, 0.8, 1.0]
+        parts = [p for p in re.split('[,\s]+', s.strip()) if p]
+        try:
+            return [float(p) for p in parts]
+        except ValueError:
+            raise ValueError(f"Invalid PERCENTAGES value: {s}")
+
+    data_dir = os.getenv('DATA_DIR', 'data/ag_news')
+    percentages = _parse_percentages(os.getenv('PERCENTAGES', '0.2,0.4,0.6,0.8,1.0'))
+    llm_provider = os.getenv('LLM_PROVIDER', 'openai')
+    base_output_dir = os.getenv('OUTPUT_DIR', 'outputs/data_availability_experiments')
+    no_cache_env = os.getenv('NO_CACHE', '')
+    auto_use_cache = not (no_cache_env.lower() in ('1', 'true', 'yes'))
+    cache_dir = os.getenv('CACHE_DIR', 'cache')
+    no_baselines_env = os.getenv('NO_BASELINES', '')
+    evaluate_baselines = not (no_baselines_env.lower() in ('1', 'true', 'yes'))
+
     print("="*80)
-    print("DATA AVAILABILITY EXPERIMENT - FUSION ENSEMBLE")
+    print("DATA AVAILABILITY EXPERIMENT - FUSION ENSEMBLE (env-vars)")
     print("="*80)
     print(f"\nConfiguration:")
-    print(f"  Data directory: {args.data_dir}")
-    print(f"  Training percentages: {[f'{int(p*100)}%' for p in args.percentages]}")
-    print(f"  LLM provider: {args.llm_provider}")
-    print(f"  Output directory: {args.output_dir}")
-    print(f"  Auto-use cache: {not args.no_cache}")
-    print(f"  Cache directory: {args.cache_dir}")
-    print(f"  Evaluate baselines: {not args.no_baselines}")
-    
+    print(f"  Data directory: {data_dir}")
+    print(f"  Training percentages: {[f'{int(p*100)}%' for p in percentages]}")
+    print(f"  LLM provider: {llm_provider}")
+    print(f"  Output directory: {base_output_dir}")
+    print(f"  Auto-use cache: {auto_use_cache}")
+    print(f"  Cache directory: {cache_dir}")
+    print(f"  Evaluate baselines: {evaluate_baselines}")
+
     # Run experiments
     results, summary = run_data_availability_experiments(
-        data_dir=args.data_dir,
-        percentages=args.percentages,
-        llm_provider=args.llm_provider,
-        base_output_dir=args.output_dir,
-        auto_use_cache=not args.no_cache,
-        cache_dir=args.cache_dir,
-        evaluate_baselines=not args.no_baselines
+        data_dir=data_dir,
+        percentages=percentages,
+        llm_provider=llm_provider,
+        base_output_dir=base_output_dir,
+        auto_use_cache=auto_use_cache,
+        cache_dir=cache_dir,
+        evaluate_baselines=evaluate_baselines
     )
-    
+
     print("\n✅ All experiments completed!")

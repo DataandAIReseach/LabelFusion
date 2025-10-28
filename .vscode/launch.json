@@ -1,4 +1,45 @@
 {
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Eval GoEmotions: Quick smoke",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/evaluation/eval_goemotions.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--n-samples",
+        "10",
+        "--no-baselines"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "justMyCode": false
+    },
+    {
+      "name": "Eval GoEmotions: Full run",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/evaluation/eval_goemotions.py",
+      "console": "integratedTerminal",
+      "args": [
+        "--full",
+        "--llm-provider",
+        "openai",
+        "--cache-dir",
+        "cache",
+        "--output-dir",
+        "outputs/goemotions_experiments",
+        "--train-on-all"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "justMyCode": false
+    }
+  ]
+}
   // Launch configuration for debugging `eval_goemotions.py` from VS Code Run/Debug (bug button).
   // This configuration runs the file with a small default sample size so it finishes quickly
   // and avoids triggering long trainings by default. You can edit `args` as needed.

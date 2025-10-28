@@ -17,138 +17,94 @@ from .base import BaseEnsemble
 
 
 class FusionMLP(nn.Module):
-    """Multi-layer perceptron for fusing ML and LLM predictions.
-    
-    Learns optimal combination weights for ML and LLM features through supervised training.
-    Uses dropout regularization to prevent overfitting on small fusion training sets.
-    """
+    """Trainable MLP for fusing ML and LLM predictions."""
     
     def __init__(self, input_dim: int, output_dim: int, hidden_dims: List[int] = [64, 32]):
-        """Initialize Fusion MLP architecture.
+        """Initialize Fusion MLP.
         
         Args:
-            input_dim: Input feature dimension (768 RoBERTa hidden states + 4 LLM scores = 772)
-            output_dim: Number of output classes
-            hidden_dims: List of hidden layer sizes for progressive dimensionality reduction
+            input_dim: Input dimension (ML logits + LLM scores)
+            output_dim: Output dimension (number of classes)
+            hidden_dims: Hidden layer dimensions
         """
         super().__init__()
         
         layers = []
         prev_dim = input_dim
         
-        # Build hidden layers with ReLU activation and dropout
         for hidden_dim in hidden_dims:
             layers.extend([
                 nn.Linear(prev_dim, hidden_dim),
                 nn.ReLU(),
-                nn.Dropout(0.3)  # Regularization to prevent overfitting
+                nn.Dropout(0.1)
             ])
             prev_dim = hidden_dim
         
-        # Final classification layer
+        # Output layer
         layers.append(nn.Linear(prev_dim, output_dim))
         
         self.network = nn.Sequential(*layers)
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through fusion network.
-        
-        Args:
-            x: Concatenated ML and LLM features
-            
-        Returns:
-            Class logits before softmax
-        """
+        """Forward pass through fusion MLP."""
         return self.network(x)
 
 
 class FusionWrapper(nn.Module):
-    """Wrapper that combines ML model hidden states with LLM predictions through trainable fusion.
-    
-    This module orchestrates the extraction of ML features and their combination with LLM outputs.
-    Supports two modes: hidden state fusion (rich 768-dim features) or probability fusion (sparse 4-dim).
-    """
+    """Wrapper that combines ML model with frozen LLM scores via Fusion MLP."""
     
     def __init__(self, ml_model, num_labels: int, task: str = "multiclass", 
-                 hidden_dims: List[int] = [64, 32], use_hidden_states: bool = True):
-        """Initialize fusion wrapper with ML model and configuration.
+                 hidden_dims: List[int] = [64, 32]):
+        """Initialize Fusion Wrapper.
         
         Args:
-            ml_model: Pre-trained ML classifier (typically RoBERTa-based)
-            num_labels: Number of classification labels
-            task: Classification task type ("multiclass" or "multilabel")
-            hidden_dims: Hidden layer dimensions for fusion MLP
-            use_hidden_states: Whether to use ML hidden states (768-dim) or probabilities (4-dim).
-                              Hidden states provide richer semantic representation.
+            ml_model: Pre-trained ML model (e.g., RoBERTa)
+            num_labels: Number of output labels
+            task: "multiclass" or "multilabel"
+            hidden_dims: Hidden dimensions for fusion MLP
         """
         super().__init__()
         self.ml_model = ml_model
         self.num_labels = num_labels
         self.task = task
-        self.use_hidden_states = use_hidden_states
         
-        # Calculate fusion MLP input dimension based on feature type
-        if use_hidden_states:
-            # Rich representation: RoBERTa [CLS] hidden state (768-dim) + LLM predictions (num_labels)
-            roberta_hidden_size = 768
-            fusion_input_dim = roberta_hidden_size + num_labels
-            print(f"   Using RoBERTa hidden states ({roberta_hidden_size}-dim) + LLM probabilities for rich fusion")
-        else:
-            # Sparse representation: ML probabilities + LLM probabilities
-            fusion_input_dim = num_labels * 2
-            print(f"   Using probability-only fusion ({fusion_input_dim}-dim)")
-        
-        # Initialize trainable fusion network
+        # Fusion MLP takes ML logits + LLM scores
+        fusion_input_dim = num_labels * 2  # ML logits + LLM scores
         self.fusion_mlp = FusionMLP(fusion_input_dim, num_labels, hidden_dims)
         
-        # Set device and move to GPU if available
+        # Device management
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
     
-    def forward(self, ml_hidden_or_probs: torch.Tensor, llm_predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """Combine ML and LLM features through fusion MLP.
+    def forward(self, ml_predictions: torch.Tensor, llm_predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Forward pass combining ML and LLM predictions.
         
         Args:
-            ml_hidden_or_probs: ML features - either hidden states (batch, 768) or probabilities (batch, num_labels)
-            llm_predictions: LLM prediction scores (batch, num_labels)
+            ml_predictions: Pre-computed ML predictions/logits
+            llm_predictions: Pre-computed LLM predictions/scores
             
         Returns:
-            Dictionary with 'fused_logits' key containing classification logits (batch, num_labels)
+            Dict containing ML predictions, LLM predictions, and fused logits
         """
-        # Detach inputs to prevent gradient flow back to pre-trained models
-        ml_hidden_or_probs = ml_hidden_or_probs.detach()
+        # Ensure predictions are detached (no gradient flow to original models)
+        ml_predictions = ml_predictions.detach()
         llm_predictions = llm_predictions.detach()
         
-        # Concatenate ML and LLM features along feature dimension
-        # Shape examples:
-        #   Hidden state mode: ml (batch, 768) + llm (batch, 4) -> fusion_input (batch, 772)
-        #   Probability mode: ml (batch, 4) + llm (batch, 4) -> fusion_input (batch, 8)
-        fusion_input = torch.cat([ml_hidden_or_probs, llm_predictions], dim=1)
+        # Concatenate ML and LLM predictions
+        fusion_input = torch.cat([ml_predictions, llm_predictions], dim=1)
         
-        # Pass concatenated features through fusion MLP
+        # Generate fused predictions through MLP
         fused_logits = self.fusion_mlp(fusion_input)
         
         return {
-            "ml_features": ml_hidden_or_probs,
+            "ml_predictions": ml_predictions,
             "llm_predictions": llm_predictions,
             "fused_logits": fused_logits
         }
 
 
 class FusionEnsemble(BaseEnsemble):
-    """Ensemble that combines ML and LLM classifiers through a trainable fusion layer.
-    
-    The fusion approach extracts rich semantic features from the ML model (RoBERTa hidden states)
-    and combines them with LLM predictions using a trainable MLP. This allows the system to learn
-    optimal combination weights based on validation data.
-    
-    Key features:
-    - Extracts 768-dimensional hidden states from RoBERTa [CLS] token
-    - Combines with LLM predictions (binary vectors or probabilities)
-    - Trains a small MLP (64->32->num_classes) to fuse features
-    - Implements early stopping to prevent overfitting
-    - Supports automatic caching of LLM predictions
-    """
+    """Ensemble that fuses ML and LLM classifiers with trainable MLP."""
     
     def __init__(
         self, 
@@ -157,23 +113,16 @@ class FusionEnsemble(BaseEnsemble):
         output_dir: str = "outputs",
         experiment_name: Optional[str] = None,
         auto_save_results: bool = True,
-        save_intermediate_llm_predictions: bool = False,
-        # Cache management parameters
-        auto_use_cache: bool = False,
-        cache_dir: str = "cache"
+        save_intermediate_llm_predictions: bool = False
     ):
-        """Initialize fusion ensemble with ML and LLM models.
+        """Initialize fusion ensemble.
         
         Args:
-            ensemble_config: Ensemble configuration containing fusion parameters
-            output_dir: Directory for saving experiment results
-            experiment_name: Unique name for this experiment run
-            auto_save_results: Whether to automatically save predictions and metrics
-            save_intermediate_llm_predictions: Whether to save LLM predictions during training
-            auto_use_cache: Whether to automatically load cached LLM predictions if available
-            cache_dir: Base directory for caching LLM predictions
-            auto_use_cache: Whether to automatically check and reuse cached LLM predictions (default: False)
-            cache_dir: Directory to search for cached predictions (default: "cache")
+            ensemble_config: Configuration for the ensemble
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
+            save_intermediate_llm_predictions: Whether to save intermediate LLM predictions (default: False)
         """
         super().__init__(
             ensemble_config,
@@ -190,10 +139,6 @@ class FusionEnsemble(BaseEnsemble):
         self.batch_size = ensemble_config.parameters.get('batch_size', 16)
         self.save_intermediate_llm_predictions = save_intermediate_llm_predictions
         
-        # Cache management settings
-        self.auto_use_cache = auto_use_cache
-        self.cache_dir = cache_dir
-        
         # Model components
         self.ml_model = None
         self.llm_model = None
@@ -203,12 +148,8 @@ class FusionEnsemble(BaseEnsemble):
         self.test_performance = {}  # Store test set performance
         
         # LLM prediction cache file paths from ensemble config
-        # Auto-generate cache paths if not provided and auto_use_cache is enabled
-        default_val_cache = f"{cache_dir}/fusion_val_llm" if auto_use_cache else ''
-        default_test_cache = f"{cache_dir}/fusion_test_llm" if auto_use_cache else ''
-        
-        self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', default_val_cache)
-        self.test_llm_cache_path = ensemble_config.parameters.get('test_llm_cache_path', default_test_cache)
+        self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', '')
+        self.test_llm_cache_path = ensemble_config.parameters.get('test_llm_cache_path', '')
         
         # Results management
         output_dir = ensemble_config.parameters.get('output_dir', 'outputs')
@@ -258,19 +199,8 @@ class FusionEnsemble(BaseEnsemble):
         self.model_names.append("ml_model")
     
     def add_llm_model(self, llm_model):
-        """Add LLM model to the fusion ensemble.
-        
-        If auto_use_cache is enabled in the ensemble, it will be propagated to the LLM model.
-        """
+        """Add LLM model to the fusion ensemble."""
         self.llm_model = llm_model
-        
-        # Propagate cache settings to LLM model if supported
-        if hasattr(llm_model, 'auto_use_cache') and hasattr(llm_model, 'cache_dir'):
-            llm_model.auto_use_cache = self.auto_use_cache
-            llm_model.cache_dir = self.cache_dir
-            if self.auto_use_cache and hasattr(llm_model, 'verbose') and llm_model.verbose:
-                print(f"🔗 FusionEnsemble: Propagated auto_use_cache={self.auto_use_cache} to LLM model")
-        
         self.models.append(llm_model)
         self.model_names.append("llm_model")
     
@@ -384,14 +314,12 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 4: Create fusion wrapper
         print("Creating fusion wrapper...")
-        print("   Using RoBERTa hidden states (768-dim) + LLM probabilities for rich fusion")
         task = "multilabel" if self.classification_type == ClassificationType.MULTI_LABEL else "multiclass"
         self.fusion_wrapper = FusionWrapper(
             ml_model=self.ml_model,
             num_labels=self.num_labels,
             task=task,
-            hidden_dims=self.fusion_hidden_dims,
-            use_hidden_states=True  # Use RoBERTa hidden states for better fusion
+            hidden_dims=self.fusion_hidden_dims
         )
         
         # Step 5: Train fusion MLP on validation set predictions
@@ -769,25 +697,21 @@ class FusionEnsemble(BaseEnsemble):
                 with open(latest_file, 'r') as f:
                     cache_data = json.load(f)
                 
-                # Handle both new format (with metadata and IDs) and old format (just predictions)
+                # Handle both new format (with metadata) and old format (just predictions)
                 if isinstance(cache_data, dict) and 'predictions' in cache_data:
                     predictions = cache_data['predictions']
-                    ids = cache_data.get('ids', None)  # Extract IDs if available
                     metadata = cache_data.get('metadata', {})
                     
                     # Validate sample count
                     if metadata.get('num_samples') == len(df):
-                        if ids:
-                            print(f"✅ Loaded matching cached predictions with IDs: {latest_file} (Hash: {current_hash}, IDs: {len(ids)})")
-                        else:
-                            print(f"✅ Loaded matching cached predictions: {latest_file} (Hash: {current_hash})")
+                        print(f"✅ Loaded matching cached predictions: {latest_file} (Hash: {current_hash})")
                         return predictions
                     else:
                         print(f"⚠️ Sample count mismatch in cache: {latest_file}")
                 elif isinstance(cache_data, list):
-                    # Old format - just validate sample count (no IDs available)
+                    # Old format - just validate sample count
                     if len(cache_data) == len(df):
-                        print(f"✅ Loaded compatible cached predictions (legacy format, no IDs): {latest_file} (Hash: {current_hash})")
+                        print(f"✅ Loaded compatible cached predictions: {latest_file} (Hash: {current_hash})")
                         return cache_data
             
             # Fallback: Look for old files without hash (backward compatibility)
@@ -803,19 +727,14 @@ class FusionEnsemble(BaseEnsemble):
                     # Handle both old and new formats
                     if isinstance(data, list):
                         predictions = data
-                        ids = None
                     elif isinstance(data, dict) and 'predictions' in data:
                         predictions = data['predictions']
-                        ids = data.get('ids', None)
                     else:
                         continue
                     
                     # Validate sample count
                     if len(predictions) == len(df):
-                        if ids:
-                            print(f"⚠️ Using backward-compatible cache with IDs: {file_path} (no hash validation, IDs: {len(ids)})")
-                        else:
-                            print(f"⚠️ Using backward-compatible cache: {file_path} (no hash validation, no IDs)")
+                        print(f"⚠️ Using backward-compatible cache: {file_path} (no hash validation)")
                         return predictions
                         
                 except Exception:
@@ -856,36 +775,23 @@ class FusionEnsemble(BaseEnsemble):
             timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
             cache_filename = f"{base_cache_path}_{timestamp}_{dataset_hash}.json"
             
-            # Extract IDs from DataFrame if available (common column names: id, index, row_id, uid)
-            ids = None
-            for id_col in ['id', 'index', 'row_id', 'uid']:
-                if id_col in df.columns:
-                    ids = df[id_col].tolist()
-                    break
-            
-            # If no explicit ID column, use DataFrame index
-            if ids is None:
-                ids = df.index.tolist()
-            
-            # Create cache data with metadata and IDs
+            # Create cache data with metadata
             cache_data = {
                 'predictions': predictions,
-                'ids': ids,  # Include IDs for mapping back to original data
                 'metadata': {
                     'timestamp': timestamp,
                     'num_samples': len(df),
                     'dataset_hash': dataset_hash,
                     'columns': list(df.columns),
-                    'created_at': datetime.now().isoformat(),
-                    'has_explicit_ids': ids is not None and ids != df.index.tolist()
+                    'created_at': datetime.now().isoformat()
                 }
             }
             
-            # Save predictions with metadata and IDs
+            # Save predictions with metadata
             with open(cache_filename, 'w') as f:
                 json.dump(cache_data, f, indent=2)
             
-            print(f"✅ LLM predictions saved to {cache_filename} (Hash: {dataset_hash}, IDs: {len(ids)})")
+            print(f"✅ LLM predictions saved to {cache_filename} (Hash: {dataset_hash})")
             
         except Exception as e:
             print(f"Warning: Could not save predictions to cache {base_cache_path}: {e}")
@@ -955,53 +861,9 @@ class FusionEnsemble(BaseEnsemble):
         """
         import json
         with open(filepath, 'r') as f:
-            data = json.load(f)
-        
-        # Handle both old format (just list) and new format (dict with predictions and IDs)
-        if isinstance(data, list):
-            predictions = data
-            print(f"LLM predictions loaded from {filepath} (legacy format, no IDs)")
-        elif isinstance(data, dict) and 'predictions' in data:
-            predictions = data['predictions']
-            ids = data.get('ids', None)
-            if ids:
-                print(f"LLM predictions loaded from {filepath} (with {len(ids)} IDs)")
-            else:
-                print(f"LLM predictions loaded from {filepath} (no IDs)")
-        else:
-            raise ValueError(f"Invalid cache file format: {filepath}")
-        
+            predictions = json.load(f)
+        print(f"LLM predictions loaded from {filepath}")
         return predictions
-    
-    def load_llm_predictions_with_ids(self, filepath: str) -> Tuple[List[Union[str, List[str]]], Optional[List[Any]]]:
-        """Load LLM predictions and IDs from a file.
-        
-        Args:
-            filepath: Path to load predictions from (JSON format)
-            
-        Returns:
-            Tuple of (predictions, ids) where ids may be None for legacy format
-        """
-        import json
-        with open(filepath, 'r') as f:
-            data = json.load(f)
-        
-        # Handle both old format (just list) and new format (dict with predictions and IDs)
-        if isinstance(data, list):
-            predictions = data
-            ids = None
-            print(f"LLM predictions loaded from {filepath} (legacy format, no IDs)")
-        elif isinstance(data, dict) and 'predictions' in data:
-            predictions = data['predictions']
-            ids = data.get('ids', None)
-            if ids:
-                print(f"✅ LLM predictions with IDs loaded from {filepath} ({len(predictions)} predictions, {len(ids)} IDs)")
-            else:
-                print(f"⚠️ LLM predictions loaded from {filepath} (no IDs available)")
-        else:
-            raise ValueError(f"Invalid cache file format: {filepath}")
-        
-        return predictions, ids
     
     def load_cached_predictions_for_dataset(self, df: pd.DataFrame, dataset_type: str = "auto") -> Optional[List[Union[str, List[str]]]]:
         """Load cached LLM predictions for a specific dataset (validation or test).
@@ -1262,83 +1124,54 @@ class FusionEnsemble(BaseEnsemble):
         # Split both ML and LLM results accordingly
         split_idx = len(fusion_train_df)
         
-        # Create split ClassificationResults for train and validation
-        from ..core.types import ClassificationResult
+        # Split ML predictions
+        fusion_train_ml_predictions = ml_val_result.predictions[:split_idx]
+        fusion_val_ml_predictions = ml_val_result.predictions[split_idx:]
         
-        # Split ML results
-        fusion_train_ml_result = ClassificationResult(
-            predictions=ml_val_result.predictions[:split_idx],
-            probabilities=ml_val_result.probabilities[:split_idx] if ml_val_result.probabilities else None,
-            model_name=ml_val_result.model_name,
-            classification_type=ml_val_result.classification_type
-        )
-        fusion_val_ml_result = ClassificationResult(
-            predictions=ml_val_result.predictions[split_idx:],
-            probabilities=ml_val_result.probabilities[split_idx:] if ml_val_result.probabilities else None,
-            model_name=ml_val_result.model_name,
-            classification_type=ml_val_result.classification_type
-        )
+        # Split LLM predictions
+        fusion_train_llm_predictions = llm_val_result.predictions[:split_idx]
+        fusion_val_llm_predictions = llm_val_result.predictions[split_idx:]
         
-        # Split LLM results
-        fusion_train_llm_result = ClassificationResult(
-            predictions=llm_val_result.predictions[:split_idx],
-            probabilities=llm_val_result.probabilities[:split_idx] if llm_val_result.probabilities else None,
-            model_name=llm_val_result.model_name,
-            classification_type=llm_val_result.classification_type
-        )
-        fusion_val_llm_result = ClassificationResult(
-            predictions=llm_val_result.predictions[split_idx:],
-            probabilities=llm_val_result.probabilities[split_idx:] if llm_val_result.probabilities else None,
-            model_name=llm_val_result.model_name,
-            classification_type=llm_val_result.classification_type
-        )
+        print(f"   🔧 Fusion training: {len(fusion_train_df)} samples")
+        print(f"   🔧 Fusion validation: {len(fusion_val_df)} samples")
         
-        print(f"   Fusion training split: {len(fusion_train_df)} samples")
-        print(f"   Fusion validation split: {len(fusion_val_df)} samples")
-        
-        # Create PyTorch datasets for fusion training
-        # Datasets extract RoBERTa hidden states on-the-fly and combine with LLM predictions
+        # Create data loaders using both ML and LLM predictions
         train_dataset = self._create_fusion_dataset(
             fusion_train_df[text_column].tolist(), 
             fusion_train_df[label_columns].values.tolist(), 
-            fusion_train_ml_result,
-            fusion_train_llm_result
+            fusion_train_ml_predictions,
+            fusion_train_llm_predictions
         )
         val_dataset = self._create_fusion_dataset(
             fusion_val_df[text_column].tolist(), 
             fusion_val_df[label_columns].values.tolist(), 
-            fusion_val_ml_result,
-            fusion_val_llm_result
+            fusion_val_ml_predictions,
+            fusion_val_llm_predictions
         )
         
-        # Create data loaders with shuffling for training, sequential for validation
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
         
-        # Freeze pre-trained ML model parameters to prevent catastrophic forgetting
-        # Only the fusion MLP parameters will be optimized
+        # Freeze ML model parameters - only optimize the fusion MLP
         for param in self.fusion_wrapper.ml_model.model.parameters():
             param.requires_grad = False
         
-        # Initialize optimizer for fusion MLP parameters only
+        # Setup optimizer for fusion MLP only
         fusion_params = list(self.fusion_wrapper.fusion_mlp.parameters())
         optimizer = torch.optim.AdamW(fusion_params, lr=self.fusion_lr)
         
-        # Select loss function based on classification type
+        # Loss function
         if self.classification_type == ClassificationType.MULTI_CLASS:
             criterion = nn.CrossEntropyLoss()
         else:
             criterion = nn.BCEWithLogitsLoss()
         
-        # Initialize training with early stopping to prevent overfitting
+        # Training loop with validation monitoring
         self.fusion_wrapper.train()
         best_val_loss = float('inf')
-        best_model_state = None
-        patience = 3  # Number of epochs without improvement before stopping
-        patience_counter = 0
         
         for epoch in range(self.num_epochs):
-            # Training phase: optimize fusion MLP weights
+            # Training phase
             total_train_loss = 0
             for batch in train_loader:
                 ml_predictions, llm_predictions, labels = batch
@@ -1346,25 +1179,21 @@ class FusionEnsemble(BaseEnsemble):
                 llm_predictions = llm_predictions.to(self.device)
                 labels = labels.to(self.device)
                 
-                # Reset gradients
                 optimizer.zero_grad()
                 
-                # Forward pass through fusion wrapper
                 outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
                 fused_logits = outputs['fused_logits']
                 
-                # Convert labels to class indices for multi-class classification
                 if self.classification_type == ClassificationType.MULTI_CLASS:
                     labels = torch.argmax(labels, dim=1)
                 
-                # Compute loss and backpropagate
                 loss = criterion(fused_logits, labels)
                 loss.backward()
                 optimizer.step()
                 
                 total_train_loss += loss.item()
             
-            # Validation phase: evaluate without updating weights
+            # Validation phase
             self.fusion_wrapper.eval()
             total_val_loss = 0
             with torch.no_grad():
@@ -1374,173 +1203,65 @@ class FusionEnsemble(BaseEnsemble):
                     llm_predictions = llm_predictions.to(self.device)
                     labels = labels.to(self.device)
                     
-                    # Forward pass only
                     outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
                     fused_logits = outputs['fused_logits']
                     
-                    # Convert labels for loss computation
                     if self.classification_type == ClassificationType.MULTI_CLASS:
                         labels = torch.argmax(labels, dim=1)
                     
-                    # Compute validation loss
                     loss = criterion(fused_logits, labels)
                     total_val_loss += loss.item()
             
-            # Calculate average losses for this epoch
             avg_train_loss = total_train_loss / len(train_loader)
             avg_val_loss = total_val_loss / len(val_loader)
             
             print(f"   Epoch {epoch + 1}/{self.num_epochs} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
             
-            # Early stopping: check if validation loss improved
+            # Save best model based on validation loss
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                # Save best model weights for later restoration
-                best_model_state = {
-                    'fusion_mlp': self.fusion_wrapper.fusion_mlp.state_dict(),
-                    'epoch': epoch + 1
-                }
-                patience_counter = 0
-                print(f"   New best validation loss: {best_val_loss:.4f}")
-            else:
-                patience_counter += 1
-                print(f"   No improvement for {patience_counter} epoch(s)")
-                
-                # Stop training if no improvement for patience epochs
-                if patience_counter >= patience:
-                    print(f"   Early stopping triggered at epoch {epoch + 1}")
-                    print(f"   Best validation loss: {best_val_loss:.4f} at epoch {best_model_state['epoch']}")
-                    break
+                # Could save model state here if needed
             
-            # Return to training mode for next epoch
-            self.fusion_wrapper.train()
-        
-        # Restore the best model weights after training completes
-        if best_model_state is not None:
-            self.fusion_wrapper.fusion_mlp.load_state_dict(best_model_state['fusion_mlp'])
-            print(f"   Restored best model from epoch {best_model_state['epoch']}")
-        
-        # Set to evaluation mode for inference
-        self.fusion_wrapper.eval()
+            self.fusion_wrapper.train()  # Back to training mode
     
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
-                              ml_result, llm_result):
-        """Create custom dataset that extracts RoBERTa hidden states on-the-fly during training.
+                              ml_predictions: List, llm_predictions: List):
+        """Create dataset for fusion training using pre-computed ML and LLM predictions."""
         
-        This method creates a PyTorch Dataset that combines:
-        1. RoBERTa hidden states extracted from [CLS] token (768-dim)
-        2. LLM predictions converted to vectors (4-dim binary or probability)
-        3. True labels for supervised learning
+        # Convert ML predictions to tensor format (binary vectors)
+        ml_tensor = torch.zeros(len(ml_predictions), self.num_labels)
+        for i, prediction in enumerate(ml_predictions):
+            if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                # Already in binary vector format
+                ml_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+            elif isinstance(prediction, str):
+                # Convert class name to binary vector
+                if prediction in self.classes_:
+                    class_idx = self.classes_.index(prediction)
+                    ml_tensor[i, class_idx] = 1.0
         
-        Args:
-            texts: Input texts for hidden state extraction
-            labels: Ground truth labels as binary vectors
-            ml_result: Classification results from ML model (contains model reference)
-            llm_result: Classification results from LLM model (contains predictions)
-            
-        Returns:
-            PyTorch Dataset yielding (ml_hidden_states, llm_vector, labels) tuples
-        """
-        
-        # Convert LLM predictions to tensor representation
-        # Two modes: probability distributions (soft) or binary vectors (hard)
-        llm_tensor = torch.zeros(len(texts), self.num_labels)
-        if hasattr(llm_result, 'probabilities') and llm_result.probabilities:
-            # Mode 1: Use probability distributions from LLM if available
-            print(f"   Using LLM probability distributions (soft predictions)")
-            for i, prob_dict in enumerate(llm_result.probabilities):
-                for class_name in self.classes_:
-                    class_idx = self.classes_.index(class_name)
-                    llm_tensor[i, class_idx] = prob_dict.get(class_name, 0.0)
-            # Display example for verification
-            if len(llm_result.probabilities) > 0:
-                print(f"   Example LLM probabilities: {llm_result.probabilities[0]}")
-        else:
-            # Mode 2: Convert hard predictions to binary one-hot vectors
-            print(f"   LLM has no probabilities - using binary vectors (hard predictions)")
-            print(f"   Example: 'label_2' -> [0, 1, 0, 0]")
-            for i, prediction in enumerate(llm_result.predictions):
-                # Handle string predictions (e.g., "label_2")
-                if isinstance(prediction, str):
-                    if prediction in self.classes_:
-                        class_idx = self.classes_.index(prediction)
+        # Convert LLM predictions to tensor format (binary vectors)
+        llm_tensor = torch.zeros(len(llm_predictions), self.num_labels)
+        for i, prediction in enumerate(llm_predictions):
+            if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                # Already in binary vector format
+                llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+            elif isinstance(prediction, str):
+                # Convert class name to binary vector
+                if prediction in self.classes_:
+                    class_idx = self.classes_.index(prediction)
+                    llm_tensor[i, class_idx] = 1.0
+            elif isinstance(prediction, list):
+                # List of class names (multi-label)
+                for pred_class in prediction:
+                    if pred_class in self.classes_:
+                        class_idx = self.classes_.index(pred_class)
                         llm_tensor[i, class_idx] = 1.0
-                # Handle list predictions (multi-label or binary vectors)
-                elif isinstance(prediction, list):
-                    if len(prediction) == self.num_labels and all(isinstance(x, (int, float)) for x in prediction):
-                        # Already in binary vector format
-                        llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
-                    else:
-                        # List of class names - convert to multi-hot encoding
-                        for pred_class in prediction:
-                            if pred_class in self.classes_:
-                                class_idx = self.classes_.index(pred_class)
-                                llm_tensor[i, class_idx] = 1.0
         
-        # Convert ground truth labels to tensor
+        # Create tensor dataset with predictions only (no tokenization needed)
         labels_tensor = torch.FloatTensor(labels)
         
-        # Define custom dataset class for on-the-fly hidden state extraction
-        class FusionDatasetWithHiddenStates(torch.utils.data.Dataset):
-            """Dataset that extracts RoBERTa hidden states during training.
-            
-            This approach avoids storing all hidden states in memory by computing them
-            on-demand for each batch. The ML model is frozen, so no gradient computation needed.
-            """
-            
-            def __init__(self, texts, llm_probs, labels, ml_model, tokenizer, max_length, device):
-                self.texts = texts
-                self.llm_probs = llm_probs
-                self.labels = labels
-                self.ml_model = ml_model
-                self.tokenizer = tokenizer
-                self.max_length = max_length
-                self.device = device
-                
-            def __len__(self):
-                return len(self.texts)
-            
-            def __getitem__(self, idx):
-                """Extract features for a single sample.
-                
-                Returns:
-                    tuple: (hidden_state, llm_prediction, label)
-                        - hidden_state: RoBERTa [CLS] token embedding (768-dim)
-                        - llm_prediction: LLM prediction vector (4-dim)
-                        - label: Ground truth label vector
-                """
-                # Tokenize input text
-                text = str(self.texts[idx])
-                encoding = self.tokenizer(
-                    text,
-                    truncation=True,
-                    padding='max_length',
-                    max_length=self.max_length,
-                    return_tensors='pt'
-                )
-                
-                # Extract hidden states from frozen RoBERTa model
-                with torch.no_grad():
-                    outputs = self.ml_model.model(
-                        input_ids=encoding['input_ids'].to(self.device),
-                        attention_mask=encoding['attention_mask'].to(self.device),
-                        output_hidden_states=True  # Request hidden states
-                    )
-                    # Extract [CLS] token from last hidden layer (position 0)
-                    # Shape: (1, seq_len, 768) -> (768,)
-                    hidden_state = outputs.hidden_states[-1][:, 0, :].squeeze(0)
-                
-                return hidden_state.cpu(), self.llm_probs[idx], self.labels[idx]
-        
-        return FusionDatasetWithHiddenStates(
-            texts=texts,
-            llm_probs=llm_tensor,
-            labels=labels_tensor,
-            ml_model=self.ml_model,
-            tokenizer=self.ml_model.tokenizer,
-            max_length=self.ml_model.max_length,
-            device=self.device
-        )
+        return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
     
     def predict(self, test_df: pd.DataFrame, true_labels: Optional[List[List[int]]] = None,
                 test_llm_predictions: Optional[List[Union[str, List[str]]]] = None) -> ClassificationResult:
@@ -1660,9 +1381,9 @@ class FusionEnsemble(BaseEnsemble):
     
     def _predict_with_fusion(self, ml_result, llm_result, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Generate fusion predictions using trained MLP."""
-        # Create dataset using both ML and LLM ClassificationResults (with probabilities!)
+        # Create dataset using both ML and LLM predictions
         dummy_labels = [[0] * self.num_labels] * len(texts)
-        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_result, llm_result)
+        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_result.predictions, llm_result.predictions)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         
         # Generate predictions
