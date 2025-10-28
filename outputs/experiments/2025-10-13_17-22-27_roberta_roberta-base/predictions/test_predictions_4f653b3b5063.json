@@ -1,0 +1,67 @@
+{
+  "metadata": {
+    "experiment_id": "2025-10-13_17-22-27_roberta_roberta-base",
+    "model_name": "roberta-base",
+    "model_type": "traditional_ml",
+    "classification_type": "multi_class",
+    "timestamp": "2025-10-13T17:23:19.432856",
+    "dataset_name": "test",
+    "dataset_hash": "4f653b3b5063",
+    "num_predictions": 5,
+    "git_commit": "7467cf97e00e18596935ce34cdc3b0821cbd317f"
+  },
+  "predictions": [
+    "label_4",
+    "label_1",
+    "label_4",
+    "label_1",
+    "label_4"
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {
+    "accuracy": 0.2,
+    "precision_weighted": 0.2,
+    "recall_weighted": 0.2,
+    "f1_weighted": 0.2,
+    "classification_report": {
+      "label_1": {
+        "precision": 0.5,
+        "recall": 0.5,
+        "f1-score": 0.5,
+        "support": 2.0
+      },
+      "label_2": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 1.0
+      },
+      "label_3": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 2.0
+      },
+      "label_4": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 0.0
+      },
+      "accuracy": 0.2,
+      "macro avg": {
+        "precision": 0.125,
+        "recall": 0.125,
+        "f1-score": 0.125,
+        "support": 5.0
+      },
+      "weighted avg": {
+        "precision": 0.2,
+        "recall": 0.2,
+        "f1-score": 0.2,
+        "support": 5.0
+      }
+    }
+  }
+}

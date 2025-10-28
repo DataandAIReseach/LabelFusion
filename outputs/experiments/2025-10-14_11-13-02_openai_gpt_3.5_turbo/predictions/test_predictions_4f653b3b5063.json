@@ -1,0 +1,29 @@
+{
+  "metadata": {
+    "experiment_id": "2025-10-14_11-13-02_openai_gpt_3.5_turbo",
+    "model_name": "gpt-3.5-turbo",
+    "model_type": "llm",
+    "classification_type": "single_label",
+    "timestamp": "2025-10-14T11:15:15.996748",
+    "dataset_name": "test",
+    "dataset_hash": "4f653b3b5063",
+    "num_predictions": 5,
+    "git_commit": "7467cf97e00e18596935ce34cdc3b0821cbd317f"
+  },
+  "predictions": [
+    "label_2",
+    "label_2",
+    "label_4",
+    "label_2",
+    "label_1"
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {
+    "accuracy": 0.4,
+    "precision": 0.3333333333333333,
+    "recall": 0.375,
+    "f1": 0.29166666666666663,
+    "auc": NaN
+  }
+}

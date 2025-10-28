@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "experiment_id": "2025-10-13_17-40-50_yaml_binary_test",
+    "model_name": "gpt-3.5-turbo",
+    "model_type": "llm",
+    "classification_type": "single_label",
+    "timestamp": "2025-10-13T17:40:58.414289",
+    "dataset_name": "test",
+    "dataset_hash": "aa854ef988a1",
+    "num_predictions": 1,
+    "git_commit": "7467cf97e00e18596935ce34cdc3b0821cbd317f"
+  },
+  "predictions": [
+    "negative"
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "auc": NaN
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "metadata": {
+    "experiment_id": "2025-10-13_17-04-50_fusion_fusion",
+    "model_name": "ensemble_fusion",
+    "model_type": "ensemble",
+    "classification_type": "multi_class",
+    "timestamp": "2025-10-13T17:05:42.649794",
+    "dataset_name": "test",
+    "dataset_hash": "64e4192bb20c",
+    "num_predictions": 5,
+    "git_commit": "eaf40d2f35195c972057278cb817f266e790d909"
+  },
+  "predictions": [
+    "label_3",
+    "label_3",
+    "label_3",
+    "label_1",
+    "label_3"
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {
+    "accuracy": 0.4,
+    "precision": 0.16666666666666666,
+    "recall": 0.3333333333333333,
+    "f1": 0.2222222222222222,
+    "auc": NaN
+  }
+}

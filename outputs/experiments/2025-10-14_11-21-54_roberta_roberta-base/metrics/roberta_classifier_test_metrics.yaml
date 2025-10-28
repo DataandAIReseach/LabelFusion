@@ -1,0 +1,43 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-10-14_11-21-54_roberta_roberta-base
+  git_commit: 7467cf97e00e18596935ce34cdc3b0821cbd317f
+  model_name: roberta_classifier
+  timestamp: '2025-10-14T11:22:57.000118'
+metrics:
+  accuracy: 0.2
+  classification_report:
+    accuracy: 0.2
+    label_1:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 2.0
+    label_2:
+      f1-score: 0.6666666666666666
+      precision: 0.5
+      recall: 1.0
+      support: 1.0
+    label_3:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 2.0
+    label_4:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 0.0
+    macro avg:
+      f1-score: 0.16666666666666666
+      precision: 0.125
+      recall: 0.25
+      support: 5.0
+    weighted avg:
+      f1-score: 0.13333333333333333
+      precision: 0.1
+      recall: 0.2
+      support: 5.0
+  f1_weighted: 0.13333333333333333
+  precision_weighted: 0.1
+  recall_weighted: 0.2

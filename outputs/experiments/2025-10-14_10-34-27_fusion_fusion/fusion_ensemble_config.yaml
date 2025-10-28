@@ -1,0 +1,20 @@
+config:
+  batch_size: 8
+  classes:
+  - label_1
+  - label_2
+  - label_3
+  - label_4
+  classification_type: ClassificationType.MULTI_CLASS
+  ensemble_method: fusion
+  fusion_hidden_dims:
+  - 32
+  - 16
+  fusion_lr: 0.001
+  ml_lr: 1.0e-05
+  num_epochs: 5
+  num_labels: 4
+metadata:
+  experiment_id: 2025-10-14_10-34-27_fusion_fusion
+  model_name: fusion_ensemble
+  timestamp: '2025-10-14T10:35:23.747237'

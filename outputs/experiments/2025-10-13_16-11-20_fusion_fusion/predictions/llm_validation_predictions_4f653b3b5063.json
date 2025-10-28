@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "experiment_id": "2025-10-13_16-11-20_fusion_fusion",
+    "model_name": "llm_model",
+    "model_type": "None",
+    "classification_type": "multi_class",
+    "timestamp": "2025-10-13T16:12:41.077834",
+    "dataset_name": "llm_validation",
+    "dataset_hash": "4f653b3b5063",
+    "num_predictions": 5,
+    "git_commit": "cc0a740a7decb24bc865fe8417139e436b097a01"
+  },
+  "predictions": [
+    "label_4",
+    "label_3",
+    "label_3",
+    "label_2",
+    "label_1"
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {}
+}

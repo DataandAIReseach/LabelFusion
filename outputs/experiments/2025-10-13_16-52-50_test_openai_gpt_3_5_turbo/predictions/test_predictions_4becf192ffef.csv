@@ -1,0 +1,4 @@
+text,label,predicted
+This is a positive review,positive,positive
+This product is terrible,negative,negative
+Great service and quality,positive,positive

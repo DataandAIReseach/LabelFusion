@@ -1,0 +1,15 @@
+config:
+  few_shot_mode: few_shot
+  label_columns:
+  - positive
+  - negative
+  max_completion_tokens: 150
+  model_name: gpt-3.5-turbo
+  multi_label: false
+  provider: openai
+  temperature: 0.1
+  text_column: text
+metadata:
+  experiment_id: 2025-10-13_16-52-50_test_openai_gpt_3_5_turbo
+  model_name: openai_classifier
+  timestamp: '2025-10-13T16:52:50.426655'

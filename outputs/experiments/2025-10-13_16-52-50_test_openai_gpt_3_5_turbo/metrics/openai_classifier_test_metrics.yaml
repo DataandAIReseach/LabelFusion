@@ -1,0 +1,11 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-10-13_16-52-50_test_openai_gpt_3_5_turbo
+  git_commit: eaf40d2f35195c972057278cb817f266e790d909
+  model_name: openai_classifier
+  timestamp: '2025-10-13T16:52:50.425979'
+metrics:
+  accuracy: 0.95
+  f1: 0.95
+  precision: 0.93
+  recall: 0.97
