@@ -152,7 +152,7 @@ def create_llm_model(text_column: str, label_columns: list,
             "model": "gpt-4o-mini" if provider == 'openai' else "deepseek-chat",
             "temperature": 0.0,
             "max_tokens": 500,
-            "few_shot_examples": 3,
+            "few_shot_examples": 10,
             "classification_type": "multi_label" if multi_label else "multi_class"
         }
     )
@@ -435,7 +435,8 @@ def run_goemotions_experiments(
     base_output_dir: str = "outputs/goemotions_experiments",
     auto_use_cache: bool = True,
     cache_dir: str = "cache",
-    evaluate_baselines: bool = True
+    evaluate_baselines: bool = True,
+    train_on_all: bool = False
 ):
     """
     Run experiments on GoEmotions dataset with different training data sizes.
@@ -464,6 +465,14 @@ def run_goemotions_experiments(
     
     # Load datasets
     df_train, df_val, df_test = load_datasets(data_dir)
+
+    # Optionally merge train, val and test into the training set
+    if train_on_all:
+        print("\n⚠️  TRAIN-ON-ALL enabled: merging train, val and test into the training set.")
+        print("This will use all available labeled data for training. Evaluation will still use the original val/test splits,")
+        print("but note that evaluating on examples that were included in training will produce optimistic metrics.")
+        df_train = pd.concat([df_train, df_val, df_test], ignore_index=True)
+        print(f"✅ New training size: {len(df_train)} (train+val+test merged)")
     
     # Get label columns
     text_column = 'text'
@@ -590,6 +599,8 @@ if __name__ == "__main__":
                         help="Cache directory")
     parser.add_argument("--no-baselines", action="store_true",
                         help="Skip baseline model evaluation")
+    parser.add_argument("--train-on-all", action="store_true",
+                        help="Merge train, val and test into the training set before training")
     
     args = parser.parse_args()
     
@@ -615,5 +626,6 @@ if __name__ == "__main__":
         base_output_dir=args.output_dir,
         auto_use_cache=not args.no_cache,
         cache_dir=args.cache_dir,
-        evaluate_baselines=not args.no_baselines
+        evaluate_baselines=not args.no_baselines,
+        train_on_all=args.train_on_all
     )
