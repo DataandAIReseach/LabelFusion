@@ -25,7 +25,7 @@ bibliography: paper_labelfusion.bib
 
 ## Summary
 
-LabelFusion is a fusion ensemble for text classification that learns to combine a traditional transformer-based classifier (e.g., RoBERTa) with one or more Large Language Models (LLMs) to deliver accurate and cost‑aware predictions across multi‑class and multi‑label tasks. The package provides a simple high‑level interface (AutoFusion) that trains the full pipeline end‑to‑end, and a configurable API for advanced users. Under the hood, LabelFusion takes vector signals from an ML backbone (logits) and LLM(s) (per‑class scores), calibrates them, and feeds their concatenation into a small multi‑layer perceptron (MLP) that is trained to produce the final prediction. This learned fusion approach captures complementary strengths of LLM reasoning and transformer efficiency, yielding robust performance across domains while enabling practical trade‑offs between accuracy, latency, and cost.
+LabelFusion is a fusion ensemble for text classification that learns to combine a traditional transformer-based classifier (e.g., RoBERTa) with one or more Large Language Models (LLMs such as OpenAI GPT, Google Gemini, or DeepSeek) to deliver accurate and cost‑aware predictions across multi‑class and multi‑label tasks. The package provides a simple high‑level interface (`AutoFusionClassifier`) that trains the full pipeline end‑to‑end with minimal configuration, and a flexible API for advanced users. Under the hood, LabelFusion takes vector signals from an ML backbone (logits) and LLM(s) (per‑class scores), calibrates them using temperature scaling and isotonic regression, and feeds their concatenation into a small multi‑layer perceptron (`FusionMLP`) that is trained to produce the final prediction. This learned fusion approach captures complementary strengths of LLM reasoning and transformer efficiency, yielding robust performance across domains—achieving 92.4% accuracy on AG News topic classification—while enabling practical trade‑offs between accuracy, latency, and cost.
 
 ## Statement of Need
 
@@ -47,11 +47,13 @@ LabelFusion consists of three layers:
 
 Key features:
 
-- Multi‑class and multi‑label support with consistent data structures.
-- Calibration of model signals (e.g., temperature/Platt‑style and isotonic techniques) for better probability estimates [@guo2017calibration; @zadrozny2002transforming].
-- Caching of LLM responses and batched scoring to reduce cost/latency.
-- Command‑line training via `train_fusion.py` and YAML configs; or a minimal AutoFusion API for quick starts.
-- Seamless use with other ensembles (e.g., voting/weighted) where LabelFusion can serve as a strong base learner.
+- **Multi‑class and multi‑label support** with consistent data structures and unified training pipeline.
+- **Calibration of model signals** using temperature scaling and isotonic regression [@guo2017calibration; @zadrozny2002transforming] for better probability estimates. LLM scores are calibrated on validation data before fusion training.
+- **LLM response caching** with disk-based persistence reduces API costs by storing and reusing predictions. Cache invalidation handles configuration changes automatically.
+- **Batched scoring** processes multiple texts efficiently with configurable batch sizes for both ML tokenization and LLM API calls.
+- **Results management** via `ResultsManager` tracks experiments, stores predictions, computes metrics, and enables reproducible research workflows.
+- **Flexible interfaces**: Command‑line training via `train_fusion.py` with YAML configs for research; or minimal AutoFusion API for quick deployment.
+- **Composable design**: LabelFusion can serve as a strong base learner in higher-level ensembles (e.g., voting/weighted combinations of multiple fusion models).
 
 ### Minimal Example (AutoFusion)
 
@@ -78,24 +80,71 @@ Users can generate a starter config and train via the command line:
 
 ## Quality Control
 
-The repository includes unit and integration tests (see `tests/`) that validate configuration handling, core types, and package integration. Fusion‑specific logic is exercised in examples and the CLI, which run end‑to‑end training with deterministic seeds where applicable. LLM scoring paths implement retries and disk caching; transformer training supports standard sanity checks (overfit a small batch, reduced batch sizes for constrained hardware). Metrics (accuracy/F1, per‑label scores) are computed automatically and stored with run artifacts to facilitate regression tracking.
+The repository includes unit and integration tests (see `tests/`) that validate configuration handling, core types, and package integration. Fusion‑specific logic is exercised in examples and the CLI, which run end‑to‑end training with deterministic seeds where applicable. 
+
+Evaluation scripts (`tests/evaluation/`) provide comprehensive benchmarking on standard datasets:
+- **AG News** [@zhang2015character]: 4-class topic classification with experiments across varying training data sizes (20%–100%)
+- **GoEmotions** [@demszky2020goemotions]: 28-class multi-label emotion classification for validating multi-label fusion performance
+
+LLM scoring paths implement retries and disk caching; transformer training supports standard sanity checks (overfit a small batch, reduced batch sizes for constrained hardware). Metrics (accuracy/F1, per‑label scores) are computed automatically and stored with run artifacts to facilitate regression tracking and reproducibility.
 
 ## Availability and Installation
 
-LabelFusion is distributed as part of the `textclassify` package under the MIT license. The fusion components require Python 3.8+ and common scientific Python dependencies (PyTorch, transformers, scikit‑learn, numpy, pandas, PyYAML). Optional plotting depends on matplotlib/seaborn. Installation and quick‑start snippets are provided in the README and `FUSION_README.md`.
+LabelFusion is distributed as part of the `textclassify` package under the MIT license and is available at [https://github.com/DataandAIReseach/LabelFusion](https://github.com/DataandAIReseach/LabelFusion). The fusion components require Python 3.8+ and common scientific Python dependencies (PyTorch, transformers, scikit‑learn, numpy, pandas, PyYAML). Optional plotting depends on matplotlib/seaborn. Installation and quick‑start snippets are provided in the README and `FUSION_README.md`.
+
+### Production-Ready Features
+
+Beyond the core fusion methodology, LabelFusion includes features for practical deployment:
+
+- **LLM Response Caching**: Automatic caching of LLM predictions to disk reduces API costs and enables reproducible experiments. The cache system handles invalidation and supports multiple cache backends.
+- **Results Management**: Built-in `ResultsManager` tracks experiments, stores predictions, and computes metrics automatically. Supports comparison across runs and configuration tracking.
+- **Batch Processing**: Efficient batched scoring of texts with configurable batch sizes for both ML and LLM components.
+- **Cost Monitoring**: Tracks API usage and estimated costs across LLM providers with configurable budget limits.
 
 ## Impact and Use Cases
 
-Empirically, learned fusion tends to outperform any single model when domains vary or label boundaries are ambiguous, with gains attributable to complementary error profiles. Typical applications include:
+### Empirical Performance
 
-- Customer feedback analysis with nuanced multi‑label taxonomies.
-- Content moderation where uncertain cases benefit from LLM reasoning while routine items rely on the ML backbone.
-- Scientific/article routing across heterogeneous topics.
+LabelFusion has been evaluated on standard benchmark datasets to validate its effectiveness. Key findings demonstrate consistent improvements over individual model components:
 
-The approach enables pragmatic cost control (e.g., using fast LLMs for all items and invoking stronger models only for low‑confidence subsets) while retaining a single trainable decision surface.
+#### AG News Topic Classification
+
+Evaluation on the AG News dataset [@zhang2015character] (4-class topic classification) with 5,000 test samples shows:
+
+| Training Data | Model | Accuracy | F1-Score | Precision | Recall |
+|--------------|-------|----------|----------|-----------|--------|
+| 20% (800) | **Fusion** | **92.2%** | **0.922** | 0.923 | 0.922 |
+| 20% (800) | RoBERTa | 89.8% | 0.899 | 0.902 | 0.898 |
+| 20% (800) | OpenAI | 84.4% | 0.844 | 0.857 | 0.844 |
+| 40% (1,600) | **Fusion** | **92.2%** | **0.922** | 0.924 | 0.922 |
+| 40% (1,600) | RoBERTa | 91.0% | 0.911 | 0.913 | 0.910 |
+| 40% (1,600) | OpenAI | 84.4% | 0.844 | 0.857 | 0.844 |
+| 100% (4,000) | **Fusion** | **92.4%** | **0.924** | 0.926 | 0.924 |
+| 100% (4,000) | RoBERTa | 92.2% | 0.922 | 0.923 | 0.922 |
+| 100% (4,000) | OpenAI | 84.4% | 0.844 | 0.857 | 0.844 |
+
+**Key Observations:**
+- Fusion consistently outperforms individual models across all training data sizes
+- With only 20% training data, Fusion achieves 92.2% accuracy—matching its performance with full data
+- Demonstrates superior **data efficiency**: fusion learning extracts maximum value from limited examples
+- RoBERTa alone requires 100% of data to approach Fusion's 20% performance
+- LLM (OpenAI) shows stable but lower performance, highlighting the value of combining approaches
+
+These results validate that learned fusion captures complementary strengths: the LLM provides robust reasoning even with limited training data, while the ML backbone adds efficiency and domain-specific patterns.
+
+### Application Domains
+
+Learned fusion excels in scenarios where model strengths complement each other:
+
+- **Customer feedback analysis** with nuanced multi‑label taxonomies where LLMs handle ambiguous sentiment while ML models efficiently process clear cases
+- **Content moderation** where uncertain cases benefit from LLM reasoning while routine items rely on the fast ML backbone, enabling real-time processing with accuracy guarantees
+- **Scientific literature classification** across heterogeneous topics where domain shift is common and LLMs provide robustness to new terminology
+- **Low-resource settings** where limited training data is available but task complexity requires sophisticated reasoning
+
+The approach enables pragmatic cost control (e.g., the fusion layer learns when to rely more heavily on the efficient ML backbone versus the more expensive LLM signal) while retaining a single trainable decision surface that optimizes for the specific deployment constraints.
 
 ## Acknowledgements
 
-We thank contributors and users who reported issues and shared datasets. LabelFusion builds on the open‑source ecosystem, notably Hugging Face Transformers, scikit‑learn, PyTorch, and LLM provider SDKs.
+We thank contributors and users who reported issues and shared datasets. LabelFusion builds on the open‑source ecosystem, notably Hugging Face Transformers [@wolf2019huggingface], scikit‑learn [@pedregosa2011scikit], PyTorch [@paszke2019pytorch], and LLM provider SDKs. We acknowledge the use of the AG News and GoEmotions benchmark datasets for evaluation.
 
 ## References
