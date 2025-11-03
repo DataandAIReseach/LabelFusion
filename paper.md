@@ -9,10 +9,16 @@ tags:
   - Multi-class
   - Multi-label
 authors:
-  - name: Christoph Weisser
+  - name: Michael Schlee
     affiliation: "1, 2"
-  - name: LabelFusion contributors
+  - name: Chistoph Weisser
+    affiliation: "1, 2"
+  - name: Timo Kivimäki
     affiliation: 1
+  - name: Mel 
+    affiliation: 1
+  - name: Benjamin Saefken 
+    affiliation: 1    
 affiliations:
  - name: Campus-Institut Data Science, Göttingen, Germany
    index: 1
