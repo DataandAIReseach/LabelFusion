@@ -14,16 +14,23 @@ authors:
   - name: Chistoph Weisser
     affiliation: "1, 2"
   - name: Timo Kivimäki
-    affiliation: 1
+    affiliation: 2
   - name: Mel 
-    affiliation: 1
+    affiliation: 4
   - name: Benjamin Saefken 
-    affiliation: 1    
+    affiliation: 3    
 affiliations:
- - name: Campus-Institut Data Science, Göttingen, Germany
-   index: 1
  - name: Centre for Statistics, Georg-August-Universität Göttingen, Germany
+   index: 1
+ - name: Department of Politics and International Studies, University of Bath, Bath, UK
    index: 2
+ - name: Department of Politics and International Studies, University of Bath, Bath, UK
+   index: 3
+ - name: Institute of Mathematics, Clausthal University of Technology, Clausthal-Zellerfeld, Germany
+   index: 4
+
+
+
 date: 15 August 2025
 bibliography: paper.bib
 ---
