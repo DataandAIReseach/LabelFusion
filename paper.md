@@ -10,12 +10,12 @@ tags:
   - Multi-label
 authors:
   - name: Michael Schlee
-    affiliation: "1, 2"
+    affiliation: 1
   - name: Chistoph Weisser
-    affiliation: "1, 2"
+    affiliation: 1
   - name: Timo Kivimäki
     affiliation: 2
-  - name: Mel 
+  - name: Melchy Mashiku
     affiliation: 4
   - name: Benjamin Saefken 
     affiliation: 3    
@@ -24,9 +24,9 @@ affiliations:
    index: 1
  - name: Department of Politics and International Studies, University of Bath, Bath, UK
    index: 2
- - name: Department of Politics and International Studies, University of Bath, Bath, UK
-   index: 3
  - name: Institute of Mathematics, Clausthal University of Technology, Clausthal-Zellerfeld, Germany
+   index: 3
+ - name: 
    index: 4
 
 
