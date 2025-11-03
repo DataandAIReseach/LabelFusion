@@ -20,7 +20,7 @@ affiliations:
  - name: Centre for Statistics, Georg-August-Universität Göttingen, Germany
    index: 2
 date: 15 August 2025
-bibliography: paper_labelfusion.bib
+bibliography: paper.bib
 ---
 
 ## Summary
