@@ -532,7 +532,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         batch_df: pd.DataFrame,
         text_column: str
     ) -> List[List[int]]:
-        """Process a batch of texts for prediction with detailed logging.
+        """Process a batch of texts for prediction with detailed logging and retry logic.
         
         Returns:
             List[List[int]]: List of binary vectors representing predictions
@@ -562,11 +562,42 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if self.verbose and failed_responses > 0:
             self.logger.warning(f"WARNING: {failed_responses} out of {len(responses)} LLM calls failed")
         
-        return [
-            self._parse_prediction_response(r) if not isinstance(r, Exception)
-            else self._handle_error(r)
-            for r in responses
-        ]
+        # Parse responses and retry if needed for multi-label with wrong length
+        predictions = []
+        max_retries = 3
+        
+        for i, r in enumerate(responses):
+            if isinstance(r, Exception):
+                predictions.append(self._handle_error(r))
+                continue
+            
+            # Try parsing with retries for multi-label binary format issues
+            prediction = None
+            for attempt in range(max_retries):
+                prediction = self._parse_prediction_response(r)
+                
+                # Check if we got the right number of labels (only for multi-label)
+                if self.multi_label and len(prediction) == len(self.classes_):
+                    break  # Success!
+                elif not self.multi_label:
+                    break  # For single-label, we don't need to retry
+                else:
+                    # Wrong number of labels in multi-label - retry
+                    if attempt < max_retries - 1:
+                        if self.verbose:
+                            self.logger.warning(f"Retry {attempt + 1}/{max_retries}: Wrong label count ({len(prediction)} != {len(self.classes_)}), retrying LLM call...")
+                        # Call LLM again
+                        r = await self._call_llm(prompts[i])
+                        if isinstance(r, Exception):
+                            prediction = self._handle_error(r)
+                            break
+                    else:
+                        if self.verbose:
+                            self.logger.warning(f"After {max_retries} retries, still wrong label count. Using best-effort prediction.")
+            
+            predictions.append(prediction)
+        
+        return predictions
 
     def _parse_prediction_response(self, response: str) -> List[int]:
         """Parse the LLM response for predictions.
@@ -688,15 +719,31 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if '|' in response:
             binary_parts = [part.strip() for part in response.split('|')]
             # Check if this looks like a binary format (all parts are '0' or '1')
-            if (len(binary_parts) == len(self.classes_) and 
-                all(part in ['0', '1'] for part in binary_parts)):
-                # Convert to integer list and return
-                return [int(part) for part in binary_parts]
+            if all(part in ['0', '1'] for part in binary_parts):
+                # Check if length matches
+                if len(binary_parts) == len(self.classes_):
+                    # Perfect match - convert to integer list and return
+                    return [int(part) for part in binary_parts]
+                else:
+                    # Wrong length - pad or truncate to match expected length
+                    if self.verbose:
+                        self.logger.warning(f"Binary response length ({len(binary_parts)}) doesn't match classes count ({len(self.classes_)})")
+                    
+                    # Pad with zeros if too short
+                    if len(binary_parts) < len(self.classes_):
+                        binary_parts.extend(['0'] * (len(self.classes_) - len(binary_parts)))
+                        if self.verbose:
+                            self.logger.info(f"Padded binary response to {len(self.classes_)} labels")
+                    # Truncate if too long
+                    elif len(binary_parts) > len(self.classes_):
+                        binary_parts = binary_parts[:len(self.classes_)]
+                        if self.verbose:
+                            self.logger.info(f"Truncated binary response to {len(self.classes_)} labels")
+                    
+                    return [int(part) for part in binary_parts]
             else:
-                if self.verbose and len(binary_parts) == len(self.classes_):
-                    self.logger.warning(f"Binary response length matches but contains non-binary values: {binary_parts}")
-                elif self.verbose:
-                    self.logger.warning(f"Binary response length ({len(binary_parts)}) doesn't match classes count ({len(self.classes_)})")
+                if self.verbose:
+                    self.logger.warning(f"Binary response contains non-binary values: {binary_parts}")
         
         # Fallback: parse text-based responses and convert to binary vector
         predicted_classes = []
