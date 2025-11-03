@@ -1,13 +1,13 @@
 """
-Evaluation script for testing Fusion Ensemble performance on GoEmotions dataset.
+Evaluation script for testing Fusion Ensemble performance with different training data sizes on GoEmotions.
 
-This script evaluates the fusion ensemble on the GoEmotions multi-label emotion classification task
-with different training data sizes (starting with 1% for pipeline testing).
+Tests how the ensemble performs with 0.1% to 1% (in 0.1% steps) and 10% to 100% (in 10% steps) of training data,
+while keeping validation and test sets constant.
 """
-
-import sys
 import os
+import sys
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from datetime import datetime
 import json
@@ -28,101 +28,79 @@ def load_datasets(data_dir: str = "data/goemotions"):
     """Load GoEmotions train, validation and test datasets."""
     print(f"Loading datasets from {data_dir}...")
     
-    train_path = Path(data_dir) / "goemotions_all_train_balanced.csv"
-    val_path = Path(data_dir) / "goemotions_all_val_balanced.csv"
-    test_path = Path(data_dir) / "goemotions_all_test_balanced.csv"
+    df_train = pd.read_csv(os.path.join(data_dir, "goemotions_all_train_balanced.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
+    df_val = pd.read_csv(os.path.join(data_dir, "goemotions_all_val_balanced.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
+    df_test = pd.read_csv(os.path.join(data_dir, "goemotions_all_test_balanced.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
     
-    df_train = pd.read_csv(train_path)
-    df_val = pd.read_csv(val_path)
-    df_test = pd.read_csv(test_path)
+    print(f"  Training samples: {len(df_train)}")
+    print(f"  Validation samples: {len(df_val)}")
+    print(f"  Test samples: {len(df_test)}")
     
-    print(f"✅ Loaded {len(df_train)} train, {len(df_val)} val, {len(df_test)} test samples")
     return df_train, df_val, df_test
 
 
-def get_emotion_label_columns():
-    """Return the list of emotion label columns in GoEmotions dataset."""
-    # Based on the CSV structure, these are the emotion labels (excluding metadata columns)
-    emotion_labels = [
-        'admiration', 'amusement', 'anger', 'annoyance', 'approval', 'caring',
-        'confusion', 'curiosity', 'desire', 'disappointment', 'disapproval',
-        'disgust', 'embarrassment', 'excitement', 'fear', 'gratitude', 'grief',
-        'joy', 'love', 'nervousness', 'optimism', 'pride', 'realization',
-        'relief', 'remorse', 'sadness', 'surprise', 'neutral'
-    ]
-    return emotion_labels
-
-
-def create_stratified_subset(df: pd.DataFrame, percentage: float = None, n_samples: int = None, label_columns: list = None, random_state: int = 42) -> pd.DataFrame:
-    """Create a stratified subset of the dataframe for multi-label data.
-    
-    For multi-label classification, we use a simple random sample while trying to
-    maintain some balance across the most common labels.
+def create_stratified_subset(df: pd.DataFrame, percentage: float, label_columns: list, random_state: int = 42) -> pd.DataFrame:
+    """Create a stratified subset of the dataframe.
     
     Args:
-        df: Input dataframe
-        percentage: Percentage of data to sample (0-1)
-        n_samples: Exact number of samples to take (overrides percentage)
-        label_columns: List of label columns for statistics
-        random_state: Random seed
+        df: Input DataFrame
+        percentage: Percentage of data to keep (0.0 to 1.0)
+        label_columns: List of label column names
+        random_state: Random seed for reproducibility
+        
+    Returns:
+        Stratified subset DataFrame
     """
-    if percentage is not None and percentage >= 1.0:
-        return df.copy()
+    from sklearn.model_selection import train_test_split
     
-    if n_samples is not None:
-        target_size = min(n_samples, len(df))
-        size_description = f"{target_size} samples"
-    else:
-        target_size = int(len(df) * percentage)
-        size_description = f"{percentage*100:.1f}% = {target_size} samples"
+    # If percentage is 1.0, return the full dataframe (no split needed)
+    if percentage >= 1.0:
+        return df.reset_index(drop=True)
     
-    # For multi-label, simple random sampling is often sufficient
-    # Stratification is complex for multi-label, so we use random sampling
-    subset_df = df.sample(n=target_size, random_state=random_state)
+    # Split to get the desired percentage
+    try:
+        # For multi-label, create a string representation of the label combination for stratification
+        stratify_column = df[label_columns].apply(lambda row: ''.join(row.astype(int).astype(str)), axis=1)
+        
+        subset_df, _ = train_test_split(
+            df,
+            train_size=percentage,
+            stratify=stratify_column,
+            random_state=random_state
+        )
+    except (ValueError, Exception) as e:
+        # If stratification fails (some combinations too rare), do random sampling
+        print(f"  Warning: Stratification failed for {percentage*100:.1f}%, using random sampling instead")
+        n_samples = max(1, int(len(df) * percentage))
+        subset_df = df.sample(n=n_samples, random_state=random_state)
     
-    print(f"Created subset: {size_description}")
-    
-    # Print label distribution statistics if label_columns provided
-    if label_columns:
-        label_counts = subset_df[label_columns].sum()
-        print(f"Label distribution in subset:")
-        print(f"  - Total labels: {label_counts.sum()}")
-        print(f"  - Avg labels per sample: {label_counts.sum() / len(subset_df):.2f}")
-        print(f"  - Most common: {label_counts.nlargest(3).to_dict()}")
-    
-    return subset_df
+    return subset_df.reset_index(drop=True)
 
 
 def create_ml_model(text_column: str, label_columns: list, output_dir: str, experiment_name: str, 
                     auto_save_path: str = None) -> RoBERTaClassifier:
-    """Create RoBERTa classifier for multi-label emotion classification."""
-    config = ModelConfig(
-        model_name="roberta-base",
+    """Create and configure ML (RoBERTa) model."""
+    ml_config = ModelConfig(
+        model_name='roberta-base',
         model_type=ModelType.TRADITIONAL_ML,
         parameters={
-            "max_length": 128,
-            "batch_size": 16,
-            "num_epochs": 3,
-            "learning_rate": 2e-5,
-            "classification_type": "multi_label"
+            'model_name': 'roberta-base',
+            'max_length': 256,
+            'learning_rate': 2e-5,
+            'num_epochs': 2,  # Faster training for experiments
+            'batch_size': 8,
         }
     )
-    # Explicitly mark model config as multi-label so components that read
-    # `config.label_type` (e.g. PromptEngineer) detect the correct task.
-    try:
-        config.label_type = "multiple"
-    except Exception:
-        # Be defensive: if ModelConfig is immutable or doesn't accept new attrs,
-        # write into parameters as a fallback (already present above).
-        config.parameters["classification_type"] = "multi_label"
+    
     return RoBERTaClassifier(
-        config=config,
+        config=ml_config,
         text_column=text_column,
         label_columns=label_columns,
-        multi_label=True,  # Multiclass now
+        multi_label=True,
+        auto_save_path=auto_save_path,
+        auto_save_results=True,
         output_dir=output_dir,
-        experiment_name=experiment_name,
-        auto_save_path=auto_save_path
+        experiment_name=f"{experiment_name}_roberta"
     )
 
 
@@ -130,373 +108,358 @@ def create_llm_model(text_column: str, label_columns: list,
                      provider: str = 'openai', 
                      output_dir: str = "outputs",
                      experiment_name: str = "llm",
-                     cache_dir: str = "cache",
-                     multi_label: bool = True):
-    """Create LLM classifier for multi-label or multi-class emotion classification.
-
-    Args:
-        text_column: name of the text column
-        label_columns: list of label column names
-        provider: 'openai' or 'deepseek'
-        output_dir: output directory
-        experiment_name: experiment name
-        cache_dir: cache directory
-        multi_label: whether this is a multi-label task (True) or single-label/multi-class (False)
-    """
-    config = Config()
-    
-    llm_config = ModelConfig(
-        model_name="gpt-4o-mini" if provider == 'openai' else "deepseek-chat",
-        model_type=ModelType.LLM,
-        parameters={
-            "model": "gpt-4o-mini" if provider == 'openai' else "deepseek-chat",
-            "temperature": 0.0,
-            "max_tokens": 500,
-            "few_shot_examples": 10,
-            "classification_type": "multi_label" if multi_label else "multi_class"
-        }
-    )
-    # Ensure config exposes label_type for prompt engineering
-    try:
-        llm_config.label_type = "multiple" if multi_label else "single"
-    except Exception:
-        llm_config.parameters["classification_type"] = "multi_label" if multi_label else "multi_class"
+                     cache_dir: str = "cache"):
+    """Create and configure LLM model."""
     
     if provider == 'openai':
+        llm_config = ModelConfig(
+            model_name="gpt-5-nano",
+            model_type=ModelType.LLM,
+            parameters={
+                "model": "gpt-5-nano",
+                "temperature": 0.1,
+                "max_completion_tokens": 150,
+                "top_p": 1.0
+            }
+        )
         return OpenAIClassifier(
             config=llm_config,
             text_column=text_column,
             label_columns=label_columns,
-            multi_label=multi_label,
-            few_shot_mode="few_shot",
+            enable_cache=True,
+            cache_dir=cache_dir,
+            multi_label=True,
+            auto_save_results=True,
             output_dir=output_dir,
-            experiment_name=experiment_name,
-            auto_use_cache=True,
-            cache_dir=cache_dir
+            experiment_name=f"{experiment_name}_openai"
         )
     elif provider == 'deepseek':
+        llm_config = Config()
+        llm_config.model_type = ModelType.LLM
+        llm_config.parameters = {
+            'model': 'deepseek-chat',
+            'temperature': 0.1,
+            'max_completion_tokens': 150,
+            'top_p': 1.0,
+            'frequency_penalty': 0.0,
+            'presence_penalty': 0.0
+        }
         return DeepSeekClassifier(
             config=llm_config,
             text_column=text_column,
             label_columns=label_columns,
-            multi_label=multi_label,
-            few_shot_mode="few_shot",
+            multi_label=True,
+            auto_save_results=True,
+            cache_dir=cache_dir,
             output_dir=output_dir,
-            experiment_name=experiment_name,
-            auto_use_cache=True,
-            cache_dir=cache_dir
+            experiment_name=f"{experiment_name}_deepseek"
         )
     else:
-        raise ValueError(f"Unsupported LLM provider: {provider}")
+        raise ValueError(f"Unknown provider: {provider}")
 
 
 def create_fusion_ensemble(ml_model, llm_model, output_dir: str, experiment_name: str, 
                           auto_use_cache: bool = True, cache_dir: str = "cache",
                           val_llm_cache_path: str = None, test_llm_cache_path: str = None) -> FusionEnsemble:
-    """Create Fusion Ensemble for multi-label emotion classification."""
-    ensemble_config = EnsembleConfig(
-        ensemble_method="fusion",
+    """Create and configure Fusion Ensemble."""
+    fusion_config = EnsembleConfig(
+        ensemble_method='fusion',
         models=[ml_model, llm_model],
         parameters={
-            "fusion_hidden_dims": [64, 32],
-            "fusion_epochs": 10,
-            "fusion_batch_size": 32,
-            "fusion_learning_rate": 0.001,
-            "early_stopping_patience": 3,
-            "use_hidden_states": True,
-            "val_llm_cache_path": val_llm_cache_path or "",
-            "test_llm_cache_path": test_llm_cache_path or "",
-            "classification_type": "multi_label"
+            'fusion_hidden_dims': [64, 32],  # Smaller network to prevent overfitting
+            'ml_lr': 1e-5,  # Low LR for stable RoBERTa fine-tuning
+            'fusion_lr': 5e-4,  # Lower LR for more stable fusion training
+            'num_epochs': 10,  # Fewer epochs (early stopping at ~6-7 would be ideal)
+            'batch_size': 8,
+            'classification_type': 'multi_label',
+            'output_dir': output_dir,
+            'experiment_name': experiment_name,
+            'auto_save_results': True,
+            'val_llm_cache_path': val_llm_cache_path or f"{cache_dir}/val",
+            'test_llm_cache_path': test_llm_cache_path or f"{cache_dir}/test"
         }
     )
     
-    return FusionEnsemble(
-        ensemble_config=ensemble_config,
+    fusion = FusionEnsemble(
+        fusion_config,
         output_dir=output_dir,
         experiment_name=experiment_name,
         auto_save_results=True,
-        save_intermediate_llm_predictions=True,
-        auto_use_cache=auto_use_cache,
-        cache_dir=cache_dir
+        save_intermediate_llm_predictions=False  # Disable intermediate LLM prediction saving
     )
+    
+    fusion.add_ml_model(ml_model)
+    fusion.add_llm_model(llm_model)
+    
+    return fusion
 
 
 def evaluate_with_data_percentage(
     df_train_full: pd.DataFrame,
     df_val: pd.DataFrame,
     df_test: pd.DataFrame,
-    percentage: float = None,
-    n_samples: int = None,
-    text_column: str = None,
-    label_columns: list = None,
+    percentage: float,
+    text_column: str,
+    label_columns: list,
     llm_provider: str = 'openai',
-    base_output_dir: str = "outputs/goemotions_experiments",
+    base_output_dir: str = "outputs/goemotions_availability_experiments",
     auto_use_cache: bool = True,
     cache_dir: str = "cache",
     evaluate_baselines: bool = True
 ) -> dict:
-    """
-    Evaluate fusion ensemble and baselines with a specific percentage or number of samples.
+    """Evaluate fusion ensemble with a specific percentage of training data.
     
     Args:
-        df_train_full: Full training dataset
-        df_val: Validation dataset
-        df_test: Test dataset
-        percentage: Percentage of training data to use (optional)
-        n_samples: Exact number of samples to use (optional, overrides percentage)
+        df_train_full: Full training DataFrame
+        df_val: Validation DataFrame (kept constant)
+        df_test: Test DataFrame (kept constant)
+        percentage: Percentage of training data to use (0.0 to 1.0)
         text_column: Name of text column
-        label_columns: List of label columns
+        label_columns: List of label column names
         llm_provider: LLM provider to use ('openai' or 'deepseek')
-        base_output_dir: Base directory for outputs
-        auto_use_cache: Whether to use automatic caching
-        cache_dir: Cache directory
-        evaluate_baselines: Whether to evaluate baseline models
+        base_output_dir: Base output directory for experiments
+        auto_use_cache: Whether to use cached LLM predictions
+        cache_dir: Directory for LLM prediction caches
+        evaluate_baselines: Whether to evaluate individual models (RoBERTa, LLM) separately
         
     Returns:
         Dictionary with evaluation results
     """
+    percentage_str = f"{int(percentage * 100)}pct" if percentage >= 0.01 else f"{percentage * 100:.1f}pct"
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    experiment_name = f"goemotions_{percentage_str}_{timestamp}"
+    output_dir = os.path.join(base_output_dir, f"train_{percentage_str}")
+    
     print("\n" + "="*80)
-    if n_samples is not None:
-        print(f"🚀 EVALUATING WITH {n_samples} SAMPLES")
-    else:
-        print(f"🚀 EVALUATING WITH {percentage*100:.1f}% OF TRAINING DATA")
+    print(f"EXPERIMENT: Training with {percentage_str} of training data")
     print("="*80)
     
-    # Create subset of training data
-    if n_samples is not None:
-        df_train = create_stratified_subset(df_train_full, n_samples=n_samples, label_columns=label_columns)
-        df_val = create_stratified_subset(df_val, n_samples=n_samples, label_columns=label_columns, random_state=43)
-        df_test = create_stratified_subset(df_test, n_samples=n_samples, label_columns=label_columns, random_state=44)
-        size_str = f"{n_samples}samples"
-    else:
-        df_train = create_stratified_subset(df_train_full, percentage=percentage, label_columns=label_columns)
-        
-        # Also subset validation and test for small test runs (≤ 1%)
-        if percentage <= 0.01:  # For 1% or less training, also subset val and test
-            print(f"\n📊 Creating {percentage*100:.1f}% subsets for validation and test sets as well...")
-            df_val = create_stratified_subset(df_val, percentage=percentage, label_columns=label_columns, random_state=43)
-            df_test = create_stratified_subset(df_test, percentage=percentage, label_columns=label_columns, random_state=44)
-        size_str = f"{int(percentage*100)}pct"
+    # Create stratified subset of training data
+    print(f"\nCreating stratified subset with {percentage:.0%} of training data...")
+    df_train_subset = create_stratified_subset(df_train_full, percentage, label_columns)
+    print(f"  Subset size: {len(df_train_subset)} samples")
     
-    # Create experiment directory
-    experiment_name = f"goemotions_{llm_provider}_{size_str}"
-    output_dir = os.path.join(base_output_dir, experiment_name)
-    os.makedirs(output_dir, exist_ok=True)
+    # Verify class distribution
+    print("\nClass distribution in subset:")
+    subset_dist = df_train_subset[label_columns].sum()
+    print(subset_dist)
     
     # Setup cache paths
-    cache_base = os.path.join(cache_dir, f"goemotions_{llm_provider}_cache_{size_str}")
-    val_cache_path = os.path.join(cache_base, "val")
-    test_cache_path = os.path.join(cache_base, "test")
-    os.makedirs(cache_base, exist_ok=True)
+    ml_cache_path = os.path.join(cache_dir, "experimente", f"fusion_roberta_model_{percentage_str}")
+    llm_cache_base = os.path.join(cache_dir, "experimente", f"fusion_{llm_provider}_cache_{percentage_str}")
+    val_cache_path = os.path.join(llm_cache_base, "val")
+    test_cache_path = os.path.join(llm_cache_base, "test")
     
-    results = {
-        'percentage': percentage if percentage is not None else None,
-        'n_samples': n_samples if n_samples is not None else None,
-        'train_size': len(df_train),
-        'val_size': len(df_val),
-        'test_size': len(df_test),
-        'timestamp': datetime.now().isoformat()
-    }
+    # Create models
+    print("\nCreating models...")
+    ml_model = create_ml_model(text_column, label_columns, output_dir, experiment_name, auto_save_path=ml_cache_path)
+    llm_model = create_llm_model(text_column, label_columns, llm_provider, output_dir, experiment_name, cache_dir=llm_cache_base)
     
-    # 1. Train and evaluate ML model (baseline)
+    # Create fusion ensemble
+    print("Creating fusion ensemble...")
+    fusion = create_fusion_ensemble(ml_model, llm_model, output_dir, experiment_name, auto_use_cache, cache_dir,
+                                   val_llm_cache_path=val_cache_path, test_llm_cache_path=test_cache_path)
+    
+    # Dictionary to store all results
+    all_model_results = {}
+    
+    # ===== BASELINE 1: Evaluate RoBERTa alone (if requested) =====
     if evaluate_baselines:
         print("\n" + "-"*80)
-        print("1️⃣  TRAINING ML MODEL (RoBERTa baseline)")
+        print("BASELINE 1: Evaluating RoBERTa (ML) model alone...")
         print("-"*80)
         
-        ml_model = create_ml_model(
-            text_column=text_column,
-            label_columns=label_columns,
-            output_dir=os.path.join(output_dir, "ml_model"),
-            experiment_name=f"ml_{experiment_name}"
-        )
-        
-        ml_train_result = ml_model.fit(df_train, df_val)
-        print(f"✅ ML training completed")
+        # Train RoBERTa
+        print(f"Training RoBERTa on {len(df_train_subset)} samples...")
+        ml_training_result = ml_model.fit(df_train_subset, df_val)
         
         # Evaluate on test set
+        print("Evaluating RoBERTa on test set...")
         ml_test_result = ml_model.predict(df_test)
-        ml_metrics = ml_test_result.metadata.get('metrics', {})
+        ml_test_metrics = ml_test_result.metadata.get('metrics', {}) if ml_test_result.metadata else {}
         
-        print(f"\n📊 ML Model Test Results:")
-        print(f"   Accuracy: {ml_metrics.get('accuracy', 0):.4f}")
-        print(f"   Macro F1: {ml_metrics.get('macro_f1', 0):.4f}")
-        print(f"   Micro F1: {ml_metrics.get('micro_f1', 0):.4f}")
+        print("\nRoBERTa Test Results:")
+        print(f"  Accuracy: {ml_test_metrics.get('accuracy', 0.0):.4f}")
+        print(f"  F1 Score (Weighted): {ml_test_metrics.get('f1_weighted', 0.0):.4f}")
+        print(f"  Precision (Weighted): {ml_test_metrics.get('precision_weighted', 0.0):.4f}")
+        print(f"  Recall (Weighted): {ml_test_metrics.get('recall_weighted', 0.0):.4f}")
         
-        results['ml_model'] = {
-            'test_accuracy': ml_metrics.get('accuracy', 0),
-            'test_macro_f1': ml_metrics.get('macro_f1', 0),
-            'test_micro_f1': ml_metrics.get('micro_f1', 0),
-            'test_hamming_loss': ml_metrics.get('hamming_loss', 0)
+        all_model_results['roberta'] = {
+            'test_metrics': ml_test_metrics,
+            'training_result': ml_training_result
         }
-    else:
-        print("\n⏩ Skipping ML baseline evaluation")
-        ml_model = create_ml_model(
-            text_column=text_column,
-            label_columns=label_columns,
-            output_dir=os.path.join(output_dir, "ml_model"),
-            experiment_name=f"ml_{experiment_name}"
-        )
     
-    # 2. Evaluate LLM model (baseline)
+    # ===== BASELINE 2: Evaluate LLM alone (if requested) =====
+    # NOTE: LLM predictions are cached and identical for all experiments (same test set)
+    # LLM always uses FULL training data for consistency across all experiments
     if evaluate_baselines:
         print("\n" + "-"*80)
-        print(f"2️⃣  EVALUATING LLM MODEL ({llm_provider.upper()} baseline)")
+        print(f"BASELINE 2: Evaluating {llm_provider.upper()} (LLM) model alone...")
         print("-"*80)
         
-        llm_model = create_llm_model(
-            text_column=text_column,
-            label_columns=label_columns,
-            provider=llm_provider,
-            output_dir=os.path.join(output_dir, "llm_model"),
-            experiment_name=f"llm_{experiment_name}",
-            cache_dir=cache_dir,
-            multi_label=True  # Multiclass now
-        )
+        # LLM predictions are cached (test set is constant across all experiments)
+        # Using FULL training data (not subset) for LLM baseline
+        print(f"Evaluating {llm_provider.upper()} on test set with FULL training data (with caching enabled)...")
+        llm_test_result = llm_model.predict(train_df=df_train_full, test_df=df_test)
+        llm_test_metrics = llm_test_result.metadata.get('metrics', {}) if llm_test_result.metadata else {}
         
-        # LLM prediction with auto-cache
-        llm_test_result = llm_model.predict(train_df=df_train, test_df=df_test)
-        llm_metrics = llm_test_result.metadata.get('metrics', {})
+        print(f"\n{llm_provider.upper()} Test Results (trained on {len(df_train_full)} samples):")
+        print(f"  Accuracy: {llm_test_metrics.get('accuracy', 0.0):.4f}")
+        print(f"  F1 Score: {llm_test_metrics.get('f1', 0.0):.4f}")
+        print(f"  Precision: {llm_test_metrics.get('precision', 0.0):.4f}")
+        print(f"  Recall: {llm_test_metrics.get('recall', 0.0):.4f}")
         
-        print(f"\n📊 LLM Model Test Results:")
-        print(f"   Accuracy: {llm_metrics.get('accuracy', 0):.4f}")
-        print(f"   Macro F1: {llm_metrics.get('macro_f1', 0):.4f}")
-        print(f"   Micro F1: {llm_metrics.get('micro_f1', 0):.4f}")
-        
-        results['llm_model'] = {
-            'test_accuracy': llm_metrics.get('accuracy', 0),
-            'test_macro_f1': llm_metrics.get('macro_f1', 0),
-            'test_micro_f1': llm_metrics.get('micro_f1', 0),
-            'test_hamming_loss': llm_metrics.get('hamming_loss', 0)
+        all_model_results['llm'] = {
+            'test_metrics': llm_test_metrics,
+            'model_name': llm_provider
         }
-    else:
-        print("\n⏩ Skipping LLM baseline evaluation")
-        llm_model = create_llm_model(
-            text_column=text_column,
-            label_columns=label_columns,
-            provider=llm_provider,
-            output_dir=os.path.join(output_dir, "llm_model"),
-            experiment_name=f"llm_{experiment_name}",
-            cache_dir=cache_dir
-        )
     
-    # 3. Train and evaluate Fusion Ensemble
+    # ===== MAIN: Train and evaluate Fusion Ensemble =====
     print("\n" + "-"*80)
-    print("3️⃣  TRAINING FUSION ENSEMBLE")
+    print("FUSION ENSEMBLE: Training combined RoBERTa + LLM model...")
     print("-"*80)
     
-    fusion = create_fusion_ensemble(
-        ml_model=ml_model,
-        llm_model=llm_model,
-        output_dir=os.path.join(output_dir, "fusion"),
-        experiment_name=f"fusion_{experiment_name}",
-        auto_use_cache=auto_use_cache,
-        cache_dir=cache_dir,
-        val_llm_cache_path=val_cache_path,
-        test_llm_cache_path=test_cache_path
-    )
+    # Train fusion ensemble
+    print(f"\nTraining fusion ensemble on {len(df_train_subset)} samples...")
+    training_result = fusion.fit(df_train_subset, df_val)
     
-    # Train fusion
-    fusion_train_result = fusion.fit(df_train, df_val)
-    print(f"✅ Fusion training completed")
+    print("\nTraining completed!")
+    print(f"  ML model trained: {training_result.get('ml_model_trained', False)}")
+    print(f"  Fusion MLP trained: {training_result.get('fusion_mlp_trained', False)}")
     
     # Evaluate on test set
-    print("\n🧪 Evaluating fusion on test set...")
-    fusion_test_result = fusion.predict(df_test)
-    fusion_metrics = fusion_test_result.metadata.get('metrics', {})
+    print("\nEvaluating fusion ensemble on test set...")
+    test_result = fusion.predict(df_test)
     
-    print(f"\n📊 Fusion Ensemble Test Results:")
-    print(f"   Accuracy: {fusion_metrics.get('accuracy', 0):.4f}")
-    print(f"   Macro F1: {fusion_metrics.get('macro_f1', 0):.4f}")
-    print(f"   Micro F1: {fusion_metrics.get('micro_f1', 0):.4f}")
+    # Extract metrics
+    test_metrics = test_result.metadata.get('metrics', {}) if test_result.metadata else {}
     
-    results['fusion'] = {
-        'test_accuracy': fusion_metrics.get('accuracy', 0),
-        'test_macro_f1': fusion_metrics.get('macro_f1', 0),
-        'test_micro_f1': fusion_metrics.get('micro_f1', 0),
-        'test_hamming_loss': fusion_metrics.get('hamming_loss', 0)
+    print("\nFusion Ensemble Test Results:")
+    print(f"  Accuracy: {test_metrics.get('accuracy', 0.0):.4f}")
+    print(f"  F1 Score: {test_metrics.get('f1', 0.0):.4f}")
+    print(f"  Precision: {test_metrics.get('precision', 0.0):.4f}")
+    print(f"  Recall: {test_metrics.get('recall', 0.0):.4f}")
+    
+    all_model_results['fusion'] = {
+        'test_metrics': test_metrics,
+        'training_result': training_result
     }
     
-    # Save results summary
-    results_file = os.path.join(output_dir, "evaluation_results.json")
-    with open(results_file, 'w') as f:
-        json.dump(results, f, indent=2)
+    # ===== COMPARISON SUMMARY =====
+    if evaluate_baselines:
+        print("\n" + "="*80)
+        print("PERFORMANCE COMPARISON")
+        print("="*80)
+        print(f"\nModel Comparison on Test Set ({len(df_test)} samples):")
+        print(f"{'Model':<20} {'Accuracy':>10} {'F1':>10} {'Precision':>12} {'Recall':>10}")
+        print("-" * 65)
+        
+        for model_name in ['roberta', 'llm', 'fusion']:
+            if model_name in all_model_results:
+                metrics = all_model_results[model_name]['test_metrics']
+                display_name = {
+                    'roberta': 'RoBERTa (ML)',
+                    'llm': f'{llm_provider.upper()} (LLM)',
+                    'fusion': 'Fusion Ensemble'
+                }[model_name]
+                
+                acc = metrics.get('accuracy', 0.0)
+                # RoBERTa uses weighted metrics, others use regular metrics
+                if model_name == 'roberta':
+                    f1 = metrics.get('f1_weighted', 0.0)
+                    precision = metrics.get('precision_weighted', 0.0)
+                    recall = metrics.get('recall_weighted', 0.0)
+                else:
+                    f1 = metrics.get('f1', 0.0)
+                    precision = metrics.get('precision', 0.0)
+                    recall = metrics.get('recall', 0.0)
+                
+                print(f"{display_name:<20} {acc:>10.4f} {f1:>10.4f} {precision:>12.4f} {recall:>10.4f}")
+        
+        # Calculate improvement
+        if 'roberta' in all_model_results and 'fusion' in all_model_results:
+            roberta_acc = all_model_results['roberta']['test_metrics'].get('accuracy', 0.0)
+            fusion_acc = all_model_results['fusion']['test_metrics'].get('accuracy', 0.0)
+            improvement = ((fusion_acc - roberta_acc) / roberta_acc * 100) if roberta_acc > 0 else 0
+            
+            print("\n" + "-" * 55)
+            print(f"Fusion vs RoBERTa: {improvement:+.2f}% accuracy improvement")
     
-    print(f"\n💾 Results saved to: {results_file}")
+    # Compile results
+    results = {
+        'percentage': percentage,
+        'percentage_str': percentage_str,
+        'experiment_name': experiment_name,
+        'output_dir': output_dir,
+        'train_samples': len(df_train_subset),
+        'val_samples': len(df_val),
+        'test_samples': len(df_test),
+        'training_result': training_result,
+        'test_metrics': test_metrics,
+        'test_predictions': len(test_result.predictions),
+        'all_models': all_model_results if evaluate_baselines else {'fusion': all_model_results.get('fusion', {})}
+    }
     
     return results
 
 
-def run_goemotions_experiments(
+def run_data_availability_experiments(
     data_dir: str = "data/goemotions",
     percentages: list = None,
-    n_samples: int = 10,  # Default: 10 samples for quick testing
     llm_provider: str = 'openai',
-    base_output_dir: str = "outputs/goemotions_experiments",
+    base_output_dir: str = "outputs/goemotions_availability_experiments",
     auto_use_cache: bool = True,
     cache_dir: str = "cache",
-    evaluate_baselines: bool = True,
-    train_on_all: bool = False
+    evaluate_baselines: bool = True
 ):
-    """
-    Run experiments on GoEmotions dataset with different training data sizes.
+    """Run experiments with different training data percentages.
     
     Args:
-        data_dir: Directory containing GoEmotions CSV files
-        percentages: List of training data percentages to evaluate (optional)
-        n_samples: Number of samples to use (default: 10 for quick testing)
-        llm_provider: LLM provider to use ('openai' or 'deepseek')
-        base_output_dir: Base directory for all experiment outputs
-        auto_use_cache: Whether to use automatic caching
-        cache_dir: Cache directory
-        evaluate_baselines: Whether to evaluate baseline models
+        data_dir: Directory containing GoEmotions data
+        percentages: List of training data percentages to test (default: 0.1%-1% in 0.1% steps, 10%-100% in 10% steps)
+        llm_provider: LLM provider ('openai' or 'deepseek')
+        base_output_dir: Base directory for experiment outputs
+        auto_use_cache: Whether to use cached LLM predictions
+        cache_dir: Directory for LLM prediction caches
+        evaluate_baselines: Whether to evaluate individual models (RoBERTa, LLM) separately
     """
-    print("="*80)
-    print("🎭 GOEMOTIONS MULTI-LABEL EMOTION CLASSIFICATION EXPERIMENTS")
-    print("="*80)
-    print(f"📁 Data directory: {data_dir}")
-    print(f"🤖 LLM Provider: {llm_provider}")
-    if n_samples is not None:
-        print(f"📊 Number of samples: {n_samples} (train, val, test)")
-    else:
-        print(f"📊 Training percentages: {percentages}")
-    print(f"💾 Cache enabled: {auto_use_cache}")
-    print(f"📈 Evaluate baselines: {evaluate_baselines}")
-    
-    # Load datasets
-    df_train, df_val, df_test = load_datasets(data_dir)
-
-    # Optionally merge train, val and test into the training set
-    if train_on_all:
-        print("\n⚠️  TRAIN-ON-ALL enabled: merging train, val and test into the training set.")
-        print("This will use all available labeled data for training. Evaluation will still use the original val/test splits,")
-        print("but note that evaluating on examples that were included in training will produce optimistic metrics.")
-        df_train = pd.concat([df_train, df_val, df_test], ignore_index=True)
-        print(f"✅ New training size: {len(df_train)} (train+val+test merged)")
-    
-    # Get label columns
-    text_column = 'text'
-    label_columns = get_emotion_label_columns()
-    
-    print(f"\n📋 Dataset Info:")
-    print(f"   Text column: {text_column}")
-    print(f"   Label columns: {len(label_columns)} emotions")
-    print(f"   Labels: {', '.join(label_columns[:5])}... (showing first 5)")
+    # Default percentages: 0.1% to 1% in 0.1% steps, then 10% to 100% in 10% steps
+    if percentages is None:
+        percentages = [i * 0.001 for i in range(1, 11)]  # 0.1% to 1.0%
+        percentages += [i * 0.1 for i in range(1, 11)]   # 10% to 100%
     
     # Create output directory
     os.makedirs(base_output_dir, exist_ok=True)
     
-    # Run experiments
+    # Load datasets
+    df_train, df_val, df_test = load_datasets(data_dir)
+    
+    # Detect text and label columns (GoEmotions uses 'text' and emotion labels)
+    text_column = 'text'
+    # For GoEmotions: label columns are the emotion names
+    label_columns = [
+        'admiration', 'amusement', 'anger', 'annoyance', 'approval', 'caring',
+        'confusion', 'curiosity', 'desire', 'disappointment', 'disapproval',
+        'disgust', 'embarrassment', 'excitement', 'fear', 'gratitude', 'grief',
+        'joy', 'love', 'nervousness', 'optimism', 'pride', 'realization',
+        'relief', 'remorse', 'sadness', 'surprise', 'neutral'
+    ]
+    
+    print(f"\nDataset configuration:")
+    print(f"  Text column: {text_column}")
+    print(f"  Label columns: {len(label_columns)} emotions")
+    
+    # Store all results
     all_results = []
     
-    if n_samples is not None:
-        # Run with fixed number of samples
+    # Run experiments for each percentage
+    for percentage in percentages:
         try:
-            results = evaluate_with_data_percentage(
+            result = evaluate_with_data_percentage(
                 df_train_full=df_train,
                 df_val=df_val,
                 df_test=df_test,
-                n_samples=n_samples,
+                percentage=percentage,
                 text_column=text_column,
                 label_columns=label_columns,
                 llm_provider=llm_provider,
@@ -505,127 +468,142 @@ def run_goemotions_experiments(
                 cache_dir=cache_dir,
                 evaluate_baselines=evaluate_baselines
             )
-            all_results.append(results)
+            all_results.append(result)
+            
         except Exception as e:
-            print(f"\n❌ Error evaluating with {n_samples} samples: {e}")
+            print(f"\n❌ Error in experiment with {int(percentage*100)}% training data: {e}")
             import traceback
             traceback.print_exc()
-    else:
-        # Run with percentages
-        for pct in percentages:
-            try:
-                results = evaluate_with_data_percentage(
-                    df_train_full=df_train,
-                    df_val=df_val,
-                    df_test=df_test,
-                    percentage=pct,
-                    text_column=text_column,
-                    label_columns=label_columns,
-                    llm_provider=llm_provider,
-                    base_output_dir=base_output_dir,
-                    auto_use_cache=auto_use_cache,
-                    cache_dir=cache_dir,
-                    evaluate_baselines=evaluate_baselines
-                )
-                all_results.append(results)
-            except Exception as e:
-                print(f"\n❌ Error evaluating with {pct*100:.1f}% data: {e}")
-                import traceback
-                traceback.print_exc()
+            continue
     
-    # Save overall summary
-    summary_file = os.path.join(base_output_dir, "all_experiments_summary.json")
-    with open(summary_file, 'w') as f:
-        json.dump(all_results, f, indent=2)
-    
+    # Save consolidated results
     print("\n" + "="*80)
-    print("✅ ALL EXPERIMENTS COMPLETED")
+    print("SUMMARY OF ALL EXPERIMENTS")
     print("="*80)
-    print(f"📁 Results saved to: {base_output_dir}")
-    print(f"📊 Summary file: {summary_file}")
     
-    # Print comparison table
-    print("\n📊 RESULTS COMPARISON:")
-    print("-"*80)
-    print(f"{'Data Size':<12} {'Model':<15} {'Accuracy':<12} {'Macro F1':<12} {'Micro F1':<12}")
-    print("-"*80)
-    
-    for res in all_results:
-        if res.get('n_samples') is not None:
-            size_str = f"{res['n_samples']} samples"
+    summary_data = []
+    for result in all_results:
+        # Format percentage for display (0.1% or 1% or 10%)
+        pct = result['percentage'] * 100
+        if pct < 1:
+            pct_str = f"{pct:.1f}%"
         else:
-            size_str = f"{res['percentage']*100:.1f}%"
+            pct_str = f"{int(pct)}%"
         
-        if 'ml_model' in res:
-            print(f"{size_str:<12} {'ML (RoBERTa)':<15} "
-                  f"{res['ml_model']['test_accuracy']:<12.4f} "
-                  f"{res['ml_model']['test_macro_f1']:<12.4f} "
-                  f"{res['ml_model']['test_micro_f1']:<12.4f}")
+        # Add fusion results
+        fusion_metrics = result['test_metrics']
+        summary_data.append({
+            'percentage': pct_str,
+            'model': 'Fusion',
+            'train_samples': result['train_samples'],
+            'accuracy': fusion_metrics.get('accuracy', 0.0),
+            'f1': fusion_metrics.get('f1', 0.0),
+            'precision': fusion_metrics.get('precision', 0.0),
+            'recall': fusion_metrics.get('recall', 0.0)
+        })
         
-        if 'llm_model' in res:
-            print(f"{'':<12} {f'LLM ({llm_provider})':<15} "
-                  f"{res['llm_model']['test_accuracy']:<12.4f} "
-                  f"{res['llm_model']['test_macro_f1']:<12.4f} "
-                  f"{res['llm_model']['test_micro_f1']:<12.4f}")
-        
-        if 'fusion' in res:
-            print(f"{'':<12} {'Fusion':<15} "
-                  f"{res['fusion']['test_accuracy']:<12.4f} "
-                  f"{res['fusion']['test_macro_f1']:<12.4f} "
-                  f"{res['fusion']['test_micro_f1']:<12.4f}")
-        
-        print("-"*80)
+        # Add baseline results if available
+        if evaluate_baselines and 'all_models' in result:
+            all_models = result['all_models']
+            
+            if 'roberta' in all_models:
+                ml_metrics = all_models['roberta']['test_metrics']
+                summary_data.append({
+                    'percentage': pct_str,
+                    'model': 'RoBERTa',
+                    'train_samples': result['train_samples'],
+                    'accuracy': ml_metrics.get('accuracy', 0.0),
+                    'f1': ml_metrics.get('f1', 0.0),
+                    'precision': ml_metrics.get('precision', 0.0),
+                    'recall': ml_metrics.get('recall', 0.0)
+                })
+            
+            if 'llm' in all_models:
+                llm_metrics = all_models['llm']['test_metrics']
+                summary_data.append({
+                    'percentage': pct_str,
+                    'model': llm_provider.upper(),
+                    'train_samples': result['train_samples'],
+                    'accuracy': llm_metrics.get('accuracy', 0.0),
+                    'f1': llm_metrics.get('f1', 0.0),
+                    'precision': llm_metrics.get('precision', 0.0),
+                    'recall': llm_metrics.get('recall', 0.0)
+                })
+    
+    summary_df = pd.DataFrame(summary_data)
+    print("\n" + summary_df.to_string(index=False))
+    
+    # Save summary to CSV
+    summary_file = os.path.join(base_output_dir, f"summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+    summary_df.to_csv(summary_file, index=False)
+    print(f"\n📊 Summary saved to: {summary_file}")
+    
+    # Save detailed results to JSON
+    detailed_file = os.path.join(base_output_dir, f"detailed_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+    with open(detailed_file, 'w') as f:
+        json.dump(all_results, f, indent=2, default=str)
+    print(f"📋 Detailed results saved to: {detailed_file}")
+    
+    return all_results, summary_df
 
 
 if __name__ == "__main__":
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Evaluate Fusion Ensemble on GoEmotions dataset")
-    parser.add_argument("--data-dir", type=str, default="data/goemotions",
-                        help="Directory containing GoEmotions CSV files")
-    parser.add_argument("--percentages", type=float, nargs="+", default=None,
-                        help="List of training data percentages to evaluate (e.g., 0.01 0.05 0.1 1.0)")
-    parser.add_argument("--n-samples", type=int, default=10,
-                        help="Number of samples to use for train, val, and test (default: 10)")
-    parser.add_argument("--full", action="store_true",
-                        help="Use full datasets (overrides --n-samples and --percentages)")
-    parser.add_argument("--llm-provider", type=str, default="openai", choices=["openai", "deepseek"],
-                        help="LLM provider to use")
-    parser.add_argument("--output-dir", type=str, default="outputs/goemotions_experiments",
-                        help="Base directory for experiment outputs")
-    parser.add_argument("--no-cache", action="store_true",
-                        help="Disable automatic caching")
-    parser.add_argument("--cache-dir", type=str, default="cache",
-                        help="Cache directory")
-    parser.add_argument("--no-baselines", action="store_true",
-                        help="Skip baseline model evaluation")
-    parser.add_argument("--train-on-all", action="store_true",
-                        help="Merge train, val and test into the training set before training")
-    
-    args = parser.parse_args()
-    
-    # Determine which mode to use
-    if args.full:
-        # Use full datasets
-        percentages = [1.0]
-        n_samples = None
-    elif args.percentages is not None:
-        # Use specified percentages
-        percentages = args.percentages
-        n_samples = None
-    else:
-        # Use n_samples
-        percentages = None
-        n_samples = args.n_samples
-    
-    run_goemotions_experiments(
-        data_dir=args.data_dir,
+    # Environment-variable based runner (no argparse required).
+    # Supported env vars:
+    #   DATA_DIR - path to GoEmotions data (default: data/goemotions)
+    #   PERCENTAGES - comma- or whitespace-separated list of percentages (e.g. "0.001,0.002,0.1,0.2")
+    #   LLM_PROVIDER - 'openai' or 'deepseek' (default: openai)
+    #   OUTPUT_DIR - base output directory (default: outputs/goemotions_availability_experiments)
+    #   NO_CACHE - set to '1' or 'true' to disable cache (default: not set)
+    #   CACHE_DIR - cache directory (default: cache)
+    #   NO_BASELINES - set to '1' or 'true' to skip baseline evaluations
+
+    def _parse_percentages(s: str):
+        """Parse a comma- or whitespace-separated string of floats into a list of floats."""
+        import re
+        if not s:
+            # Default: 0.1% to 1% in 0.1% steps, then 10% to 100% in 10% steps
+            percentages = [i * 0.001 for i in range(1, 11)]  # 0.1% to 1.0%
+            percentages += [i * 0.1 for i in range(1, 11)]   # 10% to 100%
+            return percentages
+        parts = [p for p in re.split('[,\s]+', s.strip()) if p]
+        try:
+            return [float(p) for p in parts]
+        except ValueError:
+            raise ValueError(f"Invalid PERCENTAGES value: {s}")
+
+    data_dir = os.getenv('DATA_DIR', 'data/goemotions')
+    percentages = _parse_percentages(os.getenv('PERCENTAGES', ''))
+    llm_provider = os.getenv('LLM_PROVIDER', 'openai')
+    base_output_dir = os.getenv('OUTPUT_DIR', 'outputs/goemotions_availability_experiments')
+    no_cache_env = os.getenv('NO_CACHE', '')
+    auto_use_cache = not (no_cache_env.lower() in ('1', 'true', 'yes'))
+    cache_dir = os.getenv('CACHE_DIR', 'cache')
+    no_baselines_env = os.getenv('NO_BASELINES', '')
+    evaluate_baselines = not (no_baselines_env.lower() in ('1', 'true', 'yes'))
+
+    print("="*80)
+    print("DATA AVAILABILITY EXPERIMENT - FUSION ENSEMBLE ON GOEMOTIONS")
+    print("="*80)
+    print(f"\nConfiguration:")
+    print(f"  Data directory: {data_dir}")
+    pct_display = [f"{p*100:.1f}%" if p < 0.01 else f"{int(p*100)}%" for p in percentages]
+    print(f"  Training percentages: {pct_display}")
+    print(f"  LLM provider: {llm_provider}")
+    print(f"  Output directory: {base_output_dir}")
+    print(f"  Auto-use cache: {auto_use_cache}")
+    print(f"  Cache directory: {cache_dir}")
+    print(f"  Evaluate baselines: {evaluate_baselines}")
+
+    # Run experiments
+    results, summary = run_data_availability_experiments(
+        data_dir=data_dir,
         percentages=percentages,
-        n_samples=n_samples,
-        llm_provider=args.llm_provider,
-        base_output_dir=args.output_dir,
-        auto_use_cache=not args.no_cache,
-        cache_dir=args.cache_dir,
-        evaluate_baselines=not args.no_baselines,
-        train_on_all=args.train_on_all
+        llm_provider=llm_provider,
+        base_output_dir=base_output_dir,
+        auto_use_cache=auto_use_cache,
+        cache_dir=cache_dir,
+        evaluate_baselines=evaluate_baselines
     )
+
+    print("\n✅ All experiments completed!")
