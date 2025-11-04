@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-11-04_11-39-37_openai_gpt_5_nano
+  git_commit: b06398b8dcd53ac230df9e4cd8cd43e48958249f
+  model_name: openai_classifier
+  timestamp: '2025-11-04T11:47:07.792771'
+metrics:
+  f1: 0.2733333333333333
+  hamming_loss: 0.06428571428571428
+  micro_f1: 0.9357142857142857
+  micro_precision: 0.9357142857142857
+  micro_recall: 0.9357142857142857
+  precision: 0.4
+  recall: 0.225
+  subset_accuracy: 0.1
