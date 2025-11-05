@@ -74,7 +74,6 @@ In contrast, multi-label classification predicts a subset of relevant classes, r
 $$
 f_{\text{ml}}: \mathcal{X} \rightarrow \{0,1\}^K.
 $$
-LabelFusion uses a shared data pipeline so that both problem settings rely on the same feature abstractions while the downstream evaluation metrics respect their distinct label structures.
 
 ### Minimal Example (AutoFusion)
 
