@@ -66,6 +66,16 @@ Key features:
 - **Flexible interfaces**: Command‑line training via `train_fusion.py` with YAML configs for research; or minimal AutoFusion API for quick deployment.
 - **Composable design**: LabelFusion can serve as a strong base learner in higher-level ensembles (e.g., voting/weighted combinations of multiple fusion models).
 
+Formally, multi-class classification assigns each input \(x \in \mathcal{X}\) to exactly one label among \(K\) mutually exclusive classes:
+$$
+f_{\text{mc}}: \mathcal{X} \rightarrow \{1,\dots,K\}.
+$$
+In contrast, multi-label classification predicts a subset of relevant classes, represented as a binary indicator vector \(\mathbf{y} \in \{0,1\}^K\), where \(y_k = 1\) denotes membership in class \(k\):
+$$
+f_{\text{ml}}: \mathcal{X} \rightarrow \{0,1\}^K.
+$$
+LabelFusion uses a shared data pipeline so that both problem settings rely on the same feature abstractions while the downstream evaluation metrics respect their distinct label structures.
+
 ### Minimal Example (AutoFusion)
 
 ```python
