@@ -11,7 +11,7 @@ tags:
 authors:
   - name: Michael Schlee
     affiliation: 1
-  - name: Chistoph Weisser
+  - name: Christoph Weisser
     affiliation: 1
   - name: Timo Kivimäki
     affiliation: 2
