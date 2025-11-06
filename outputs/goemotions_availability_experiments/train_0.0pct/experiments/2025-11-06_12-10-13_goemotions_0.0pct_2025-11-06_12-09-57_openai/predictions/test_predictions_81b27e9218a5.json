@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "experiment_id": "2025-11-06_12-10-13_goemotions_0.0pct_2025-11-06_12-09-57_openai",
+    "model_name": "gpt-5-nano",
+    "model_type": "llm",
+    "classification_type": "multi_label",
+    "timestamp": "2025-11-06T12:11:54.578092",
+    "dataset_name": "test",
+    "dataset_hash": "81b27e9218a5",
+    "num_predictions": 2,
+    "git_commit": "91c29aa6f90ba18634a8c39c5ee5a3ae818d2609"
+  },
+  "predictions": [
+    [
+      "love"
+    ],
+    [
+      "confusion"
+    ]
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {
+    "precision": 0.5,
+    "recall": 0.5,
+    "f1": 0.5,
+    "subset_accuracy": 0.5,
+    "hamming_loss": 0.017857142857142856,
+    "micro_precision": 0.9821428571428571,
+    "micro_recall": 0.9821428571428571,
+    "micro_f1": 0.9821428571428571
+  }
+}

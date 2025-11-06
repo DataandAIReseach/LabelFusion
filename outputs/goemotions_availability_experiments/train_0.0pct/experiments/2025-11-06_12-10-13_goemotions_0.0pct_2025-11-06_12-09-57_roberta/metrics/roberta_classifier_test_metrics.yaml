@@ -1,0 +1,173 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-11-06_12-10-13_goemotions_0.0pct_2025-11-06_12-09-57_roberta
+  git_commit: 91c29aa6f90ba18634a8c39c5ee5a3ae818d2609
+  model_name: roberta_classifier
+  timestamp: '2025-11-06T12:10:28.051716'
+metrics:
+  classification_report:
+    admiration:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 39.0
+    amusement:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 16.0
+    anger:
+      f1-score: 0.06576402321083172
+      precision: 0.034
+      recall: 1.0
+      support: 17.0
+    annoyance:
+      f1-score: 0.15948275862068967
+      precision: 0.08747044917257683
+      recall: 0.9024390243902439
+      support: 41.0
+    approval:
+      f1-score: 0.14471243042671614
+      precision: 0.078
+      recall: 1.0
+      support: 39.0
+    caring:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 14.0
+    confusion:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 22.0
+    curiosity:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 26.0
+    desire:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 10.0
+    disappointment:
+      f1-score: 0.07321772639691715
+      precision: 0.038
+      recall: 1.0
+      support: 19.0
+    disapproval:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 20.0
+    disgust:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 17.0
+    embarrassment:
+      f1-score: 0.0058309037900874635
+      precision: 0.002967359050445104
+      recall: 0.16666666666666666
+      support: 6.0
+    excitement:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 15.0
+    fear:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 6.0
+    gratitude:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 30.0
+    grief:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 0.0
+    joy:
+      f1-score: 0.0916030534351145
+      precision: 0.048
+      recall: 1.0
+      support: 24.0
+    love:
+      f1-score: 0.0842911877394636
+      precision: 0.044
+      recall: 1.0
+      support: 22.0
+    macro avg:
+      f1-score: 0.04474930292041322
+      precision: 0.02522630284395988
+      recall: 0.4221109175377468
+      support: 590.0
+    micro avg:
+      f1-score: 0.10222222222222223
+      precision: 0.056006493506493504
+      recall: 0.5847457627118644
+      support: 590.0
+    nervousness:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 4.0
+    neutral:
+      f1-score: 0.4227129337539432
+      precision: 0.268
+      recall: 1.0
+      support: 134.0
+    optimism:
+      f1-score: 0.0694980694980695
+      precision: 0.036
+      recall: 1.0
+      support: 18.0
+    pride:
+      f1-score: 0.004098360655737705
+      precision: 0.002053388090349076
+      recall: 1.0
+      support: 1.0
+    realization:
+      f1-score: 0.07321772639691715
+      precision: 0.038
+      recall: 1.0
+      support: 19.0
+    relief:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 3.0
+    remorse:
+      f1-score: 0.014285714285714285
+      precision: 0.007211538461538462
+      recall: 0.75
+      support: 4.0
+    sadness:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 13.0
+    samples avg:
+      f1-score: 0.10151450314391491
+      precision: 0.05590822510822511
+      recall: 0.6104
+      support: 590.0
+    surprise:
+      f1-score: 0.04426559356136821
+      precision: 0.02263374485596708
+      recall: 1.0
+      support: 11.0
+    weighted avg:
+      f1-score: 0.1332429929562304
+      precision: 0.08072536153513638
+      recall: 0.5847457627118644
+      support: 590.0
+  exact_match_accuracy: 0.0
+  f1_weighted: 0.1332429929562304
+  hamming_loss: 0.4328571428571429
+  precision_weighted: 0.08072536153513638
+  recall_weighted: 0.5847457627118644
