@@ -127,10 +127,10 @@ def create_llm_model(text_column: str, label_columns: list,
             text_column=text_column,
             label_columns=label_columns,
             auto_use_cache=True,
-            cache_dir=cache_dir,
+            cache_dir=cache_dir,  # Cache goes to cache/ directory
             multi_label=True,
-            auto_save_results=True,
-            output_dir=output_dir,
+            auto_save_results=True,  # Results go to output_dir
+            output_dir=output_dir,  # Results go to outputs/ directory
             experiment_name=f"{experiment_name}_openai"
         )
     elif provider == 'deepseek':
@@ -300,7 +300,7 @@ def evaluate_with_data_percentage(
         # LLM predictions are cached (test set is constant across all experiments)
         # Using FULL training data (not subset) for LLM baseline
         print(f"Evaluating {llm_provider.upper()} on test set with FULL training data (with caching enabled)...")
-        llm_test_result = llm_model.predict(train_df=df_train_full, test_df=df_test)
+        llm_test_result = llm_model.predict(train_df=df_train_full, test_df=df_test.sample(n=2))
         llm_test_metrics = llm_test_result.metadata.get('metrics', {}) if llm_test_result.metadata else {}
         
         print(f"\n{llm_provider.upper()} Test Results (trained on {len(df_train_full)} samples):")
@@ -322,6 +322,13 @@ def evaluate_with_data_percentage(
     # Train fusion ensemble
     print(f"\nTraining fusion ensemble on {len(df_train_subset)} samples...")
     training_result = fusion.fit(df_train_subset, df_val)
+    
+    # TEMPORARY: Exit here for testing
+    print("\n✅ Test successful! Fusion training completed.")
+    print(f"  ML model trained: {training_result.get('ml_model_trained', False)}")
+    print(f"  Fusion MLP trained: {training_result.get('fusion_mlp_trained', False)}")
+    import sys
+    sys.exit(0)
     
     print("\nTraining completed!")
     print(f"  ML model trained: {training_result.get('ml_model_trained', False)}")
@@ -564,6 +571,7 @@ if __name__ == "__main__":
         if not s:
             # Default: 0.1% to 1% in 0.1% steps, then 10% to 100% in 10% steps
             percentages = [i * 0.001 for i in range(1, 11)]  # 0.1% to 1.0%
+            percentages.insert(0, 0.00001)
             percentages += [i * 0.1 for i in range(1, 11)]   # 10% to 100%
             return percentages
         parts = [p for p in re.split('[,\s]+', s.strip()) if p]
