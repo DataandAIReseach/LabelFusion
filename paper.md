@@ -15,7 +15,7 @@ authors:
     affiliation: 1
   - name: Timo Kivimäki
     affiliation: 2
-  - name: Melchy Mashiku
+  - name: Melchizedek Mashiku
     affiliation: 4
   - name: Benjamin Saefken 
     affiliation: 3    
@@ -26,8 +26,8 @@ affiliations:
    index: 2
  - name: Institute of Mathematics, Clausthal University of Technology, Clausthal-Zellerfeld, Germany
    index: 3
- - name: 
-   index: 4 Unkown
+ - name: Tanaq Management Services LLC, Contracting Agency to the Division of Viral Diseases, Centers for Disease Control and Prevention, Chamblee, Georgia, USA
+   index: 4
 
 
 
@@ -164,6 +164,6 @@ The approach enables pragmatic cost control (e.g., the fusion layer learns when 
 
 ## Acknowledgements
 
-We thank contributors and users who reported issues and shared datasets. LabelFusion builds on the open‑source ecosystem, notably Hugging Face Transformers [@wolf2019huggingface], scikit‑learn [@pedregosa2011scikit], PyTorch [@paszke2019pytorch], and LLM provider SDKs. We acknowledge the use of the AG News and GoEmotions benchmark datasets for evaluation.
+We thank contributors and users who reported issues and shared datasets. LabelFusion builds on the open‑source ecosystem, notably Hugging Face Transformers [@wolf2019huggingface], scikit‑learn [@pedregosa2011scikit], PyTorch [@paszke2019pytorch], and LLM provider SDKs. The work presented in this paper was conducted independently by the author Melchizedek Mashiku and is not affiliated with Tanaq Management Services LLC, Contracting Agency to the Division of Viral Diseases, Centers for Disease Control and Prevention, Chamblee, Georgia, USA. We acknowledge the use of the AG News and GoEmotions benchmark datasets for evaluation.
 
 ## References
