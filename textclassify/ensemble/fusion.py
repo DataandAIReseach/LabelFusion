@@ -669,7 +669,7 @@ class FusionEnsemble(BaseEnsemble):
         """Try to load cached LLM predictions from file with dataset validation.
         
         Args:
-            base_cache_path: Base path without datetime extension
+            base_cache_path: Base path without hash extension (e.g., 'cache/path/test')
             df: DataFrame to validate against
             
         Returns:
@@ -681,20 +681,15 @@ class FusionEnsemble(BaseEnsemble):
         try:
             import json
             import os
-            import glob
             
             # Calculate current dataset hash
             current_hash = self._create_dataset_hash(df)
             
-            # First, try to find files with matching hash
-            pattern = f"{base_cache_path}_*_{current_hash}.json"
-            matching_files = glob.glob(pattern)
+            # Try to find file with exact hash match (new format: test_hash.json)
+            cache_filename = f"{base_cache_path}_{current_hash}.json"
             
-            if matching_files:
-                # Get the most recent file with matching hash
-                latest_file = max(matching_files, key=os.path.getctime)
-                
-                with open(latest_file, 'r') as f:
+            if os.path.exists(cache_filename):
+                with open(cache_filename, 'r') as f:
                     cache_data = json.load(f)
                 
                 # Handle both new format (with metadata) and old format (just predictions)
@@ -704,20 +699,21 @@ class FusionEnsemble(BaseEnsemble):
                     
                     # Validate sample count
                     if metadata.get('num_samples') == len(df):
-                        print(f"✅ Loaded matching cached predictions: {latest_file} (Hash: {current_hash})")
+                        print(f"✅ Loaded cached predictions: {cache_filename} (Hash: {current_hash})")
                         return predictions
                     else:
-                        print(f"⚠️ Sample count mismatch in cache: {latest_file}")
+                        print(f"⚠️ Sample count mismatch in cache: {cache_filename}")
                 elif isinstance(cache_data, list):
                     # Old format - just validate sample count
                     if len(cache_data) == len(df):
-                        print(f"✅ Loaded compatible cached predictions: {latest_file} (Hash: {current_hash})")
+                        print(f"✅ Loaded cached predictions: {cache_filename} (Hash: {current_hash})")
                         return cache_data
             
-            # Fallback: Look for old files without hash (backward compatibility)
-            print(f"🔍 No hash-matched cache found, checking backward compatibility...")
-            old_pattern = f"{base_cache_path}_*.json"
-            old_files = [f for f in glob.glob(old_pattern) if not f.endswith(f"_{current_hash}.json")]
+            # Fallback: Look for old files with timestamp (backward compatibility)
+            import glob
+            print(f"🔍 No exact match found, checking backward compatibility...")
+            old_pattern = f"{base_cache_path}_*_{current_hash}.json"
+            old_files = glob.glob(old_pattern)
             
             for file_path in sorted(old_files, key=os.path.getctime, reverse=True):
                 try:
@@ -748,11 +744,11 @@ class FusionEnsemble(BaseEnsemble):
             return None
     
     def _save_cached_llm_predictions(self, predictions: List[Union[str, List[str]]], base_cache_path: str, df: pd.DataFrame):
-        """Save LLM predictions to cache file with datetime stamp and dataset hash.
+        """Save LLM predictions to cache file with dataset hash only.
         
         Args:
             predictions: LLM predictions to save
-            base_cache_path: Base path for the cache file
+            base_cache_path: Base path for the cache file (e.g., 'cache/path/test')
             df: DataFrame for hash calculation and metadata
         """
         if not base_cache_path or not base_cache_path.strip():
@@ -771,19 +767,17 @@ class FusionEnsemble(BaseEnsemble):
             # Calculate dataset hash
             dataset_hash = self._create_dataset_hash(df)
             
-            # Create filename with datetime stamp and hash
-            timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-            cache_filename = f"{base_cache_path}_{timestamp}_{dataset_hash}.json"
+            # Create filename with only hash (format: test_hash.json or val_hash.json)
+            cache_filename = f"{base_cache_path}_{dataset_hash}.json"
             
             # Create cache data with metadata
             cache_data = {
                 'predictions': predictions,
                 'metadata': {
-                    'timestamp': timestamp,
+                    'timestamp': datetime.now().isoformat(),
                     'num_samples': len(df),
                     'dataset_hash': dataset_hash,
-                    'columns': list(df.columns),
-                    'created_at': datetime.now().isoformat()
+                    'columns': list(df.columns)
                 }
             }
             

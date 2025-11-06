@@ -31,6 +31,7 @@ def load_datasets(data_dir: str = "data/goemotions"):
     df_train = pd.read_csv(os.path.join(data_dir, "goemotions_all_train_balanced.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
     df_val = pd.read_csv(os.path.join(data_dir, "goemotions_all_val_balanced.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
     df_test = pd.read_csv(os.path.join(data_dir, "goemotions_all_test_balanced.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
+
     
     print(f"  Training samples: {len(df_train)}")
     print(f"  Validation samples: {len(df_val)}")
@@ -88,7 +89,7 @@ def create_ml_model(text_column: str, label_columns: list, output_dir: str, expe
             'max_length': 256,
             'learning_rate': 2e-5,
             'num_epochs': 2,  # Faster training for experiments
-            'batch_size': 8,
+            'batch_size': 32,  # Larger batch size for efficiency
         }
     )
     
@@ -127,10 +128,10 @@ def create_llm_model(text_column: str, label_columns: list,
             text_column=text_column,
             label_columns=label_columns,
             auto_use_cache=True,
-            cache_dir=cache_dir,  # Cache goes to cache/ directory
+            cache_dir=cache_dir,  # Where to search for existing cache
             multi_label=True,
-            auto_save_results=True,  # Results go to output_dir
-            output_dir=output_dir,  # Results go to outputs/ directory
+            auto_save_results=True,  # Save experiment results to output_dir
+            output_dir=output_dir,  # Experiment outputs go here
             experiment_name=f"{experiment_name}_openai"
         )
     elif provider == 'deepseek':
@@ -150,8 +151,8 @@ def create_llm_model(text_column: str, label_columns: list,
             label_columns=label_columns,
             multi_label=True,
             auto_save_results=True,
-            cache_dir=cache_dir,
-            output_dir=output_dir,
+            cache_dir=cache_dir,  # Where to search for existing cache
+            output_dir=output_dir,  # Experiment outputs go here
             experiment_name=f"{experiment_name}_deepseek"
         )
     else:
@@ -244,16 +245,15 @@ def evaluate_with_data_percentage(
     subset_dist = df_train_subset[label_columns].sum()
     print(subset_dist)
     
-    # Setup cache paths
-    ml_cache_path = os.path.join(cache_dir, "experimente", f"fusion_roberta_model_{percentage_str}")
-    llm_cache_base = os.path.join(cache_dir, "experimente", f"fusion_{llm_provider}_cache_{percentage_str}")
-    val_cache_path = os.path.join(llm_cache_base, "val")
-    test_cache_path = os.path.join(llm_cache_base, "test")
+    # Setup cache paths - save directly in cache directory
+    ml_cache_path = os.path.join(cache_dir, f"fusion_roberta_model_{percentage_str}")
+    val_cache_path = os.path.join(cache_dir, "val")
+    test_cache_path = os.path.join(cache_dir, "test")
     
     # Create models
     print("\nCreating models...")
     ml_model = create_ml_model(text_column, label_columns, output_dir, experiment_name, auto_save_path=ml_cache_path)
-    llm_model = create_llm_model(text_column, label_columns, llm_provider, output_dir, experiment_name, cache_dir=llm_cache_base)
+    llm_model = create_llm_model(text_column, label_columns, llm_provider, output_dir, experiment_name, cache_dir=cache_dir)
     
     # Create fusion ensemble
     print("Creating fusion ensemble...")
@@ -322,13 +322,6 @@ def evaluate_with_data_percentage(
     # Train fusion ensemble
     print(f"\nTraining fusion ensemble on {len(df_train_subset)} samples...")
     training_result = fusion.fit(df_train_subset, df_val)
-    
-    # TEMPORARY: Exit here for testing
-    print("\n✅ Test successful! Fusion training completed.")
-    print(f"  ML model trained: {training_result.get('ml_model_trained', False)}")
-    print(f"  Fusion MLP trained: {training_result.get('fusion_mlp_trained', False)}")
-    import sys
-    sys.exit(0)
     
     print("\nTraining completed!")
     print(f"  ML model trained: {training_result.get('ml_model_trained', False)}")
@@ -587,7 +580,7 @@ if __name__ == "__main__":
     no_cache_env = os.getenv('NO_CACHE', '')
     auto_use_cache = not (no_cache_env.lower() in ('1', 'true', 'yes'))
     cache_dir = os.getenv('CACHE_DIR', 'cache')
-    no_baselines_env = os.getenv('NO_BASELINES', '')
+    no_baselines_env = os.getenv('NO_BASELINES', '1')  # Default to skipping baselines for testing
     evaluate_baselines = not (no_baselines_env.lower() in ('1', 'true', 'yes'))
 
     print("="*80)
