@@ -1,0 +1,165 @@
+# Standard ML Project Configuration Template
+# This configuration demonstrates the new standardized project structure features
+
+# Dataset configuration
+data:
+  train_file: "data/ag_news/ag_train_balanced.csv"
+  val_file: "data/ag_news/ag_val_balanced.csv" 
+  test_file: "data/ag_news/ag_test_balanced.csv"
+  text_column: "description"
+  label_columns: ["label_1", "label_2", "label_3", "label_4"]
+
+# ML Model configuration (RoBERTa)
+ml_model:
+  model_name: "roberta-base"
+  parameters:
+    learning_rate: 2e-5
+    num_epochs: 3
+    batch_size: 16
+    max_length: 512
+  # Results management
+  auto_save_results: true
+  output_dir: "outputs"
+  experiment_name: "roberta_experiment"
+
+# LLM Model configuration
+llm_model:
+  model_name: "gpt-4o-mini"
+  parameters:
+    model: "gpt-4o-mini"
+    temperature: 0.1
+    max_completion_tokens: 150
+    top_p: 1.0
+  # Caching configuration
+  enable_cache: true
+  cache_dir: "outputs/cache/llm"
+
+# Fusion Ensemble configuration
+fusion_ensemble:
+  ensemble_method: "fusion"
+  parameters:
+    # Fusion architecture
+    fusion_hidden_dims: [64, 32]
+    ml_lr: 1e-5
+    fusion_lr: 1e-3
+    num_epochs: 10
+    batch_size: 16
+    
+    # Classification setup
+    classification_type: "multi_class"
+    
+    # LLM prediction caching with dataset validation
+    val_llm_cache_path: "outputs/cache/llm/validation_predictions"
+    test_llm_cache_path: "outputs/cache/llm/test_predictions"
+    
+    # Results management (NEW FEATURES)
+    auto_save_results: true           # Enable automatic results saving
+    output_dir: "outputs"             # Base directory following standard structure
+    experiment_name: "fusion_ag_news" # Experiment identifier
+    
+    # Additional results options
+    save_model_artifacts: true        # Save trained model files
+    save_predictions_csv: true        # Save predictions in CSV format
+    save_predictions_json: true       # Save predictions in JSON format with metadata
+    save_metrics_yaml: true          # Save metrics in human-readable YAML
+    include_dataset_hash: true        # Include dataset hash for validation
+    track_git_commit: true           # Include git commit in metadata
+    auto_create_dirs: true           # Automatically create directory structure
+
+# Standard ML Project Structure (Generated automatically)
+# outputs/
+# ├── experiments/
+# │   ├── 2025-10-13_14-30-45_fusion_ag_news/
+# │   │   ├── predictions/
+# │   │   │   ├── train_predictions_abc123def456.csv      # Training predictions with dataset hash
+# │   │   │   ├── train_predictions_abc123def456.json     # Training predictions with metadata
+# │   │   │   ├── val_predictions_def789ghi012.csv        # Validation predictions
+# │   │   │   ├── val_predictions_def789ghi012.json       # Validation predictions with metadata
+# │   │   │   ├── test_predictions_ghi345jkl678.csv       # Test predictions
+# │   │   │   └── test_predictions_ghi345jkl678.json      # Test predictions with metadata
+# │   │   ├── metrics/
+# │   │   │   ├── roberta_classifier_train_metrics.yaml  # ML model training metrics
+# │   │   │   ├── roberta_classifier_test_metrics.yaml   # ML model test metrics
+# │   │   │   ├── fusion_ensemble_train_metrics.yaml     # Ensemble training metrics
+# │   │   │   └── fusion_ensemble_test_metrics.yaml      # Ensemble test metrics
+# │   │   ├── models/
+# │   │   │   ├── roberta_classifier/                    # ML model artifacts
+# │   │   │   │   ├── model.pth                         # PyTorch model state
+# │   │   │   │   ├── config.json                       # Model configuration
+# │   │   │   │   └── tokenizer/                        # Tokenizer files
+# │   │   │   └── fusion_ensemble/                      # Ensemble artifacts
+# │   │   │       ├── fusion_mlp.pth                    # Fusion MLP weights
+# │   │   │       └── ensemble_config.yaml              # Ensemble configuration
+# │   │   ├── logs/
+# │   │   │   ├── experiment.log                        # Training logs
+# │   │   │   ├── ml_training.log                       # ML model specific logs
+# │   │   │   └── llm_predictions.log                   # LLM prediction logs
+# │   │   ├── plots/                                    # Generated visualizations
+# │   │   │   ├── training_curves.png                   # Loss/accuracy curves
+# │   │   │   ├── confusion_matrix.png                  # Classification results
+# │   │   │   └── feature_importance.png                # Model interpretability
+# │   │   ├── roberta_classifier_config.yaml            # ML model configuration
+# │   │   ├── fusion_ensemble_config.yaml               # Ensemble configuration
+# │   │   └── experiment_summary.yaml                   # Complete experiment summary
+# │   └── 2025-10-13_16-45-20_roberta_baseline/        # Another experiment
+# └── cache/
+#     ├── llm/                                          # LLM prediction cache
+#     │   ├── validation_predictions_2025-10-13-14-30-45_abc123.json
+#     │   ├── test_predictions_2025-10-13-14-30-45_def456.json
+#     │   └── sessions/                                 # LLM session caches
+#     └── datasets/                                     # Dataset version hashes
+#         └── dataset_hashes.json
+
+# Key Features of the Standard Structure:
+# 
+# 1. 📁 ORGANIZED BY EXPERIMENT:
+#    - Each experiment gets a unique timestamped directory
+#    - Clear separation between different runs
+#    - Easy to compare results across experiments
+#
+# 2. 🔐 DATASET VALIDATION:
+#    - Dataset hashes ensure cache validity
+#    - Prevents loading wrong cached predictions
+#    - Automatic cache invalidation on data changes
+#
+# 3. 📊 COMPREHENSIVE METADATA:
+#    - Git commit tracking for reproducibility
+#    - Environment information capture
+#    - Complete configuration preservation
+#    - Automatic timestamp recording
+#
+# 4. 🎯 MULTIPLE FORMATS:
+#    - CSV files for easy inspection and analysis
+#    - JSON files with rich metadata
+#    - YAML files for human-readable configuration
+#    - Standard formats for ML pipeline integration
+#
+# 5. 🔄 REPRODUCIBILITY:
+#    - All information needed to reproduce results
+#    - Version tracking of code and data
+#    - Environment information capture
+#    - Seed and configuration preservation
+#
+# 6. 🧩 INTEGRATION READY:
+#    - Compatible with MLflow, Weights & Biases
+#    - Standard formats for downstream analysis
+#    - Easy experiment comparison and tracking
+#    - Visualization-ready data organization
+
+# Example usage in code:
+# 
+# from textclassify.ensemble.fusion import FusionEnsemble
+# from textclassify.core.types import EnsembleConfig
+# 
+# # Load this configuration
+# config = EnsembleConfig.from_yaml("config/standard_project_config.yaml")
+# 
+# # Create ensemble with automatic results management
+# ensemble = FusionEnsemble(config)
+# 
+# # Train and automatically save all results in standard structure
+# training_result = ensemble.fit(train_df, val_df)
+# test_result = ensemble.predict(test_df)
+# 
+# # Results are automatically saved to:
+# print(f"Results saved to: {training_result['output_directory']}")

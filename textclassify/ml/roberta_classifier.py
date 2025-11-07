@@ -1,14 +1,21 @@
 """RoBERTa-based text classifier using transformers."""
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
+import faulthandler
+import gc
 from typing import Any, Dict, List, Optional, Union
 import warnings
+import os
+import json
+from pathlib import Path
 
-from ..core.types import ClassificationResult, ClassificationType, TrainingData, ModelType
+from ..core.types import ClassificationResult, ClassificationType, ModelType
 from ..core.exceptions import ModelTrainingError, PredictionError, ValidationError
+from ..utils.results_manager import ResultsManager, ModelResultsManager
 from .base import BaseMLClassifier
 from .preprocessing import TextPreprocessor, clean_text, normalize_text
 
@@ -55,23 +62,51 @@ class TextDataset(Dataset):
             max_length=self.max_length,
             return_tensors='pt'
         )
-        
         # Use appropriate data type based on classification type
-        if self.classification_type == ClassificationType.MULTI_LABEL:
-            # Multi-label needs float for BCEWithLogitsLoss
-            label_tensor = torch.tensor(self.labels[idx], dtype=torch.float)
-        else:
-            # Multi-class: convert one-hot encoded vector to class index
-            # e.g., [0, 1, 0] -> 1 (index of the 1)
-            if isinstance(self.labels[idx], list):
-                class_idx = self.labels[idx].index(1)  # Find index of the 1 in one-hot vector
+        # Normalize label formats robustly to avoid crashes when label arrays contain no explicit 1
+        import numpy as _np
+
+        raw_label = self.labels[idx]
+
+        # Convert various possible label representations to a numpy array
+        try:
+            if isinstance(raw_label, list):
+                label_arr = _np.array(raw_label)
+            elif hasattr(raw_label, 'dtype') or hasattr(raw_label, 'shape'):
+                # numpy array or pandas-backed type
+                label_arr = _np.array(raw_label)
             else:
-                class_idx = int(np.argmax(self.labels[idx]))  # For numpy arrays
+                # scalar (class index) -> wrap into array
+                label_arr = _np.array([raw_label])
+        except Exception:
+            # Fallback: try to coerce to array
+            label_arr = _np.array(raw_label)
+
+        if self.classification_type == ClassificationType.MULTI_LABEL:
+            # Multi-label expects a binary vector
+            label_tensor = torch.tensor(label_arr.astype(float), dtype=torch.float)
+        else:
+            # MULTI_CLASS: prefer explicit one-hot (index of 1). If no 1 present, fallback to argmax.
+            if label_arr.size > 1:
+                ones = _np.where(label_arr == 1)[0]
+                if ones.size > 0:
+                    class_idx = int(ones[0])
+                else:
+                    # no explicit one-hot marker found -> fallback to argmax
+                    class_idx = int(_np.argmax(label_arr))
+            else:
+                # already a scalar class index
+                class_idx = int(label_arr.item())
+
             label_tensor = torch.tensor(class_idx, dtype=torch.long)
-        
+
+        # Remove leading batch dim from tokenizer outputs (tokenizers return tensors with batch dim)
+        input_ids = encoding['input_ids'].squeeze(0)
+        attention_mask = encoding['attention_mask'].squeeze(0)
+
         return {
-            'input_ids': encoding['input_ids'].flatten(),
-            'attention_mask': encoding['attention_mask'].flatten(),
+            'input_ids': input_ids,
+            'attention_mask': attention_mask,
             'labels': label_tensor
         }
 
@@ -79,11 +114,30 @@ class TextDataset(Dataset):
 class RoBERTaClassifier(BaseMLClassifier):
     """RoBERTa-based text classifier."""
     
-    def __init__(self, config):
+    def __init__(
+        self,
+        config,
+        text_column: str = 'text',
+        label_columns: Optional[List[str]] = None,
+        multi_label: bool = False,
+        enable_validation: bool = True,
+        auto_save_path: Optional[str] = None,
+        auto_save_results: bool = True,
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None
+    ):
         """Initialize RoBERTa classifier.
         
         Args:
             config: Model configuration
+            text_column: Name of the column containing text data
+            label_columns: List of column names containing labels
+            multi_label: Whether this is a multi-label classifier
+            enable_validation: Whether to evaluate on validation data during training
+            auto_save_path: Optional path to automatically save model after training
+            auto_save_results: Whether to automatically save training/prediction results
+            output_dir: Base directory for saving results
+            experiment_name: Name for the experiment (for results organization)
         """
         if not TRANSFORMERS_AVAILABLE:
             raise ImportError(
@@ -92,6 +146,32 @@ class RoBERTaClassifier(BaseMLClassifier):
             )
         
         super().__init__(config)
+        
+        # DataFrame interface parameters
+        self.text_column = text_column
+        self.label_columns = label_columns or []
+        self.multi_label = multi_label
+        self.enable_validation = enable_validation
+        self.auto_save_path = auto_save_path
+        
+        # Results management
+        self.auto_save_results = auto_save_results
+        self.results_manager = None
+        self.model_results_manager = None
+        
+        if self.auto_save_results:
+            exp_name = experiment_name or f"roberta_{self.config.model_name}"
+            self.results_manager = ResultsManager(
+                base_output_dir=output_dir,
+                experiment_name=exp_name
+            )
+            self.model_results_manager = ModelResultsManager(
+                self.results_manager,
+                f"roberta_{self.config.model_name}"
+            )
+        
+        # Set up classes
+        self.classes_ = label_columns if label_columns else []
         
         # Model parameters
         self.model_name = self.config.parameters.get('model_name', 'roberta-base')
@@ -115,109 +195,372 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.label_encoder = None
         self.num_labels = None
     
-    def fit(self, training_data: TrainingData) -> None:
-        """Train the RoBERTa classifier.
+    def fit(
+        self,
+        train_df: pd.DataFrame,
+        val_df: Optional[pd.DataFrame] = None
+    ) -> Dict[str, Any]:
+        """Train the RoBERTa classifier on the provided DataFrames.
         
         Args:
-            training_data: Training data containing texts and labels
+            train_df: Training DataFrame with text and label columns
+            val_df: Optional validation DataFrame for evaluation during training
+            
+        Returns:
+            Dictionary containing training metrics and information
         """
-        self.classification_type = training_data.classification_type
+        if not self.text_column:
+            raise ValueError("text_column must be specified in constructor")
+        if not self.label_columns:
+            raise ValueError("label_columns must be specified in constructor")
         
-        # Preprocess texts
-        processed_texts = []
-        for text in training_data.texts:
-            cleaned = clean_text(text)
-            normalized = normalize_text(cleaned)
-            preprocessed = self.preprocessor.preprocess_text(normalized)
-            processed_texts.append(preprocessed if preprocessed else text)  # Fallback to original if empty
+        # Set up classes from label columns
+        self.classes_ = self.label_columns
         
-        # Prepare labels - labels are already in binary format from validation
-        encoded_labels = training_data.labels
+        # Extract and preprocess texts from DataFrames
+        train_texts = train_df[self.text_column].tolist()
+        train_texts = [self.preprocessor.preprocess_text(text) for text in train_texts]
+        train_labels = train_df[self.label_columns].values.tolist()
         
-        # Determine number of labels from the first label vector
-        first_label = training_data.labels[0]
-        self.num_labels = len(first_label)
+        val_texts = None
+        val_labels = None
+        if val_df is not None:
+            val_texts = val_df[self.text_column].tolist()
+            val_texts = [self.preprocessor.preprocess_text(text) for text in val_texts]
+            val_labels = val_df[self.label_columns].values.tolist()
         
-        # Get class names from configuration if available, otherwise create dummy names
-        if hasattr(self.config, 'parameters') and 'label_columns' in self.config.parameters:
-            self.classes_ = self.config.parameters['label_columns']
+        # Set up tokenizer and model
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        
+        # Determine number of labels and classification type
+        self.num_labels = len(self.label_columns)
+        
+        # Set classification type based on multi_label flag
+        if self.multi_label:
+            self.classification_type = ClassificationType.MULTI_LABEL
         else:
-            if self.classification_type == ClassificationType.MULTI_CLASS:
-                self.classes_ = [f"class_{i}" for i in range(self.num_labels)]
-            else:
-                self.classes_ = [f"label_{i}" for i in range(self.num_labels)]
+            self.classification_type = ClassificationType.MULTI_CLASS
         
-        # No label encoder needed since labels are already in binary format
-        self.label_encoder = None
+        # Initialize model
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            self.model_name,
+            num_labels=self.num_labels,
+            problem_type="multi_label_classification" if self.multi_label else "single_label_classification"
+        )
+        self.model.to(self.device)
         
-        # Initialize tokenizer and model
-        try:
-            # Validate that this is actually a RoBERTa model
-            if not any(roberta_variant in self.model_name.lower() for roberta_variant in ['roberta', 'distilroberta']):
-                raise ValueError(f"RoBERTaClassifier only supports RoBERTa models. Got: {self.model_name}")
-            
-            self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            
-            # Use AutoModelForSequenceClassification for both multi-class and multi-label
-            self.model = AutoModelForSequenceClassification.from_pretrained(
-                self.model_name,
-                num_labels=self.num_labels,
-                problem_type="multi_label_classification" if self.classification_type == ClassificationType.MULTI_LABEL else "single_label_classification"
+        # Create datasets
+        train_dataset = TextDataset(
+            texts=train_texts,
+            labels=train_labels,
+            tokenizer=self.tokenizer,
+            max_length=self.max_length,
+            classification_type=self.classification_type
+        )
+        
+        val_dataset = None
+        if val_texts is not None and val_labels is not None:
+            val_dataset = TextDataset(
+                texts=val_texts,
+                labels=val_labels,
+                tokenizer=self.tokenizer,
+                max_length=self.max_length,
+                classification_type=self.classification_type
             )
-            
-            self.model.to(self.device)
-            
-        except Exception as e:
-            raise ModelTrainingError(f"Failed to initialize RoBERTa model: {str(e)}", self.model_name)
         
-        # Create dataset and dataloader
-        dataset = TextDataset(processed_texts, encoded_labels, self.tokenizer, self.max_length, self.classification_type)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        # Create data loaders
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+        val_loader = None
+        if val_dataset is not None:
+            val_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
         
-        # Setup optimizer and scheduler
-        optimizer = AdamW(self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+        # Set up optimizer and scheduler
+        optimizer = AdamW(
+            self.model.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay
+        )
         
-        total_steps = len(dataloader) * self.num_epochs
+        total_steps = len(train_loader) * self.num_epochs
         scheduler = get_linear_schedule_with_warmup(
             optimizer,g
             num_warmup_steps=self.warmup_steps,
             num_training_steps=total_steps
         )
         
+        # Ensure faulthandler is enabled to get Python-level tracebacks on crashes
+        try:
+            faulthandler.enable()
+        except Exception:
+            # faulthandler may already be enabled or not available in some envs
+            pass
+
         # Training loop
-        self.model.train()
-        
         for epoch in range(self.num_epochs):
-            total_loss = 0
+            print(f"Epoch {epoch + 1}/{self.num_epochs}")
+
+            # Training phase
+            self.model.train()
+            total_train_loss = 0
+            train_steps = 0
+
+            # Basic sanity prints
+            try:
+                print(f"Train loader batches: {len(train_loader)} | batch_size: {self.batch_size} | device: {self.device}")
+            except Exception:
+                print("Train loader length not available")
+
+            for batch_idx, batch in enumerate(train_loader):
+                # Periodic logging to trace progress and detect silent exits
+                if batch_idx % 10 == 0:
+                    print(f"  [epoch {epoch+1}] processing batch {batch_idx}")
+
+                try:
+                    input_ids = batch['input_ids'].to(self.device)
+                    attention_mask = batch['attention_mask'].to(self.device)
+                    labels = batch['labels'].to(self.device)
+
+                    optimizer.zero_grad()
+
+                    outputs = self.model(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        labels=labels
+                    )
+
+                    loss = outputs.loss
+                    loss.backward()
+                    optimizer.step()
+                    scheduler.step()
+
+                    total_train_loss += loss.item()
+                    train_steps += 1
+
+                except Exception as e:
+                    # Catch and log any exception during batch processing so we don't exit silently
+                    import traceback as _tb
+                    print(f"Exception while processing batch {batch_idx}: {e}")
+                    _tb.print_exc()
+                    # Try to free GPU memory and continue or re-raise depending on severity
+                    try:
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                    except Exception:
+                        pass
+                    gc.collect()
+                    # Re-raise to stop training after logging — caller can inspect logs
+                    raise
             
-            for batch in dataloader:
-                # Move batch to device
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
-                labels = batch['labels'].to(self.device)
-                
-                # Forward pass
-                optimizer.zero_grad()
-                
-                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-                loss = outputs.loss
-                
-                # Backward pass
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-                
-                optimizer.step()
-                scheduler.step()
-                
-                total_loss += loss.item()
+            avg_train_loss = total_train_loss / train_steps
+            print(f"  Average training loss: {avg_train_loss:.4f}")
             
-            avg_loss = total_loss / len(dataloader)
-            print(f"Epoch {epoch + 1}/{self.num_epochs}, Average Loss: {avg_loss:.4f}")
+            # Validation phase
+            if val_loader is not None and self.enable_validation:
+                self.model.eval()
+                total_val_loss = 0
+                val_steps = 0
+                
+                with torch.no_grad():
+                    for batch in val_loader:
+                        input_ids = batch['input_ids'].to(self.device)
+                        attention_mask = batch['attention_mask'].to(self.device)
+                        labels = batch['labels'].to(self.device)
+                        
+                        outputs = self.model(
+                            input_ids=input_ids,
+                            attention_mask=attention_mask,
+                            labels=labels
+                        )
+                        
+                        loss = outputs.loss
+                        total_val_loss += loss.item()
+                        val_steps += 1
+                
+                avg_val_loss = total_val_loss / val_steps
+                print(f"  Average validation loss: {avg_val_loss:.4f}")
         
         self.is_trained = True
+        print("✅ Model training completed!")
+        
+        # Auto-save model if path is provided
+        if self.auto_save_path:
+            self.save_model(self.auto_save_path)
+        
+        # Generate and save validation predictions if validation data is provided
+        val_predictions_saved = None
+        if val_df is not None and self.enable_validation:
+            print("📝 Generating validation predictions...")
+            try:
+                val_result = self._predict_on_dataset(val_df, dataset_type="validation")
+                val_predictions_saved = {
+                    'accuracy': val_result.metadata.get('metrics', {}).get('accuracy', 0.0) if val_result.metadata else 0.0,
+                    'num_samples': len(val_df)
+                }
+                print(f"✅ Validation predictions saved with accuracy: {val_predictions_saved['accuracy']:.4f}")
+            except Exception as e:
+                print(f"⚠️ Warning: Could not save validation predictions: {e}")
+                val_predictions_saved = None
+        
+        # Prepare training result
+        training_result = {
+            "model_name": self.model_name,
+            "num_labels": self.num_labels,
+            "classes": self.classes_,
+            "training_samples": len(train_df),
+            "validation_samples": len(val_df) if val_df is not None else 0,
+            "validation_predictions": val_predictions_saved,
+            "device": str(self.device)
+        }
+        
+        # Save training results using ResultsManager
+        if self.results_manager:
+            try:
+                # Save model configuration
+                model_config_dict = {
+                    'model_name': self.model_name,
+                    'max_length': self.max_length,
+                    'batch_size': self.batch_size,
+                    'learning_rate': self.learning_rate,
+                    'num_epochs': self.num_epochs,
+                    'multi_label': self.multi_label,
+                    'num_labels': self.num_labels,
+                    'classes': self.classes_,
+                    'text_column': self.text_column,
+                    'label_columns': self.label_columns
+                }
+                
+                self.results_manager.save_model_config(
+                    model_config_dict, 
+                    "roberta_classifier"
+                )
+                
+                # Save training summary
+                self.results_manager.save_experiment_summary(training_result)
+                
+                # Get experiment info
+                exp_info = self.results_manager.get_experiment_info()
+                training_result['experiment_info'] = exp_info
+                training_result['output_directory'] = exp_info['experiment_dir']
+                
+                print(f"📁 Training results saved to: {exp_info['experiment_dir']}")
+                
+            except Exception as e:
+                print(f"Warning: Could not save training results: {e}")
+        
+        return training_result
     
-    def predict(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
-        """Predict labels for texts.
+    def _predict_on_dataset(
+        self, 
+        data_df: pd.DataFrame, 
+        dataset_type: str = "test"
+    ) -> ClassificationResult:
+        """Predict on a dataset with specified dataset type for proper file naming.
+        
+        Args:
+            data_df: DataFrame for prediction with text and optionally label columns
+            dataset_type: Type of dataset ("test", "validation", etc.) for file naming
+            
+        Returns:
+            ClassificationResult with predictions and metrics
+        """
+        # Check if model is trained
+        if not self.is_trained:
+            raise ValidationError("Model must be trained first. Call fit() method before predict().")
+        
+        if not self.text_column:
+            raise ValidationError("text_column must be specified in constructor")
+        if not self.label_columns:
+            raise ValidationError("label_columns must be specified in constructor")
+        
+        # Extract texts
+        texts = data_df[self.text_column].tolist()
+        
+        # Extract true labels if available
+        true_labels = None
+        if all(col in data_df.columns for col in self.label_columns):
+            true_labels = data_df[self.label_columns].values.tolist()
+        
+        # Store DataFrame reference for results saving with specified dataset type
+        if self.results_manager:
+            self._current_test_df = data_df
+            self._current_dataset_type = dataset_type
+        
+        # Make predictions using the internal text method
+        result = self._predict_texts_internal(texts, true_labels)
+        
+        # Clean up temporary references
+        if hasattr(self, '_current_test_df'):
+            delattr(self, '_current_test_df')
+        if hasattr(self, '_current_dataset_type'):
+            delattr(self, '_current_dataset_type')
+            
+        return result
+
+    def predict(
+        self,
+        test_df: pd.DataFrame
+    ) -> ClassificationResult:
+        """Predict on test data using DataFrame.
+        
+        Note: Model must be trained first using the fit() method.
+        
+        Args:
+            test_df: Test DataFrame for prediction with text and optionally label columns
+            
+        Returns:
+            ClassificationResult with predictions and metrics
+        """
+        return self._predict_on_dataset(test_df, dataset_type="test")
+
+    def predict_without_saving(
+        self,
+        data_df: pd.DataFrame
+    ) -> ClassificationResult:
+        """Predict on data without saving results (for internal use by ensembles).
+        
+        Args:
+            data_df: DataFrame for prediction with text and optionally label columns
+            
+        Returns:
+            ClassificationResult with predictions and metrics
+        """
+        # Check if model is trained
+        if not self.is_trained:
+            raise ValidationError("Model must be trained first. Call fit() method before predict().")
+        
+        if not self.text_column:
+            raise ValidationError("text_column must be specified in constructor")
+        if not self.label_columns:
+            raise ValidationError("label_columns must be specified in constructor")
+        
+        # Extract texts
+        texts = data_df[self.text_column].tolist()
+        
+        # Extract true labels if available
+        true_labels = None
+        if all(col in data_df.columns for col in self.label_columns):
+            true_labels = data_df[self.label_columns].values.tolist()
+        
+        # Make predictions using the internal text method (no saving)
+        return self._predict_texts_internal(texts, true_labels)
+
+    def predict_texts(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Predict labels for a list of texts (compatibility method for FusionEnsemble).
+        
+        This method is provided for compatibility with FusionEnsemble which calls 
+        ML models with text lists. For regular usage, use predict(test_df) instead.
+        
+        Args:
+            texts: List of texts to classify
+            true_labels: Optional true labels in binary format for evaluation metrics
+            
+        Returns:
+            ClassificationResult with predictions and optional metrics
+        """
+        return self._predict_texts_internal(texts, true_labels)
+    
+    def _predict_texts_internal(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Internal method to predict labels for a list of texts.
         
         Args:
             texts: List of texts to classify
@@ -250,6 +593,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         # Prediction
         self.model.eval()
         all_predictions = []
+        all_probabilities = []
         
         with torch.no_grad():
             for batch in dataloader:
@@ -260,33 +604,80 @@ class RoBERTaClassifier(BaseMLClassifier):
                 logits = outputs.logits
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
+                    # Get probabilities using softmax
+                    probs = torch.softmax(logits, dim=-1)
                     predictions = torch.argmax(logits, dim=-1)
                     
-                    # Convert predictions to binary vectors (one-hot encoding)
-                    for pred_idx in predictions.cpu().numpy():
-                        binary_vector = [0] * self.num_labels
-                        if pred_idx < self.num_labels:
-                            binary_vector[pred_idx] = 1
+                    # Convert predictions to class names and probabilities to dicts
+                    for pred_idx, prob_vector in zip(predictions.cpu().numpy(), probs.cpu().numpy()):
+                        if pred_idx < len(self.classes_):
+                            all_predictions.append(self.classes_[pred_idx])
                         else:
-                            # Fallback: activate first class if prediction is out of bounds
-                            binary_vector[0] = 1
-                        all_predictions.append(binary_vector)
+                            # Fallback: use first class if prediction is out of bounds
+                            all_predictions.append(self.classes_[0])
+                        
+                        # Create probability dictionary for all classes
+                        prob_dict = {self.classes_[i]: float(prob_vector[i]) for i in range(len(self.classes_))}
+                        all_probabilities.append(prob_dict)
                 else:
                     # Multi-label classification
                     probabilities = torch.sigmoid(logits)
                     threshold = self.config.parameters.get('threshold', 0.5)
                     predictions = (probabilities > threshold).cpu().numpy()
                     
-                    # Convert predictions to binary vectors
-                    for pred_array in predictions:
-                        binary_vector = pred_array.astype(int).tolist()
-                        all_predictions.append(binary_vector)
+                    # Convert predictions to class names
+                    for pred_array, prob_vector in zip(predictions, probabilities.cpu().numpy()):
+                        active_classes = []
+                        for i, is_active in enumerate(pred_array):
+                            if is_active and i < len(self.classes_):
+                                active_classes.append(self.classes_[i])
+                        all_predictions.append(active_classes)
+                        
+                        # Create probability dictionary for all classes
+                        prob_dict = {self.classes_[i]: float(prob_vector[i]) for i in range(len(self.classes_))}
+                        all_probabilities.append(prob_dict)
         
         # Calculate metrics if true labels are provided
-        return self._create_result(
-            predictions=all_predictions, 
+        result = self._create_result(
+            predictions=all_predictions,
+            probabilities=all_probabilities if all_probabilities else None,
             true_labels=true_labels if true_labels is not None else None
         )
+        
+        # Save prediction results using ResultsManager (if it's the main predict call)
+        if self.results_manager and hasattr(self, '_current_test_df'):
+            try:
+                # Use dataset type if available, otherwise default to "test"
+                dataset_type = getattr(self, '_current_dataset_type', 'test')
+                
+                saved_files = self.results_manager.save_predictions(
+                    result, dataset_type, self._current_test_df
+                )
+                
+                # Save metrics if available
+                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                    metrics_file = self.results_manager.save_metrics(
+                        result.metadata['metrics'], dataset_type, "roberta_classifier"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                print(f"📁 Prediction results saved: {saved_files}")
+                
+                # Add file paths to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['saved_files'] = saved_files
+                
+                # Clean up temporary references
+                if hasattr(self, '_current_test_df'):
+                    delattr(self, '_current_test_df')
+                if hasattr(self, '_current_dataset_type'):
+                    delattr(self, '_current_dataset_type')
+                
+            except Exception as e:
+                print(f"Warning: Could not save prediction results: {e}")
+        
+        return result
     
     def _create_result(
         self,
@@ -404,7 +795,33 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         return result
     
-    def predict_proba(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+    def predict_proba(
+        self, 
+        test_df: pd.DataFrame
+    ) -> ClassificationResult:
+        """Predict class probabilities for DataFrame.
+        
+        Args:
+            test_df: Test DataFrame for prediction with text and optionally label columns
+            
+        Returns:
+            ClassificationResult with predictions and probabilities
+        """
+        if not self.text_column:
+            raise ValidationError("text_column must be specified in constructor")
+        if not self.label_columns:
+            raise ValidationError("label_columns must be specified in constructor")
+        
+        # Extract texts and labels
+        texts = test_df[self.text_column].tolist()
+        true_labels = None
+        if all(col in test_df.columns for col in self.label_columns):
+            true_labels = test_df[self.label_columns].values.tolist()
+        
+        # Call the internal prediction method
+        return self._predict_proba_texts(texts, true_labels)
+    
+    def _predict_proba_texts(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Predict class probabilities for texts.
         
         Args:
