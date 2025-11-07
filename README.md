@@ -1,161 +1,303 @@
-# TextClassify
+<p align="center">
+  <img src="Logo_labelfusion.png" alt="LabelFusion Logo" width="400"/>
+</p>
 
-A comprehensive Python package for multi-class and multi-label text classification using Large Language Models (LLMs) and traditional machine learning models, with advanced ensemble methods for optimized performance.
+# LabelFusion
+
+**Learning to Fuse LLMs and Transformer Classifiers for Robust Text Classification**
+
+A Python package for advanced text classification that combines Large Language Models (LLMs) with traditional transformer-based classifiers through a learned fusion approach. LabelFusion uses a trainable neural network to intelligently combine predictions from ML models (like RoBERTa) and LLMs (OpenAI, Gemini, DeepSeek) to achieve superior accuracy with data efficiency.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+
+## 🎯 Key Innovation: AutoFusion
+
+**The simplest way to get state-of-the-art text classification:**
+
+```python
+from textclassify import AutoFusionClassifier
+
+# One configuration, automatic ML+LLM fusion!
+config = {
+    'llm_provider': 'deepseek',  # or 'openai', 'gemini'
+    'label_columns': ['positive', 'negative', 'neutral']
+}
+
+classifier = AutoFusionClassifier(config)
+classifier.fit(your_dataframe)  # Trains ML backbone + LLM + fusion layer
+predictions = classifier.predict(test_texts)
+```
+
+**What makes it special?**
+- 🚀 **Superior Performance**: 92.4% accuracy on AG News (vs 92.2% RoBERTa, 84.4% OpenAI alone)
+- 📊 **Data Efficient**: Achieves 92.2% with only 20% training data
+- 🧠 **Learned Fusion**: Neural network learns optimal combination of ML logits + LLM scores
+- 💰 **Cost-Aware**: Intelligent caching and efficient resource usage
+- 🎛️ **One-Line Setup**: No complex configuration needed
 
 ## Features
 
-### 🤖 Multiple Model Types
-- **LLM Providers**: OpenAI GPT, Claude (Anthropic), Google Gemini, DeepSeek
-- **Traditional ML**: RoBERTa-based classifiers with fine-tuning
-- **Ensemble Methods**: Voting, weighted, and class-specific routing
+## Features
 
-### 📊 Classification Types
+### 🔥 Fusion Ensemble (Core Innovation)
+- **AutoFusionClassifier**: One-line interface for ML+LLM fusion
+- **FusionMLP**: Trainable neural network that combines predictions
+- **Smart Training**: Different learning rates for ML backbone vs fusion layer
+- **Calibration**: Temperature scaling and isotonic regression for better probability estimates
+- **Production-Ready**: Includes caching, results management, and cost monitoring
+
+### 🤖 Supported Models
+- **LLM Providers**: OpenAI GPT, Google Gemini, DeepSeek
+- **ML Models**: RoBERTa-based classifiers with fine-tuning
+- **Traditional Ensembles**: Voting, weighted, and class-specific routing
+
+### 📊 Classification Support
 - **Multi-class**: Single label per text (mutually exclusive)
-- **Multi-label**: Multiple labels per text (non-exclusive)
+- **Multi-label**: Multiple labels per text (28 emotions on GoEmotions dataset)
 
-### 🔧 Advanced Features
-- Asynchronous LLM processing for better performance
-- Configurable prompt engineering for LLMs
-- Model combination strategies for optimal results
-- Comprehensive evaluation metrics
-- Easy configuration management
-- Secure API key handling
+### 🔧 Production Features
+- **LLM Response Caching**: Automatic disk-based caching to reduce API costs
+- **Results Management**: Track experiments, metrics, and predictions
+- **Batch Processing**: Efficient processing of large datasets
+- **Async Support**: Asynchronous LLM API calls for better throughput
+
+## Performance Benchmarks
+
+Evaluated on **AG News** dataset (4-class topic classification):
+
+| Training Data | Model | Accuracy | F1-Score |
+|--------------|-------|----------|----------|
+| 20% (800 samples) | **Fusion** | **92.2%** | **0.922** |
+| 20% (800 samples) | RoBERTa | 89.8% | 0.899 |
+| 20% (800 samples) | OpenAI | 84.4% | 0.844 |
+| 100% (4,000 samples) | **Fusion** | **92.4%** | **0.924** |
+| 100% (4,000 samples) | RoBERTa | 92.2% | 0.922 |
+| 100% (4,000 samples) | OpenAI | 84.4% | 0.844 |
+
+**Key Findings:**
+- Fusion consistently outperforms individual models
+- Superior data efficiency: matches full-data performance with only 20% training data
+- Combines LLM reasoning with ML efficiency
 
 ## Installation
 
 ```bash
-pip install textclassify
+# Install from source
+git clone https://github.com/DataandAIReseach/LabelFusion.git
+cd LabelFusion
+pip install -e .
 ```
 
-### Optional Dependencies
+### Dependencies
 
-For RoBERTa classifier:
+**Core Requirements:**
 ```bash
-pip install transformers torch
+pip install pandas python-dotenv openai aiohttp google-generativeai
 ```
 
-For configuration file support:
+**For ML Models (RoBERTa):**
 ```bash
-pip install pyyaml
+pip install transformers torch scikit-learn
+```
+
+**For Development:**
+```bash
+pip install -e ".[dev]"
 ```
 
 ## Quick Start
 
-### Basic Multi-class Classification
+### 1️⃣ AutoFusion - Simplest Way (Recommended)
 
 ```python
-from textclassify import OpenAIClassifier, ClassificationType, ModelConfig, ModelType
-from textclassify.utils import DataLoader
+from textclassify import AutoFusionClassifier
+import pandas as pd
 
-# Create configuration
-config = ModelConfig(
-    model_name="gpt-3.5-turbo",
-    model_type=ModelType.LLM,
-    api_key="your-openai-api-key"
-)
+# Your training data
+df = pd.DataFrame({
+    'text': [
+        "I love this product!",
+        "Terrible experience, very disappointed",
+        "It's okay, nothing special"
+    ],
+    'positive': [1, 0, 0],
+    'negative': [0, 1, 0],
+    'neutral': [0, 0, 1]
+})
+
+# Simple configuration
+config = {
+    'llm_provider': 'deepseek',  # Choose: 'deepseek', 'openai', or 'gemini'
+    'label_columns': ['positive', 'negative', 'neutral']
+}
+
+# Train fusion model (ML + LLM + learned combination)
+classifier = AutoFusionClassifier(config)
+classifier.fit(df)
+
+# Make predictions
+test_texts = ["This is amazing!", "Not good at all"]
+result = classifier.predict(test_texts)
+print(result.predictions)  # ['positive', 'negative']
+```
+
+### 2️⃣ Multi-Label Classification
+
+```python
+# Multi-label example (e.g., movie genres)
+config = {
+    'llm_provider': 'deepseek',
+    'label_columns': ['action', 'comedy', 'drama', 'horror', 'romance'],
+    'multi_label': True  # Enable multi-label mode
+}
+
+classifier = AutoFusionClassifier(config)
+classifier.fit(movie_dataframe)
+
+result = classifier.predict(["A funny action movie with romance"])
+print(result.predictions[0])  # ['action', 'comedy', 'romance']
+```
+
+### 3️⃣ Using Individual LLM Classifiers
+
+```python
+from textclassify import DeepSeekClassifier, OpenAIClassifier, GeminiClassifier
+from textclassify.config import Config
+
+# Configure LLM
+config = Config()
+config.model_type = ModelType.LLM
+config.parameters = {
+    'model': 'deepseek-chat',
+    'temperature': 1,
+    'max_tokens': 150
+}
 
 # Create classifier
-classifier = OpenAIClassifier(config)
+classifier = DeepSeekClassifier(
+    config=config,
+    text_column='text',
+    label_columns=['positive', 'negative', 'neutral']
+)
 
-# Prepare training data
-training_data = DataLoader.from_lists(
-    texts=["I love this movie!", "This film is terrible.", "It was okay."],
-    labels=["positive", "negative", "neutral"],
+# Make predictions
+result = classifier.predict(train_df=train_df, test_df=test_df)
+```
+
+### 4️⃣ RoBERTa Classifier (Traditional ML)
+
+```python
+from textclassify.ml import RoBERTaClassifier
+from textclassify.core.types import ModelConfig, ModelType
+
+config = ModelConfig(
+    model_name='roberta-base',
+    model_type=ModelType.TRADITIONAL_ML,
+    parameters={
+        'max_length': 256,
+        'learning_rate': 2e-5,
+        'num_epochs': 3,
+        'batch_size': 16
+    }
+)
+
+classifier = RoBERTaClassifier(
+    config=config,
+    text_column='text',
+    label_columns=['positive', 'negative', 'neutral'],
+    multi_label=False
+)
+
+classifier.fit(train_df)
+result = classifier.predict(test_texts)
+```
+
+## Advanced Fusion Usage
+
+### Manual Fusion Configuration
+
+For advanced users who want full control:
+
+```python
+from textclassify.ensemble.fusion import FusionEnsemble
+from textclassify.ml.roberta_classifier import RoBERTaClassifier
+from textclassify.llm.deepseek_classifier import DeepSeekClassifier
+
+# Create ML model
+ml_config = ModelConfig(
+    model_name='roberta-base',
+    model_type=ModelType.TRADITIONAL_ML
+)
+ml_model = RoBERTaClassifier(config=ml_config, label_columns=labels)
+
+# Create LLM model
+llm_config = Config()
+llm_model = DeepSeekClassifier(config=llm_config, label_columns=labels)
+
+# Create fusion ensemble
+fusion = FusionEnsemble(
+    ml_classifier=ml_model,
+    llm_classifiers=[llm_model],
+    label_columns=labels,
     classification_type=ClassificationType.MULTI_CLASS
 )
 
-# Train and predict
-classifier.fit(training_data)
-result = classifier.predict(["This movie is amazing!"])
-print(result.predictions)  # ['positive']
-```
-
-### Multi-label Classification
-
-```python
-from textclassify import GeminiClassifier, ClassificationType
-
-# Multi-label training data
-training_data = DataLoader.from_lists(
-    texts=[
-        "Action movie with great special effects",
-        "Romantic comedy with funny moments",
-        "Scary horror film with supernatural elements"
-    ],
-    labels=[
-        ["action", "special_effects"],
-        ["romance", "comedy"],
-        ["horror", "supernatural"]
-    ],
-    classification_type=ClassificationType.MULTI_LABEL
+# Train fusion layer
+fusion.fit(
+    train_texts=train_df['text'].tolist(),
+    train_labels=train_df[labels].values.tolist(),
+    val_texts=val_df['text'].tolist(),
+    val_labels=val_df[labels].values.tolist()
 )
 
-# Create and train classifier
-config = ModelConfig(
-    model_name="gemini-1.5-flash",
-    model_type=ModelType.LLM,
-    api_key="your-gemini-api-key"
-)
-
-classifier = GeminiClassifier(config)
-classifier.fit(training_data)
-
-# Predict multiple labels
-result = classifier.predict(["Funny action movie with romance"])
-print(result.predictions)  # [['action', 'comedy', 'romance']]
+# Predict
+result = fusion.predict(test_texts, test_labels)
 ```
 
-### Ensemble Methods
+### Command-Line Training
 
-```python
-from textclassify import VotingEnsemble, WeightedEnsemble, EnsembleConfig
+```bash
+# Create config file
+python train_fusion.py --create-config fusion_config.yaml
 
-# Create ensemble with multiple models
-ensemble_config = EnsembleConfig(
-    models=[openai_config, claude_config],
-    ensemble_method="voting"
-)
+# Edit fusion_config.yaml with your settings, then train
+python train_fusion.py --config fusion_config.yaml
 
-ensemble = VotingEnsemble(ensemble_config)
-ensemble.add_model(OpenAIClassifier(openai_config), "openai")
-ensemble.add_model(ClaudeClassifier(claude_config), "claude")
-
-# Train and predict
-ensemble.fit(training_data)
-result = ensemble.predict(["This is a great movie!"])
+# Evaluate on test data
+python train_fusion.py --config fusion_config.yaml --evaluate --test-data path/to/test.csv
 ```
 
-## Supported Models
-
-### LLM Providers
-
-| Provider | Models | API Key Required |
-|----------|--------|------------------|
-| OpenAI | gpt-3.5-turbo, gpt-4, gpt-4-turbo | ✅ |
-| Claude | claude-3-haiku, claude-3-sonnet, claude-3-opus | ✅ |
-| Gemini | gemini-1.5-flash, gemini-1.5-pro | ✅ |
-| DeepSeek | deepseek-chat, deepseek-coder | ✅ |
-
-### Traditional ML Models
-
-| Model | Description | Dependencies |
-|-------|-------------|--------------|
-| RoBERTa | Fine-tunable transformer model | transformers, torch |
-
-## Ensemble Methods
+## Traditional Ensemble Methods
 
 ### Voting Ensemble
-Combines predictions through majority or plurality voting.
 
 ```python
-from textclassify import VotingEnsemble
+from textclassify import VotingEnsemble, EnsembleConfig
+from textclassify import OpenAIClassifier, GeminiClassifier
+
+## Traditional Ensemble Methods
+
+### Voting Ensemble
+
+```python
+from textclassify import VotingEnsemble, EnsembleConfig
+from textclassify import OpenAIClassifier, GeminiClassifier
+
+# Create individual classifiers
+openai_clf = OpenAIClassifier(openai_config)
+gemini_clf = GeminiClassifier(gemini_config)
 
 ensemble = VotingEnsemble(ensemble_config)
+ensemble.add_model(openai_clf, "openai")
+ensemble.add_model(gemini_clf, "gemini")
+
+ensemble.fit(training_data)
+result = ensemble.predict(texts)
 # Supports: 'majority', 'plurality' voting strategies
 ```
 
 ### Weighted Ensemble
-Combines predictions using weighted averages based on model performance.
 
 ```python
 from textclassify import WeightedEnsemble
@@ -163,13 +305,12 @@ from textclassify import WeightedEnsemble
 ensemble_config = EnsembleConfig(
     models=[model1_config, model2_config],
     ensemble_method="weighted",
-    weights=[0.7, 0.3]  # Custom weights
+    weights=[0.7, 0.3]  # Custom weights based on validation performance
 )
 ensemble = WeightedEnsemble(ensemble_config)
 ```
 
 ### Class Routing Ensemble
-Routes different classes to different models for optimized performance.
 
 ```python
 from textclassify import ClassRoutingEnsemble
@@ -187,230 +328,226 @@ ensemble_config = EnsembleConfig(
 ensemble = ClassRoutingEnsemble(ensemble_config)
 ```
 
-## Configuration Management
+## Supported Models
 
-### API Key Management
+### LLM Providers
 
-```python
-from textclassify import APIKeyManager
+| Provider | Models | API Key Required |
+|----------|--------|------------------|
+| OpenAI | gpt-3.5-turbo, gpt-4, gpt-4-turbo | ✅ |
+| Gemini | gemini-1.5-flash, gemini-1.5-pro | ✅ |
+| DeepSeek | deepseek-chat, deepseek-coder | ✅ |
 
-# Set up API keys
-api_manager = APIKeyManager()
-api_manager.set_key("openai", "your-openai-key")
-api_manager.set_key("claude", "your-claude-key")
+### ML Models
 
-# Or use environment variables
-# export OPENAI_API_KEY="your-key"
-# export CLAUDE_API_KEY="your-key"
-```
+| Model | Description | Dependencies |
+|-------|-------------|--------------|
+| RoBERTa | Fine-tunable transformer model | transformers, torch, scikit-learn |
 
-### Configuration Files
+## Production Features
 
-```python
-from textclassify import Config
-
-# Create configuration
-config = Config()
-config.set('llm.default_provider', 'openai')
-config.set('general.batch_size', 32)
-
-# Save configuration
-config.save('my_config.yaml')
-
-# Load configuration
-config = Config('my_config.yaml')
-```
-
-## Data Loading and Processing
-
-### From Files
+### LLM Response Caching
 
 ```python
-from textclassify.utils import DataLoader
-
-# Load from CSV
-data = DataLoader.from_csv(
-    'data.csv',
-    text_column='text',
-    label_column='label',
-    classification_type=ClassificationType.MULTI_CLASS
-)
-
-# Load from JSON
-data = DataLoader.from_json(
-    'data.json',
-    text_field='text',
-    label_field='labels',
-    classification_type=ClassificationType.MULTI_LABEL
+# Caching is automatic! Reduces API costs dramatically
+classifier = DeepSeekClassifier(
+    config=config,
+    auto_use_cache=True,  # Enable automatic cache usage
+    cache_dir="cache"      # Cache directory
 )
 ```
 
-### Data Utilities
+### Results Management
 
 ```python
-from textclassify.utils import split_data, balance_data, get_data_statistics
-
-# Split data
-train_data, val_data = split_data(data, train_ratio=0.8, stratify=True)
-
-# Balance classes
-balanced_data = balance_data(data, method='oversample')
-
-# Get statistics
-stats = get_data_statistics(data)
-print(f"Total samples: {stats['total_samples']}")
-print(f"Classes: {stats['num_classes']}")
-```
-
-## Evaluation and Metrics
-
-```python
-from textclassify.utils import evaluate_predictions, compare_models
-
-# Evaluate single model
-metrics = evaluate_predictions(result, true_labels)
-print(f"Accuracy: {metrics['accuracy']:.3f}")
-print(f"F1 Score: {metrics['macro_f1']:.3f}")
-
-# Compare multiple models
-comparison = compare_models(
-    [result1, result2, result3],
-    true_labels,
-    model_names=['Model A', 'Model B', 'Model C']
+# Automatic experiment tracking
+classifier = AutoFusionClassifier(
+    config,
+    output_dir="outputs",
+    experiment_name="my_experiment",
+    auto_save_results=True  # Saves predictions, metrics, and config
 )
-```
-
-## Examples
-
-The package includes comprehensive examples:
-
-- `examples/multi_class_example.py` - Multi-class classification
-- `examples/multi_label_example.py` - Multi-label classification  
-- `examples/ensemble_example.py` - Advanced ensemble methods
-
-Run examples:
-```bash
-python -m textclassify.examples.multi_class_example
-python -m textclassify.examples.multi_label_example
-python -m textclassify.examples.ensemble_example
 ```
 
 ## API Reference
 
 ### Core Classes
 
+- `AutoFusionClassifier` - One-line ML+LLM fusion interface (⭐ recommended)
+- `FusionEnsemble` - Advanced fusion ensemble with manual control
+- `FusionMLP` - Trainable neural network for fusion
 - `BaseClassifier` - Abstract base class for all classifiers
 - `ClassificationResult` - Container for prediction results
-- `TrainingData` - Container for training data
 - `ModelConfig` - Configuration for individual models
 - `EnsembleConfig` - Configuration for ensemble methods
 
 ### LLM Classifiers
 
 - `OpenAIClassifier` - OpenAI GPT models
-- `ClaudeClassifier` - Anthropic Claude models
 - `GeminiClassifier` - Google Gemini models
 - `DeepSeekClassifier` - DeepSeek models
 
 ### ML Classifiers
 
-- `RoBERTaClassifier` - RoBERTa-based classifier
+- `RoBERTaClassifier` - RoBERTa-based classifier with fine-tuning
 
-### Ensemble Methods
+### Traditional Ensemble Methods
 
 - `VotingEnsemble` - Voting-based ensemble
-- `WeightedEnsemble` - Weighted ensemble
+- `WeightedEnsemble` - Weighted ensemble  
 - `ClassRoutingEnsemble` - Class-specific routing
 
-### Utilities
+## Configuration Management
 
-- `DataLoader` - Data loading and saving
-- `Config` - Configuration management
-- `APIKeyManager` - API key management
-- `ClassificationMetrics` - Evaluation metrics
-
-## Advanced Usage
-
-### Custom Preprocessing
+### API Key Management
 
 ```python
-from textclassify.ml.preprocessing import TextPreprocessor
+from textclassify.config import APIKeyManager
 
-preprocessor = TextPreprocessor(
-    lowercase=True,
-    remove_punctuation=False,
-    remove_numbers=True
-)
+# Set up API keys
+api_manager = APIKeyManager()
+api_manager.set_key("openai", "your-openai-key")
+api_manager.set_key("gemini", "your-gemini-key")
 
-# Use with RoBERTa classifier
-config = ModelConfig(
-    model_name="roberta-base",
-    model_type=ModelType.TRADITIONAL_ML,
-    parameters={
-        "preprocessing": preprocessor.get_config()
-    }
-)
+# Or use environment variables (recommended)
+# export OPENAI_API_KEY="your-key"
+# export GEMINI_API_KEY="your-key"
+# export DEEPSEEK_API_KEY="your-key"
 ```
 
-### Async Processing
+### Configuration Files
 
 ```python
-import asyncio
-from textclassify import OpenAIClassifier
+from textclassify.config import Config
 
-async def async_classification():
-    classifier = OpenAIClassifier(config)
-    classifier.fit(training_data)
-    
-    # Async prediction
-    result = await classifier.predict_async(texts)
-    return result
+# Load configuration
+config = Config()
+config.load('config.yaml')
 
-# Run async
-result = asyncio.run(async_classification())
+# Or create from scratch
+config.set('llm.default_provider', 'deepseek')
+config.set('general.batch_size', 32)
+config.save('my_config.yaml')
 ```
 
-### Custom Prompts
+## Evaluation and Metrics
 
 ```python
-from textclassify.llm.prompts import MultiClassPromptTemplate
+from textclassify.utils import evaluate_predictions
 
-# Create custom prompt template
-template = MultiClassPromptTemplate()
-custom_prompt = template.format_prompt(
-    text="Your text here",
-    classes=["class1", "class2", "class3"],
-    examples=[{"text": "example", "label": "class1"}]
-)
+# Evaluate model performance
+result = classifier.predict(test_texts, test_labels)
+
+if result.metadata and 'metrics' in result.metadata:
+    metrics = result.metadata['metrics']
+    print(f"Accuracy: {metrics['accuracy']:.3f}")
+    print(f"F1 Score: {metrics['f1']:.3f}")
+    print(f"Precision: {metrics['precision']:.3f}")
+    print(f"Recall: {metrics['recall']:.3f}")
 ```
+
+## Examples and Documentation
+
+### Example Scripts
+
+The package includes comprehensive examples in the `examples/` and `textclassify/examples/` directories:
+
+- `test_autofusion_kaggle.py` - AutoFusion on real dataset
+- `test_kaggle_data.py` - Testing with Kaggle ecommerce data
+- `multi_class_example.py` - Multi-class classification examples
+- `multi_label_example.py` - Multi-label classification examples
+- `ensemble_example.py` - Advanced ensemble methods
+
+### Evaluation Scripts
+
+Comprehensive evaluation scripts in `tests/evaluation/`:
+
+- `eval_ag_news.py` - AG News topic classification benchmarks
+- `eval_goemotions.py` - GoEmotions multi-label emotion classification
+
+### Documentation Files
+
+- `FUSION_README.md` - Detailed fusion ensemble documentation
+- `PACKAGE_OVERVIEW.md` - Complete package architecture overview
+- `AUTO_CACHE_FEATURE.md` - LLM caching system documentation
+- `paper_labelfusion.md` - Academic paper describing the fusion methodology
+
+## How It Works
+
+### Fusion Architecture
+
+1. **ML Backbone** (RoBERTa): Generates logits from input text
+2. **LLM Component**: Produces per-class scores via prompting (cached for efficiency)
+3. **Calibration**: Both ML and LLM signals are calibrated for better probability estimates
+4. **FusionMLP**: Small neural network concatenates and learns to combine the signals
+5. **Training**: ML backbone uses small learning rate, fusion MLP uses higher rate for fast adaptation
+
+### Why Fusion Works
+
+- **Complementary Strengths**: LLMs provide robust reasoning, ML provides efficiency
+- **Data Efficiency**: LLM knowledge compensates for limited training data
+- **Learned Combination**: Neural network optimizes the fusion for your specific task
+- **Cost-Effective**: Caching and smart fusion reduce LLM API costs
+
+## Use Cases
+
+- **Customer Feedback Analysis**: Multi-label sentiment with nuanced categories
+- **Content Moderation**: Balance accuracy with real-time processing requirements
+- **Scientific Literature Classification**: Handle domain shift and new terminology
+- **Low-Resource Scenarios**: Achieve high accuracy with limited training data
+- **Multi-Domain Classification**: Leverage complementary model strengths
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+We welcome contributions! Please see our development setup below.
 
 ### Development Setup
 
 ```bash
-git clone https://github.com/your-org/textclassify.git
-cd textclassify
+git clone https://github.com/DataandAIReseach/LabelFusion.git
+cd LabelFusion
 pip install -e ".[dev]"
 ```
 
 ### Running Tests
 
 ```bash
+# Unit tests
 pytest tests/
+
+# Integration tests
+pytest tests/integration/
+
+# Evaluation benchmarks
+python tests/evaluation/eval_ag_news.py
+python tests/evaluation/eval_goemotions.py
 ```
+
+## Citation
+
+If you use LabelFusion in your research, please cite:
+
+```bibtex
+@software{labelfusion2025,
+  title={LabelFusion: Learning to Fuse LLMs and Transformer Classifiers for Robust Text Classification},
+  author={Weisser, Christoph and Contributors},
+  year={2025},
+  url={https://github.com/DataandAIReseach/LabelFusion}
+}
+```
+
+See `paper_labelfusion.md` for the full research paper.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## Support and Links
 
-- 📖 [Documentation](https://textclassify.readthedocs.io)
-- 🐛 [Issue Tracker](https://github.com/your-org/textclassify/issues)
-- 💬 [Discussions](https://github.com/your-org/textclassify/discussions)
+- 📖 **Documentation**: See `FUSION_README.md` and `PACKAGE_OVERVIEW.md`
+- 🐛 **Issues**: [GitHub Issues](https://github.com/DataandAIReseach/LabelFusion/issues)
+- � **Paper**: [paper_labelfusion.md](paper_labelfusion.md)
+- 💡 **Examples**: Check `examples/` and `textclassify/examples/` directories
 
 ## Changelog
 
@@ -418,5 +555,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and updates.
 
 ---
 
-**TextClassify** - Making text classification simple, powerful, and flexible.
+<p align="center">
+  <strong>LabelFusion</strong> - Superior text classification through learned ML+LLM fusion
+</p>
 
