@@ -2,15 +2,17 @@
 
 import torch
 import torch.nn as nn
+import torch.utils.data
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Union, Optional, Tuple
+from typing import Dict, List, Union, Optional, Tuple, Any
 from sklearn.model_selection import train_test_split
 from sklearn.isotonic import IsotonicRegression
 from sklearn.calibration import CalibratedClassifierCV
 
-from ..core.types import ClassificationResult, ClassificationType, TrainingData, EnsembleConfig
+from ..core.types import ClassificationResult, ClassificationType, EnsembleConfig
 from ..core.exceptions import EnsembleError, ModelTrainingError
+from ..utils.results_manager import ResultsManager, ModelResultsManager
 from .base import BaseEnsemble
 
 
@@ -104,13 +106,30 @@ class FusionWrapper(nn.Module):
 class FusionEnsemble(BaseEnsemble):
     """Ensemble that fuses ML and LLM classifiers with trainable MLP."""
     
-    def __init__(self, ensemble_config):
+    def __init__(
+        self, 
+        ensemble_config,
+        # Results management parameters
+        output_dir: str = "outputs",
+        experiment_name: Optional[str] = None,
+        auto_save_results: bool = True,
+        save_intermediate_llm_predictions: bool = False
+    ):
         """Initialize fusion ensemble.
         
         Args:
             ensemble_config: Configuration for the ensemble
+            output_dir: Base directory for saving results (default: "outputs")
+            experiment_name: Name for this experiment (default: auto-generated)
+            auto_save_results: Whether to automatically save results (default: True)
+            save_intermediate_llm_predictions: Whether to save intermediate LLM predictions (default: False)
         """
-        super().__init__(ensemble_config)
+        super().__init__(
+            ensemble_config,
+            output_dir=output_dir,
+            experiment_name=experiment_name,
+            auto_save_results=False  # Disable base ensemble results manager to prevent duplicate directories
+        )
         
         # Fusion-specific parameters
         self.fusion_hidden_dims = ensemble_config.parameters.get('fusion_hidden_dims', [64, 32])
@@ -118,6 +137,7 @@ class FusionEnsemble(BaseEnsemble):
         self.fusion_lr = ensemble_config.parameters.get('fusion_lr', 1e-3)  # Larger LR for fusion MLP
         self.num_epochs = ensemble_config.parameters.get('num_epochs', 10)
         self.batch_size = ensemble_config.parameters.get('batch_size', 16)
+        self.save_intermediate_llm_predictions = save_intermediate_llm_predictions
         
         # Model components
         self.ml_model = None
@@ -127,12 +147,42 @@ class FusionEnsemble(BaseEnsemble):
         self.calibrator = None
         self.test_performance = {}  # Store test set performance
         
+        # LLM prediction cache file paths from ensemble config
+        self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', '')
+        self.test_llm_cache_path = ensemble_config.parameters.get('test_llm_cache_path', '')
+        
+        # Results management
+        output_dir = ensemble_config.parameters.get('output_dir', 'outputs')
+        experiment_name = ensemble_config.parameters.get('experiment_name', 'fusion_ensemble')
+        auto_save_results = ensemble_config.parameters.get('auto_save_results', True)
+        
+        self.results_manager = None
+        if auto_save_results:
+            self.results_manager = ResultsManager(
+                base_output_dir=output_dir,
+                experiment_name=experiment_name
+            )
+            self.model_results_manager = ModelResultsManager(
+                self.results_manager, 
+                f"fusion_ensemble_{self.results_manager.experiment_id}"
+            )
+        
         # Initialize training state
         self.is_trained = False
         
         # Determine classification type from ensemble config or infer from models
         if 'classification_type' in ensemble_config.parameters:
-            self.classification_type = ensemble_config.parameters['classification_type']
+            config_type = ensemble_config.parameters['classification_type']
+            if isinstance(config_type, str):
+                # Convert string to enum
+                if config_type.lower() in ['multi_label', 'multilabel']:
+                    self.classification_type = ClassificationType.MULTI_LABEL
+                elif config_type.lower() in ['multi_class', 'multiclass', 'single_label']:
+                    self.classification_type = ClassificationType.MULTI_CLASS
+                else:
+                    self.classification_type = ClassificationType.MULTI_CLASS  # Default
+            else:
+                self.classification_type = config_type
         elif 'multi_label' in ensemble_config.parameters:
             self.classification_type = ClassificationType.MULTI_LABEL if ensemble_config.parameters['multi_label'] else ClassificationType.MULTI_CLASS
         else:
@@ -154,11 +204,18 @@ class FusionEnsemble(BaseEnsemble):
         self.models.append(llm_model)
         self.model_names.append("llm_model")
     
-    def fit(self, df: Union[TrainingData, pd.DataFrame, Dict]) -> None:
-        """Train the fusion ensemble with proper train/val/test split.
+    def fit(self, train_df: pd.DataFrame, val_df: pd.DataFrame, 
+            val_llm_predictions: Optional[List[Union[str, List[str]]]] = None) -> Dict[str, Any]:
+        """Train the fusion ensemble with train and validation DataFrames.
         
         Args:
-            df: Training data in various formats (DataFrame, TrainingData, or Dict)
+            train_df: Training DataFrame with text and label columns
+            val_df: Validation DataFrame with text and label columns
+            val_llm_predictions: Optional pre-computed LLM predictions for validation set.
+                                 If provided, skips LLM inference on validation data.
+            
+        Returns:
+            Dictionary with training results and metrics
         """
         if self.ml_model is None or self.llm_model is None:
             raise EnsembleError("Both ML and LLM models must be added before training")
@@ -173,89 +230,19 @@ class FusionEnsemble(BaseEnsemble):
                 # Default to multi-class
                 self.classification_type = ClassificationType.MULTI_CLASS
         
-        # Work with DataFrame directly as long as possible
-        if isinstance(df, TrainingData):
-            # Convert TrainingData to DataFrame for consistent processing
-            labels = df.labels
-            label_data = {}
-            # Create label columns from the labels
-            if labels and isinstance(labels[0], list):
-                # 2D format: [[1,0,0], [0,1,0], ...]
-                for i in range(len(labels[0])):
-                    label_data[f'label_{i}'] = [label[i] for label in labels]
-            else:
-                # This shouldn't happen with TrainingData but handle gracefully
-                raise EnsembleError("TrainingData labels should be in 2D list format")
-            
-            working_df = pd.DataFrame({
-                'text': df.texts,
-                **label_data
-            })
-            text_column = 'text'
-            label_columns = [col for col in working_df.columns if col.startswith('label_')]
-        elif isinstance(df, pd.DataFrame):
-            working_df = df.copy()
-            text_column = 'text'  # Could be configurable
-            if text_column not in working_df.columns:
-                raise EnsembleError(f"Text column '{text_column}' not found in DataFrame")
-            label_columns = [col for col in working_df.columns if col != text_column]
-        elif isinstance(df, dict):
-            # Convert dict to DataFrame for consistent processing
-            labels = df['labels']
-            label_data = {}
-            # Handle both 2D list format and 1D list format
-            if labels and isinstance(labels[0], list):
-                # 2D format: [[1,0,0], [0,1,0], ...]
-                for i in range(len(labels[0])):
-                    label_data[f'label_{i}'] = [label[i] for label in labels]
-            else:
-                # 1D format: [0, 1, 2, ...] - convert to one-hot
-                unique_labels = sorted(set(labels))
-                for i, unique_label in enumerate(unique_labels):
-                    label_data[f'label_{i}'] = [1 if label == unique_label else 0 for label in labels]
-            
-            working_df = pd.DataFrame({
-                'text': df['texts'],
-                **label_data
-            })
-            text_column = 'text'
-            label_columns = [col for col in working_df.columns if col.startswith('label_')]
-        else:
-            raise EnsembleError(f"Unsupported training data format: {type(df)}")
+        # Extract text and label columns - assume they match ML model configuration
+        text_column = self.ml_model.text_column or 'text'
+        label_columns = self.ml_model.label_columns or [col for col in train_df.columns if col != text_column]
         
         print(f"Classification type: {self.classification_type}")
-        print(f"Training data: {len(working_df)} samples")
+        print(f"Training data: {len(train_df)} samples")
+        print(f"Validation data: {len(val_df)} samples")
         
-        # Step 1: Split DataFrames directly (60/20/20)
-        print("Splitting data into train/validation/test sets...")
-        train_df, temp_df = train_test_split(
-            working_df, 
-            test_size=0.4, 
-            random_state=42, 
-            stratify=None
-        )
-        
-        val_df, test_df = train_test_split(
-            temp_df, 
-            test_size=0.5, 
-            random_state=42, 
-            stratify=None
-        )
-        
-        print(f"   📊 Train: {len(train_df)} samples")
-        print(f"   📊 Validation: {len(val_df)} samples") 
-        print(f"   📊 Test: {len(test_df)} samples")
-        
-        # Step 2: Train ML model on training set only
+        # Step 1: Train ML model on training set
         if not self.ml_model.is_trained:
             print("Training ML model on training set...")
-            # Convert to TrainingData format only when needed for ML model
-            train_data = TrainingData(
-                texts=train_df[text_column].tolist(),
-                labels=train_df[label_columns].values.tolist(),
-                classification_type=self.classification_type
-            )
-            self.ml_model.fit(train_data)
+            # Use DataFrame interface directly
+            self.ml_model.fit(train_df, val_df)
         else:
             print("ML model already trained")
         
@@ -263,23 +250,69 @@ class FusionEnsemble(BaseEnsemble):
         self.classes_ = self.ml_model.classes_
         self.num_labels = len(self.classes_)
         
-        # Step 3: Get ML predictions on validation set
+        # Step 2: Get ML predictions on validation set
         print("Getting ML predictions on validation set...")
-        ml_val_result = self.ml_model.predict(texts=val_df[text_column].tolist(), 
-                                             true_labels=val_df[label_columns].values.tolist())
+        ml_val_result = self.ml_model.predict_without_saving(val_df)
         
-    
-
-        # Step 4: Get LLM predictions on validation set
-        print("Getting LLM predictions on validation set...")
+        # Step 3: Get LLM predictions on validation set
+        llm_val_predictions = self._get_or_generate_llm_predictions(
+            df=val_df,
+            train_df=train_df,
+            cache_path=self.val_llm_cache_path,
+            dataset_type="validation",
+            provided_predictions=val_llm_predictions
+        )
         
-        # Use DataFrames directly for LLM model - no need to recreate them
-        val_llm_result = self.llm_model.predict(train_df=train_df,
-                                                test_df=val_df)
+        # Create ClassificationResult for validation predictions
+        # Extract true labels from validation DataFrame
+        val_true_labels = None
+        if all(col in val_df.columns for col in label_columns):
+            val_true_labels = val_df[label_columns].values.tolist()
         
+        # If we have true labels, call the LLM classifier's predict_texts method to get proper metrics
+        if val_true_labels is not None and self.llm_model is not None:
+            try:
+                # Temporarily disable LLM results saving if intermediate saving is disabled
+                original_llm_results_manager = None
+                if not self.save_intermediate_llm_predictions and hasattr(self.llm_model, 'results_manager'):
+                    original_llm_results_manager = self.llm_model.results_manager
+                    self.llm_model.results_manager = None
+                
+                try:
+                    # Call the LLM classifier's predict_texts method with cached predictions
+                    # This ensures metrics are calculated and individual results are saved
+                    llm_val_result = self.llm_model.predict_texts(
+                        texts=val_df[text_column].tolist(), 
+                        true_labels=val_true_labels
+                    )
+                    # Override predictions with cached ones if they were used
+                    if val_llm_predictions is not None or self.val_llm_cache_path:
+                        llm_val_result.predictions = llm_val_predictions
+                        # Update model name to indicate cached predictions were used
+                        llm_val_result.model_name = "llm_model_cached"
+                finally:
+                    # Restore the original results manager
+                    if original_llm_results_manager is not None:
+                        self.llm_model.results_manager = original_llm_results_manager
+            except Exception as e:
+                print(f"Warning: Could not call LLM classifier predict_texts for metrics: {e}")
+                # Fallback to simple ClassificationResult
+                from ..core.types import ClassificationResult
+                llm_val_result = ClassificationResult(
+                    predictions=llm_val_predictions,
+                    model_name="llm_model" if val_llm_predictions is None else "llm_model_cached",
+                    classification_type=self.classification_type
+                )
+        else:
+            # No true labels available, create simple ClassificationResult
+            from ..core.types import ClassificationResult
+            llm_val_result = ClassificationResult(
+                predictions=llm_val_predictions,
+                model_name="llm_model" if val_llm_predictions is None else "llm_model_cached",
+                classification_type=self.classification_type
+            )
         
-        
-        # Step 5: Create fusion wrapper
+        # Step 4: Create fusion wrapper
         print("Creating fusion wrapper...")
         task = "multilabel" if self.classification_type == ClassificationType.MULTI_LABEL else "multiclass"
         self.fusion_wrapper = FusionWrapper(
@@ -289,34 +322,796 @@ class FusionEnsemble(BaseEnsemble):
             hidden_dims=self.fusion_hidden_dims
         )
         
-        # Step 6: Train fusion MLP on validation set predictions
+        # Step 5: Train fusion MLP on validation set predictions
         print("Training fusion MLP on validation predictions...")
-        self._train_fusion_mlp_on_val(val_df, ml_val_result, val_llm_result, text_column, label_columns)
+        self._train_fusion_mlp_on_val(val_df, ml_val_result, llm_val_result, text_column, label_columns)
         
-        # Step 7: Store LLM result and training data for later use
-        print("Storing LLM validation results and training data...")
-        self.val_llm_result = val_llm_result
-        self.train_df_cache = train_df.copy()  # Cache training DataFrame for LLM predictions
+        # Step 6: Generate and save fusion predictions on full validation set
+        print("Generating fusion predictions on validation set...")
+        val_true_labels = val_df[label_columns].values.tolist() if all(col in val_df.columns for col in label_columns) else None
+        fusion_val_result = self._predict_with_fusion(
+            ml_val_result, 
+            llm_val_result, 
+            val_df[text_column].tolist(), 
+            val_true_labels
+        )
         
-        # Step 8: Evaluate on test set
-        print("Evaluating ensemble on test set...")
+        # Save fusion validation predictions to experiments directory
+        if self.results_manager and fusion_val_result:
+            try:
+                saved_files = self.results_manager.save_predictions(
+                    fusion_val_result, "validation", val_df
+                )
+                
+                # Save metrics if available
+                if hasattr(fusion_val_result, 'metadata') and fusion_val_result.metadata and 'metrics' in fusion_val_result.metadata:
+                    metrics_file = self.results_manager.save_metrics(
+                        fusion_val_result.metadata['metrics'], "validation", "fusion_ensemble"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                print(f"📁 Validation results saved: {saved_files}")
+                
+            except Exception as e:
+                print(f"Warning: Could not save validation results: {e}")
         
-        # Set training flag early to avoid recursive prediction issues
+        # Cache training data for later LLM predictions
+        self.train_df_cache = train_df.copy()
+        
+        # Set training flag
         self.is_trained = True
         
-        try:
-            test_result = self.predict(test_df)
-            
-            # Store test performance
-            self.test_performance = test_result.metadata.get('metrics', {}) if test_result.metadata else {}
-            print(f"   📈 Test Performance: {self.test_performance}")
-        except Exception as e:
-            print(f"   ⚠️ Warning: Test evaluation failed: {e}")
-            self.test_performance = {}
+        # Return training results (similar to RoBERTa)
+        training_result = {
+            'ensemble_method': 'fusion',
+            'training_samples': len(train_df),
+            'validation_samples': len(val_df),
+            'num_labels': self.num_labels,
+            'classes': self.classes_,
+            'classification_type': self.classification_type.value if hasattr(self.classification_type, 'value') else self.classification_type,
+            'ml_model_trained': self.ml_model.is_trained,
+            'fusion_mlp_trained': True,
+            'used_cached_val_llm_predictions': val_llm_predictions is not None
+        }
+        
+        # Save training results using ResultsManager
+        if self.results_manager:
+            try:
+                # Save model configuration
+                ensemble_config_dict = {
+                    'ensemble_method': 'fusion',
+                    'fusion_hidden_dims': self.fusion_hidden_dims,
+                    'ml_lr': self.ml_lr,
+                    'fusion_lr': self.fusion_lr,
+                    'num_epochs': self.num_epochs,
+                    'batch_size': self.batch_size,
+                    'classification_type': str(self.classification_type),
+                    'num_labels': self.num_labels,
+                    'classes': self.classes_
+                }
+                
+                self.results_manager.save_model_config(
+                    ensemble_config_dict, 
+                    "fusion_ensemble"
+                )
+                
+                # Save training summary
+                self.results_manager.save_experiment_summary(training_result)
+                
+                # Get experiment info for user
+                exp_info = self.results_manager.get_experiment_info()
+                training_result['experiment_info'] = exp_info
+                training_result['output_directory'] = exp_info['experiment_dir']
+                
+                print(f"📁 Results saved to: {exp_info['experiment_dir']}")
+                
+            except Exception as e:
+                print(f"Warning: Could not save training results: {e}")
         
         print("✅ Fusion ensemble training completed!")
+        return training_result
     
-    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, val_llm_result, 
+    def get_llm_predictions(self, df: pd.DataFrame, train_df: Optional[pd.DataFrame] = None) -> List[Union[str, List[str]]]:
+        """Get LLM predictions for a DataFrame without training the fusion ensemble.
+        
+        This is useful for caching LLM predictions that can be reused later.
+        
+        Args:
+            df: DataFrame to get predictions for
+            train_df: Optional training DataFrame for few-shot examples.
+                     If not provided, uses cached training data or df itself.
+            
+        Returns:
+            List of LLM predictions that can be passed to fit() or predict()
+        """
+        if self.llm_model is None:
+            raise EnsembleError("LLM model must be added before getting predictions")
+        
+        # Use provided train_df, cached training data, or df itself for few-shot
+        if train_df is not None:
+            few_shot_df = train_df
+        elif hasattr(self, 'train_df_cache') and self.train_df_cache is not None:
+            few_shot_df = self.train_df_cache
+        else:
+            few_shot_df = df
+            print("Warning: No training data available for few-shot examples, using target data")
+        
+        print(f"Getting LLM predictions for {len(df)} samples...")
+        llm_result = self.llm_model.predict(
+            train_df=few_shot_df,
+            test_df=df
+        )
+        
+        return llm_result.predictions
+    
+    def _get_or_generate_llm_predictions(self, df: pd.DataFrame, train_df: pd.DataFrame, 
+                                       cache_path: str, dataset_type: str,
+                                       provided_predictions: Optional[List[Union[str, List[str]]]] = None) -> List[Union[str, List[str]]]:
+        """Get LLM predictions either from cache, provided predictions, or generate new ones.
+        
+        For cached/provided predictions, saves metrics directly to experiments folder without
+        calling the LLM API. For fresh predictions, uses the normal LLM classifier workflow.
+        
+        Args:
+            df: DataFrame to get predictions for
+            train_df: Training DataFrame for few-shot examples
+            cache_path: Base path for caching (without datetime extension)
+            dataset_type: Type of dataset ("validation" or "test") for logging
+            provided_predictions: Optional pre-computed predictions
+            
+        Returns:
+            List of LLM predictions
+        """
+        final_predictions = None
+        predictions_source = "generated"
+        
+        # STEP 1: Determine prediction source and get predictions
+        if provided_predictions is not None:
+            print(f"Using provided LLM predictions for {dataset_type} set...")
+            final_predictions = provided_predictions
+            predictions_source = "provided"
+        elif not cache_path or cache_path.strip() == '':
+            print(f"No cache path specified, generating LLM predictions for {dataset_type} set on the fly...")
+            final_predictions = self._generate_llm_predictions(df, train_df)
+            predictions_source = "generated"
+        else:
+            # Try to load from cache first (with dataset validation)
+            cached_predictions = self._load_cached_llm_predictions(cache_path, df)
+            if cached_predictions is not None:
+                print(f"Loaded cached LLM predictions for {dataset_type} set from {cache_path}")
+                final_predictions = cached_predictions
+                predictions_source = "cached"
+            else:
+                # Generate new predictions and save to cache
+                print(f"Generating new LLM predictions for {dataset_type} set...")
+                final_predictions = self._generate_llm_predictions(df, train_df)
+                predictions_source = "generated"
+                
+                # Save to cache with datetime stamp and dataset hash
+                self._save_cached_llm_predictions(final_predictions, cache_path, df)
+        
+        # STEP 2: Handle results saving based on prediction source
+        if self.llm_model is not None and final_predictions is not None:
+            try:
+                # Extract label columns from DataFrame
+                text_column = self.ml_model.text_column if self.ml_model else 'text'
+                label_columns = self.ml_model.label_columns if self.ml_model else [col for col in df.columns if col != text_column]
+                
+                # Check if we have true labels for metrics calculation
+                has_true_labels = all(col in df.columns for col in label_columns)
+                
+                if has_true_labels:
+                    # Extract true labels in the format expected by LLM classifier
+                    true_labels = df[label_columns].values.tolist()
+                    texts = df[text_column].tolist()
+                    
+                    if predictions_source in ["cached", "provided"]:
+                        # For cached/provided predictions: create metrics and save directly WITHOUT calling LLM API
+                        print(f"📝 Creating metrics and saving results for {predictions_source} predictions (no API calls)...")
+                        
+                        # Convert predictions to binary format for metrics calculation
+                        binary_predictions = []
+                        for pred in final_predictions:
+                            if self.llm_model.multi_label:
+                                # Multi-label: convert list of class names to binary vector
+                                binary_pred = [0] * len(self.llm_model.classes_)
+                                if isinstance(pred, list):
+                                    for class_name in pred:
+                                        if class_name in self.llm_model.classes_:
+                                            binary_pred[self.llm_model.classes_.index(class_name)] = 1
+                                binary_predictions.append(binary_pred)
+                            else:
+                                # Single-label: convert class name to binary vector or parse string response
+                                if isinstance(pred, str):
+                                    # Parse string prediction using LLM model's method
+                                    binary_pred = self.llm_model._parse_prediction_response(pred)
+                                else:
+                                    # Assume it's already a class name
+                                    binary_pred = [0] * len(self.llm_model.classes_)
+                                    if pred in self.llm_model.classes_:
+                                        binary_pred[self.llm_model.classes_.index(pred)] = 1
+                                    else:
+                                        # Default to first class if prediction not in classes
+                                        binary_pred[0] = 1
+                                binary_predictions.append(binary_pred)
+                        
+                        # Calculate metrics
+                        metrics = self.llm_model._calculate_metrics(binary_predictions, true_labels)
+                        print(f"Calculated metrics for {dataset_type} set: {metrics}")
+                        
+                        # Create ClassificationResult for saving
+                        from ..core.types import ClassificationResult, ClassificationType, ModelType
+                        llm_result = ClassificationResult(
+                            predictions=final_predictions,
+                            probabilities=None,
+                            confidence_scores=None,
+                            model_name=self.llm_model.config.parameters.get("model", "unknown"),
+                            model_type=self.llm_model.config.model_type,
+                            classification_type=self.llm_model.config.classification_type if hasattr(self.llm_model.config, 'classification_type') else ClassificationType.MULTI_CLASS,
+                            processing_time=0.0,  # No processing time for cached predictions
+                            metadata={
+                                'metrics': metrics,
+                                'total_samples': len(final_predictions),
+                                'binary_predictions': binary_predictions,
+                                'prediction_source': predictions_source,
+                                'dataset_type': dataset_type
+                            }
+                        )
+                        
+                        # Save results using the LLM model's results manager
+                        if self.llm_model.results_manager:
+                            print(f"💾 Saving {predictions_source} prediction results to experiments folder...")
+                            
+                            # Save predictions using correct ResultsManager methods
+                            prediction_files = self.llm_model.results_manager.save_predictions(
+                                llm_result, dataset_type, df
+                            )
+                            
+                            # Save metrics separately 
+                            metrics_file = self.llm_model.results_manager.save_metrics(
+                                metrics, dataset_type, f"{self.llm_model.provider}_classifier"
+                            )
+                            
+                            # Save model configuration
+                            config_file = self.llm_model.results_manager.save_model_config(
+                                self.llm_model.config.parameters, f"{self.llm_model.provider}_classifier"
+                            )
+                            
+                            # Save experiment summary
+                            summary_file = self.llm_model.results_manager.save_experiment_summary({
+                                "predictions_source": predictions_source,
+                                "dataset_type": dataset_type,
+                                "total_samples": len(final_predictions),
+                                "metrics": metrics,
+                                "model_name": self.llm_model.config.parameters.get("model", "unknown"),
+                                "timestamp": pd.Timestamp.now().isoformat()
+                            })
+                            
+                            print(f"✅ {predictions_source.title()} prediction results saved to experiments folder")
+                            print(f"📁 Saved files: predictions={prediction_files}, metrics={metrics_file}, config={config_file}")
+                        
+                        
+                    else:
+                        # For fresh predictions: use the normal LLM classifier workflow (with API calls)
+                        print(f"🔄 Using LLM classifier predict_texts for fresh predictions...")
+                        
+                        # Temporarily disable LLM results saving if intermediate saving is disabled
+                        original_llm_results_manager = None
+                        if not self.save_intermediate_llm_predictions and hasattr(self.llm_model, 'results_manager'):
+                            original_llm_results_manager = self.llm_model.results_manager
+                            self.llm_model.results_manager = None
+                        
+                        try:
+                            llm_result = self.llm_model.predict_texts(
+                                texts=texts, 
+                                true_labels=true_labels
+                            )
+                            if not self.save_intermediate_llm_predictions:
+                                print(f"✅ Fresh LLM predictions generated (intermediate saving disabled)")
+                            else:
+                                print(f"✅ Fresh LLM prediction results saved to experiments folder")
+                        finally:
+                            # Restore the original results manager
+                            if original_llm_results_manager is not None:
+                                self.llm_model.results_manager = original_llm_results_manager
+                    
+                else:
+                    print(f"ℹ️ No true labels available in DataFrame - skipping metrics calculation")
+                    
+            except Exception as e:
+                print(f"⚠️ Warning: Could not save LLM results for {dataset_type} set: {e}")
+                print(f"   Continuing with {predictions_source} predictions only...")
+        
+        # STEP 3: Save predictions to experiments directory (fallback)
+        # Only save as fallback if predictions were cached/provided (not freshly generated)
+        # AND if intermediate LLM prediction saving is enabled
+        # Fresh predictions already get saved by predict_texts() above
+        if predictions_source in ["cached", "provided"] and self.save_intermediate_llm_predictions:
+            self._save_llm_predictions_to_experiments(final_predictions, df, dataset_type)
+        
+        return final_predictions
+    
+    def _generate_llm_predictions(self, df: pd.DataFrame, train_df: pd.DataFrame) -> List[Union[str, List[str]]]:
+        """Generate LLM predictions for a DataFrame."""
+        if self.llm_model is None:
+            raise EnsembleError("LLM model must be added before generating predictions")
+        
+        llm_result = self.llm_model.predict(
+            train_df=train_df,
+            test_df=df
+        )
+        return llm_result.predictions
+    
+    def _create_dataset_hash(self, df: pd.DataFrame) -> str:
+        """Create a hash of the DataFrame for cache validation.
+        
+        Args:
+            df: DataFrame to hash
+            
+        Returns:
+            8-character hash string
+        """
+        import hashlib
+        
+        # Create hash based on DataFrame content
+        df_hash = hashlib.md5(
+            pd.util.hash_pandas_object(df, index=True).values
+        ).hexdigest()[:8]  # Only first 8 characters
+        
+        return df_hash
+    
+    def _get_timestamp(self) -> str:
+        """Get current timestamp in ISO format."""
+        from datetime import datetime
+        return datetime.now().isoformat()
+    
+    def _load_cached_llm_predictions(self, base_cache_path: str, df: pd.DataFrame) -> Optional[List[Union[str, List[str]]]]:
+        """Try to load cached LLM predictions from file with dataset validation.
+        
+        Args:
+            base_cache_path: Base path without datetime extension
+            df: DataFrame to validate against
+            
+        Returns:
+            Cached predictions if found and valid, None otherwise
+        """
+        if not base_cache_path or not base_cache_path.strip():
+            return None
+        
+        try:
+            import json
+            import os
+            import glob
+            
+            # Calculate current dataset hash
+            current_hash = self._create_dataset_hash(df)
+            
+            # First, try to find files with matching hash
+            pattern = f"{base_cache_path}_*_{current_hash}.json"
+            matching_files = glob.glob(pattern)
+            
+            if matching_files:
+                # Get the most recent file with matching hash
+                latest_file = max(matching_files, key=os.path.getctime)
+                
+                with open(latest_file, 'r') as f:
+                    cache_data = json.load(f)
+                
+                # Handle both new format (with metadata) and old format (just predictions)
+                if isinstance(cache_data, dict) and 'predictions' in cache_data:
+                    predictions = cache_data['predictions']
+                    metadata = cache_data.get('metadata', {})
+                    
+                    # Validate sample count
+                    if metadata.get('num_samples') == len(df):
+                        print(f"✅ Loaded matching cached predictions: {latest_file} (Hash: {current_hash})")
+                        return predictions
+                    else:
+                        print(f"⚠️ Sample count mismatch in cache: {latest_file}")
+                elif isinstance(cache_data, list):
+                    # Old format - just validate sample count
+                    if len(cache_data) == len(df):
+                        print(f"✅ Loaded compatible cached predictions: {latest_file} (Hash: {current_hash})")
+                        return cache_data
+            
+            # Fallback: Look for old files without hash (backward compatibility)
+            print(f"🔍 No hash-matched cache found, checking backward compatibility...")
+            old_pattern = f"{base_cache_path}_*.json"
+            old_files = [f for f in glob.glob(old_pattern) if not f.endswith(f"_{current_hash}.json")]
+            
+            for file_path in sorted(old_files, key=os.path.getctime, reverse=True):
+                try:
+                    with open(file_path, 'r') as f:
+                        data = json.load(f)
+                    
+                    # Handle both old and new formats
+                    if isinstance(data, list):
+                        predictions = data
+                    elif isinstance(data, dict) and 'predictions' in data:
+                        predictions = data['predictions']
+                    else:
+                        continue
+                    
+                    # Validate sample count
+                    if len(predictions) == len(df):
+                        print(f"⚠️ Using backward-compatible cache: {file_path} (no hash validation)")
+                        return predictions
+                        
+                except Exception:
+                    continue
+            
+            print(f"❌ No compatible cache found for dataset (Hash: {current_hash})")
+            return None
+            
+        except Exception as e:
+            print(f"Warning: Could not load cached predictions from {base_cache_path}: {e}")
+            return None
+    
+    def _save_cached_llm_predictions(self, predictions: List[Union[str, List[str]]], base_cache_path: str, df: pd.DataFrame):
+        """Save LLM predictions to cache file with datetime stamp and dataset hash.
+        
+        Args:
+            predictions: LLM predictions to save
+            base_cache_path: Base path for the cache file
+            df: DataFrame for hash calculation and metadata
+        """
+        if not base_cache_path or not base_cache_path.strip():
+            return
+        
+        try:
+            import json
+            import os
+            from datetime import datetime
+            
+            # Create directory if it doesn't exist
+            cache_dir = os.path.dirname(base_cache_path)
+            if cache_dir and not os.path.exists(cache_dir):
+                os.makedirs(cache_dir, exist_ok=True)
+            
+            # Calculate dataset hash
+            dataset_hash = self._create_dataset_hash(df)
+            
+            # Create filename with datetime stamp and hash
+            timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+            cache_filename = f"{base_cache_path}_{timestamp}_{dataset_hash}.json"
+            
+            # Create cache data with metadata
+            cache_data = {
+                'predictions': predictions,
+                'metadata': {
+                    'timestamp': timestamp,
+                    'num_samples': len(df),
+                    'dataset_hash': dataset_hash,
+                    'columns': list(df.columns),
+                    'created_at': datetime.now().isoformat()
+                }
+            }
+            
+            # Save predictions with metadata
+            with open(cache_filename, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            
+            print(f"✅ LLM predictions saved to {cache_filename} (Hash: {dataset_hash})")
+            
+        except Exception as e:
+            print(f"Warning: Could not save predictions to cache {base_cache_path}: {e}")
+    
+    def _save_llm_predictions_to_experiments(self, predictions: List[Union[str, List[str]]], 
+                                           df: pd.DataFrame, dataset_type: str):
+        """Save LLM predictions to the experiments directory structure.
+        
+        Args:
+            predictions: LLM predictions to save
+            df: DataFrame used for predictions (for metadata)
+            dataset_type: Type of dataset ("validation" or "test")
+        """
+        if not self.results_manager:
+            return
+            
+        try:
+            # Create a ClassificationResult for the LLM predictions
+            from ..core.types import ClassificationResult
+            
+            llm_result = ClassificationResult(
+                predictions=predictions,
+                model_name="llm_model",
+                classification_type=self.classification_type,
+                metadata={
+                    'dataset_type': dataset_type,
+                    'num_samples': len(df),
+                    'dataset_hash': self._create_dataset_hash(df),
+                    'timestamp': self._get_timestamp(),
+                    'llm_model_info': {
+                        'type': type(self.llm_model).__name__ if self.llm_model else 'unknown',
+                        'model_name': getattr(self.llm_model, 'model_name', 'unknown')
+                    }
+                }
+            )
+            
+            # Save LLM predictions using ResultsManager
+            saved_files = self.results_manager.save_predictions(
+                llm_result, f"llm_{dataset_type}", df
+            )
+            
+            print(f"📁 LLM {dataset_type} predictions saved to experiments: {saved_files}")
+            
+        except Exception as e:
+            print(f"Warning: Could not save LLM predictions to experiments: {e}")
+    
+    def save_llm_predictions(self, predictions: List[Union[str, List[str]]], filepath: str):
+        """Save LLM predictions to a file for later reuse.
+        
+        Args:
+            predictions: LLM predictions to save
+            filepath: Path to save the predictions (JSON format)
+        """
+        import json
+        with open(filepath, 'w') as f:
+            json.dump(predictions, f, indent=2)
+        print(f"LLM predictions saved to {filepath}")
+    
+    def load_llm_predictions(self, filepath: str) -> List[Union[str, List[str]]]:
+        """Load LLM predictions from a file.
+        
+        Args:
+            filepath: Path to load predictions from (JSON format)
+            
+        Returns:
+            List of LLM predictions
+        """
+        import json
+        with open(filepath, 'r') as f:
+            predictions = json.load(f)
+        print(f"LLM predictions loaded from {filepath}")
+        return predictions
+    
+    def load_cached_predictions_for_dataset(self, df: pd.DataFrame, dataset_type: str = "auto") -> Optional[List[Union[str, List[str]]]]:
+        """Load cached LLM predictions for a specific dataset (validation or test).
+        
+        This function provides a convenient way to load cached LLM predictions without
+        having to train the fusion ensemble. It automatically determines which cache
+        to use based on dataset_type or attempts to match the dataset.
+        
+        Args:
+            df: DataFrame to load predictions for
+            dataset_type: Type of dataset - "validation", "test", or "auto" (default)
+                         If "auto", tries both validation and test caches
+            
+        Returns:
+            List of cached LLM predictions if found, None otherwise
+        """
+        if dataset_type == "validation" or dataset_type == "auto":
+            if self.val_llm_cache_path:
+                cached_predictions = self._load_cached_llm_predictions(self.val_llm_cache_path, df)
+                if cached_predictions is not None:
+                    print(f"✅ Found cached validation predictions for {len(df)} samples")
+                    return cached_predictions
+                elif dataset_type == "validation":
+                    print(f"❌ No cached validation predictions found for {len(df)} samples")
+                    return None
+        
+        if dataset_type == "test" or dataset_type == "auto":
+            if self.test_llm_cache_path:
+                cached_predictions = self._load_cached_llm_predictions(self.test_llm_cache_path, df)
+                if cached_predictions is not None:
+                    print(f"✅ Found cached test predictions for {len(df)} samples")
+                    return cached_predictions
+                elif dataset_type == "test":
+                    print(f"❌ No cached test predictions found for {len(df)} samples")
+                    return None
+        
+        if dataset_type == "auto":
+            print(f"❌ No cached predictions found for {len(df)} samples in either validation or test cache")
+        
+        return None
+    
+    def get_cached_predictions_summary(self) -> Dict[str, Any]:
+        """Get a summary of available cached predictions.
+        
+        Returns:
+            Dictionary with information about cached predictions
+        """
+        import glob
+        import os
+        from pathlib import Path
+        
+        summary = {
+            "validation_cache": {
+                "path": self.val_llm_cache_path,
+                "files": [],
+                "latest_file": None,
+                "available": False
+            },
+            "test_cache": {
+                "path": self.test_llm_cache_path,
+                "files": [],
+                "latest_file": None,
+                "available": False
+            }
+        }
+        
+        # Check validation cache
+        if self.val_llm_cache_path and self.val_llm_cache_path.strip():
+            pattern = f"{self.val_llm_cache_path}_*.json"
+            files = glob.glob(pattern)
+            if files:
+                summary["validation_cache"]["files"] = files
+                summary["validation_cache"]["latest_file"] = max(files, key=os.path.getctime)
+                summary["validation_cache"]["available"] = True
+        
+        # Check test cache
+        if self.test_llm_cache_path and self.test_llm_cache_path.strip():
+            pattern = f"{self.test_llm_cache_path}_*.json"
+            files = glob.glob(pattern)
+            if files:
+                summary["test_cache"]["files"] = files
+                summary["test_cache"]["latest_file"] = max(files, key=os.path.getctime)
+                summary["test_cache"]["available"] = True
+        
+        return summary
+    
+    def fit_with_cached_predictions(self, train_df: pd.DataFrame, val_df: pd.DataFrame,
+                                   val_llm_predictions: Optional[List[Union[str, List[str]]]] = None,
+                                   force_load_from_cache: bool = False) -> Dict[str, Any]:
+        """Train fusion ensemble with automatic cache loading for validation predictions.
+        
+        This is a convenience method that automatically tries to load cached LLM predictions
+        for the validation set before training, reducing the need to regenerate them.
+        
+        Args:
+            train_df: Training DataFrame
+            val_df: Validation DataFrame
+            val_llm_predictions: Optional pre-computed validation predictions.
+                                If None, will try to load from cache first.
+            force_load_from_cache: If True, only use cached predictions and fail if not found
+            
+        Returns:
+            Training results dictionary
+        """
+        # Try to load cached validation predictions if not provided
+        if val_llm_predictions is None:
+            print("🔍 Attempting to load cached validation LLM predictions...")
+            cached_val_predictions = self.load_cached_predictions_for_dataset(val_df, "validation")
+            
+            if cached_val_predictions is not None:
+                val_llm_predictions = cached_val_predictions
+                print(f"✅ Using cached validation predictions ({len(cached_val_predictions)} samples)")
+            elif force_load_from_cache:
+                raise EnsembleError(
+                    "force_load_from_cache=True but no cached validation predictions found",
+                    "FusionEnsemble"
+                )
+            else:
+                print("⚠️ No cached validation predictions found, will generate new ones during training")
+        
+        # Call the regular fit method
+        return self.fit(train_df, val_df, val_llm_predictions)
+    
+    def predict_with_cached_predictions(self, test_df: pd.DataFrame, 
+                                       true_labels: Optional[List[List[int]]] = None,
+                                       test_llm_predictions: Optional[List[Union[str, List[str]]]] = None,
+                                       force_load_from_cache: bool = False) -> ClassificationResult:
+        """Make predictions with automatic cache loading for test predictions.
+        
+        This is a convenience method that automatically tries to load cached LLM predictions
+        for the test set before making predictions.
+        
+        Args:
+            test_df: Test DataFrame
+            true_labels: Optional true labels for evaluation
+            test_llm_predictions: Optional pre-computed test predictions.
+                                 If None, will try to load from cache first.
+            force_load_from_cache: If True, only use cached predictions and fail if not found
+            
+        Returns:
+            ClassificationResult with predictions and metrics
+        """
+        # Try to load cached test predictions if not provided
+        if test_llm_predictions is None:
+            print("🔍 Attempting to load cached test LLM predictions...")
+            cached_test_predictions = self.load_cached_predictions_for_dataset(test_df, "test")
+            
+            if cached_test_predictions is not None:
+                test_llm_predictions = cached_test_predictions
+                print(f"✅ Using cached test predictions ({len(cached_test_predictions)} samples)")
+            elif force_load_from_cache:
+                raise EnsembleError(
+                    "force_load_from_cache=True but no cached test predictions found",
+                    "FusionEnsemble"
+                )
+            else:
+                print("⚠️ No cached test predictions found, will generate new ones during prediction")
+        
+        # Call the regular predict method
+        return self.predict(test_df, true_labels, test_llm_predictions)
+    
+    @classmethod
+    def discover_cached_predictions(cls, cache_directory: str) -> Dict[str, List[str]]:
+        """Discover all cached LLM prediction files in a directory.
+        
+        This is a utility function to help find cached prediction files that can be used
+        for training or prediction without regenerating LLM outputs.
+        
+        Args:
+            cache_directory: Directory to search for cached prediction files
+            
+        Returns:
+            Dictionary mapping cache file patterns to list of matching files
+        """
+        import glob
+        import os
+        from pathlib import Path
+        
+        cache_dir = Path(cache_directory)
+        if not cache_dir.exists():
+            print(f"Cache directory does not exist: {cache_directory}")
+            return {}
+        
+        # Look for all JSON files that match the cache pattern
+        pattern = str(cache_dir / "*_*.json")
+        all_files = glob.glob(pattern)
+        
+        # Group files by base name (without timestamp and hash)
+        grouped_files = {}
+        for file_path in all_files:
+            file_name = os.path.basename(file_path)
+            # Extract base name by removing timestamp and hash parts
+            parts = file_name.split('_')
+            if len(parts) >= 3:  # base_timestamp_hash.json
+                base_name = '_'.join(parts[:-2]) if len(parts) > 3 else parts[0]
+                if base_name not in grouped_files:
+                    grouped_files[base_name] = []
+                grouped_files[base_name].append(file_path)
+        
+        # Sort files within each group by creation time (newest first)
+        for base_name in grouped_files:
+            grouped_files[base_name].sort(key=os.path.getctime, reverse=True)
+        
+        return grouped_files
+    
+    def print_cache_status(self):
+        """Print a detailed status of cached predictions for this fusion ensemble."""
+        import os
+        
+        print("\n" + "="*60)
+        print("🗂️  FUSION ENSEMBLE CACHE STATUS")
+        print("="*60)
+        
+        summary = self.get_cached_predictions_summary()
+        
+        # Validation cache status
+        val_cache = summary["validation_cache"]
+        print(f"\n📊 VALIDATION CACHE:")
+        print(f"   Path: {val_cache['path'] or 'Not configured'}")
+        if val_cache["available"]:
+            print(f"   Status: ✅ Available ({len(val_cache['files'])} files)")
+            print(f"   Latest: {os.path.basename(val_cache['latest_file'])}")
+        else:
+            print(f"   Status: ❌ No cached files found")
+        
+        # Test cache status
+        test_cache = summary["test_cache"]
+        print(f"\n🧪 TEST CACHE:")
+        print(f"   Path: {test_cache['path'] or 'Not configured'}")
+        if test_cache["available"]:
+            print(f"   Status: ✅ Available ({len(test_cache['files'])} files)")
+            print(f"   Latest: {os.path.basename(test_cache['latest_file'])}")
+        else:
+            print(f"   Status: ❌ No cached files found")
+        
+        print("\n💡 USAGE TIPS:")
+        print("   • Use fit_with_cached_predictions() to automatically load cached validation predictions")
+        print("   • Use predict_with_cached_predictions() to automatically load cached test predictions")
+        print("   • Use load_cached_predictions_for_dataset() for manual cache loading")
+        print("   • Set force_load_from_cache=True to ensure cached predictions are used")
+        print("="*60)
+    
+    def train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, llm_val_result, 
+                                text_column: str, label_columns: List[str]):
+        """Public method to train the fusion MLP using validation set predictions from both ML and LLM models."""
+        return self._train_fusion_mlp_on_val(val_df, ml_val_result, llm_val_result, text_column, label_columns)
+
+    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, llm_val_result, 
                                 text_column: str, label_columns: List[str]):
         """Train the fusion MLP using validation set predictions from both ML and LLM models."""
         
@@ -334,8 +1129,8 @@ class FusionEnsemble(BaseEnsemble):
         fusion_val_ml_predictions = ml_val_result.predictions[split_idx:]
         
         # Split LLM predictions
-        fusion_train_llm_predictions = val_llm_result.predictions[:split_idx]
-        fusion_val_llm_predictions = val_llm_result.predictions[split_idx:]
+        fusion_train_llm_predictions = llm_val_result.predictions[:split_idx]
+        fusion_val_llm_predictions = llm_val_result.predictions[split_idx:]
         
         print(f"   🔧 Fusion training: {len(fusion_train_df)} samples")
         print(f"   🔧 Fusion validation: {len(fusion_val_df)} samples")
@@ -468,35 +1263,124 @@ class FusionEnsemble(BaseEnsemble):
         
         return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
     
-    def predict(self, data: pd.DataFrame) -> ClassificationResult:
-        """Predict using fusion ensemble.
+    def predict(self, test_df: pd.DataFrame, true_labels: Optional[List[List[int]]] = None,
+                test_llm_predictions: Optional[List[Union[str, List[str]]]] = None) -> ClassificationResult:
+        """Predict using fusion ensemble on test DataFrame.
         
         Args:
-            data: DataFrame with text column (and optionally label columns)
+            test_df: Test DataFrame with text and optionally label columns
+            true_labels: Optional true labels for evaluation (deprecated, will be extracted from DataFrame)
+            test_llm_predictions: Optional pre-computed LLM predictions for test set.
+                                  If provided, skips LLM inference on test data.
+            
+        Returns:
+            ClassificationResult with predictions and metrics
         """
         if not self.is_trained:
             raise EnsembleError("Fusion ensemble must be trained before prediction")
         
-        # DataFrame input only
-        test_df = data.copy()
-        text_column = 'text'  # Could be configurable
-        if text_column not in test_df.columns:
-            raise EnsembleError(f"Text column '{text_column}' not found in DataFrame")
+        # Extract text and label columns - assume they match ML model configuration
+        text_column = self.ml_model.text_column or 'text'
+        label_columns = self.ml_model.label_columns or [col for col in test_df.columns if col != text_column]
+        
         texts = test_df[text_column].tolist()
         
         # Extract true labels from DataFrame if available
         extracted_labels = None
-        if hasattr(self, 'classes_') and self.classes_:
-            label_columns = [col for col in self.classes_ if col in test_df.columns]
-            if label_columns:
-                extracted_labels = test_df[label_columns].values.tolist()
+        if all(col in test_df.columns for col in label_columns):
+            extracted_labels = test_df[label_columns].values.tolist()
+        elif true_labels is not None:
+            extracted_labels = true_labels
         
-        # Get ML predictions - match the format used in fit()
-        ml_result = self.ml_model.predict(texts=texts)
+        # Step 1: Get ML predictions on test data
+        print("Getting ML predictions on test data...")
+        ml_test_result = self.ml_model.predict(test_df)
         
-        # Get LLM predictions - match the format used in fit()
-        llm_result = self.llm_model.predict(train_df=self.train_df_cache, test_df=test_df)
+        # Step 2: Get LLM predictions on test data
+        llm_test_predictions = self._get_or_generate_llm_predictions(
+            df=test_df,
+            train_df=getattr(self, 'train_df_cache', test_df),
+            cache_path=self.test_llm_cache_path,
+            dataset_type="test",
+            provided_predictions=test_llm_predictions
+        )
         
+        # Create ClassificationResult for test predictions
+        # If we have true labels, call the LLM classifier's predict_texts method to get proper metrics
+        if extracted_labels is not None and self.llm_model is not None:
+            try:
+                # Temporarily disable LLM results saving if intermediate saving is disabled
+                original_llm_results_manager = None
+                if not self.save_intermediate_llm_predictions and hasattr(self.llm_model, 'results_manager'):
+                    original_llm_results_manager = self.llm_model.results_manager
+                    self.llm_model.results_manager = None
+                
+                try:
+                    # Call the LLM classifier's predict_texts method with cached predictions
+                    # This ensures metrics are calculated and individual results are saved
+                    llm_test_result = self.llm_model.predict_texts(
+                        texts=texts, 
+                        true_labels=extracted_labels
+                    )
+                    # Override predictions with cached ones if they were used
+                    if test_llm_predictions is not None or self.test_llm_cache_path:
+                        llm_test_result.predictions = llm_test_predictions
+                        # Update model name to indicate cached predictions were used
+                        llm_test_result.model_name = "llm_model_cached"
+                finally:
+                    # Restore the original results manager
+                    if original_llm_results_manager is not None:
+                        self.llm_model.results_manager = original_llm_results_manager
+            except Exception as e:
+                print(f"Warning: Could not call LLM classifier predict_texts for metrics: {e}")
+                # Fallback to simple ClassificationResult
+                from ..core.types import ClassificationResult
+                llm_test_result = ClassificationResult(
+                    predictions=llm_test_predictions,
+                    model_name="llm_model" if test_llm_predictions is None else "llm_model_cached",
+                    classification_type=self.classification_type
+                )
+        else:
+            # No true labels available, create simple ClassificationResult
+            from ..core.types import ClassificationResult
+            llm_test_result = ClassificationResult(
+                predictions=llm_test_predictions,
+                model_name="llm_model" if test_llm_predictions is None else "llm_model_cached",
+                classification_type=self.classification_type
+            )
+        
+        # Step 3: Use fusion MLP to combine predictions
+        print("Generating fusion predictions...")
+        result = self._predict_with_fusion(ml_test_result, llm_test_result, texts, extracted_labels)
+        
+        # Save test results using ResultsManager
+        if self.results_manager:
+            try:
+                saved_files = self.results_manager.save_predictions(
+                    result, "test", test_df
+                )
+                
+                # Save metrics if available
+                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                    metrics_file = self.results_manager.save_metrics(
+                        result.metadata['metrics'], "test", "fusion_ensemble"
+                    )
+                    saved_files["metrics"] = metrics_file
+                
+                print(f"📁 Test results saved: {saved_files}")
+                
+                # Add file paths to result metadata
+                if not result.metadata:
+                    result.metadata = {}
+                result.metadata['saved_files'] = saved_files
+                
+            except Exception as e:
+                print(f"Warning: Could not save test results: {e}")
+        
+        return result
+    
+    def _predict_with_fusion(self, ml_result, llm_result, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Generate fusion predictions using trained MLP."""
         # Create dataset using both ML and LLM predictions
         dummy_labels = [[0] * self.num_labels] * len(texts)
         dataset = self._create_fusion_dataset(texts, dummy_labels, ml_result.predictions, llm_result.predictions)
@@ -527,7 +1411,7 @@ class FusionEnsemble(BaseEnsemble):
                         active_labels = [self.classes_[i] for i, is_active in enumerate(pred_array) if is_active]
                         all_predictions.append(active_labels)
         
-        return self._create_result(predictions=all_predictions, true_labels=extracted_labels)
+        return self._create_result(predictions=all_predictions, true_labels=true_labels)
     
     def _combine_predictions(self, model_results: List[ClassificationResult], texts: List[str]) -> List[Union[str, List[str]]]:
         """Not used in fusion ensemble - predictions are generated directly."""

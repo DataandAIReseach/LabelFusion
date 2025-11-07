@@ -27,11 +27,10 @@ Description-Content-Type: text/markdown
 License-File: LICENSE
 Requires-Dist: pandas
 Requires-Dist: python-dotenv
-Requires-Dist: openai
+Requires-Dist: openai>=1.0.0
 Requires-Dist: aiohttp
 Requires-Dist: pytest
 Requires-Dist: pytest-asyncio
-Requires-Dist: deepseek-ai
 Requires-Dist: google-generativeai
 Provides-Extra: dev
 Requires-Dist: pytest>=7.0.0; extra == "dev"

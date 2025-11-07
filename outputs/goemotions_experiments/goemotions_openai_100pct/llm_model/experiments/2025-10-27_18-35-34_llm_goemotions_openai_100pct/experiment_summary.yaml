@@ -1,0 +1,76 @@
+created_at: '2025-10-27T18:59:06.079458'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq003
+    platform: Linux-4.18.0-553.77.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /mnt/vast-standard/home/schlee2/u19147/repos/LabelFusion
+  experiment_id: 2025-10-27_18-35-34_llm_goemotions_openai_100pct
+  git_commit: 5041b5567d5e6e8d526211d06abc90b70218d278
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-10-27T18:35:34.441691'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/openai_classifier_test_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/test_predictions_49f3a93c40d1.csv
+  - predictions/test_predictions_49f3a93c40d1.json
+test_results: null
+training_results:
+  batch_size: 32
+  classes:
+  - admiration
+  - amusement
+  - anger
+  - annoyance
+  - approval
+  - caring
+  - confusion
+  - curiosity
+  - desire
+  - disappointment
+  - disapproval
+  - disgust
+  - embarrassment
+  - excitement
+  - fear
+  - gratitude
+  - grief
+  - joy
+  - love
+  - nervousness
+  - optimism
+  - pride
+  - realization
+  - relief
+  - remorse
+  - sadness
+  - surprise
+  - neutral
+  classification_type: multi_label
+  completed: true
+  max_completion_tokens: 150
+  metrics:
+    f1: 0.10813333333333333
+    hamming_loss: 0.07635714285714286
+    micro_f1: 0.9236428571428571
+    micro_precision: 0.9236428571428571
+    micro_recall: 0.9236428571428571
+    precision: 0.107
+    recall: 0.12256666666666666
+    subset_accuracy: 0.056
+  model_name: gpt-4o-mini
+  model_type: llm
+  num_labels: 28
+  provider: openai
+  temperature: 0.0
+  test_samples: 500
+  train_samples: 5000

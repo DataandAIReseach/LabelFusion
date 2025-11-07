@@ -3,6 +3,7 @@
 from .logging import setup_logging, get_logger
 from .metrics import ClassificationMetrics, evaluate_predictions
 from .data import DataLoader, split_data, balance_data
+from .results_manager import ResultsManager, ModelResultsManager, ExperimentMetadata
 
 # Fusion utilities (optional import due to matplotlib dependency)
 try:
@@ -22,6 +23,9 @@ __all__ = [
     "DataLoader",
     "split_data",
     "balance_data",
+    "ResultsManager",
+    "ModelResultsManager",
+    "ExperimentMetadata",
 ]
 
 if FUSION_UTILS_AVAILABLE:
