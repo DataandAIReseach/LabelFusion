@@ -25,28 +25,33 @@ from tests.evaluation.eval_goemotions import create_stratified_subset
 def calculate_dataset_hash(df: pd.DataFrame) -> str:
     """Calculate hash of a dataset based on its content.
     
+    Uses a set-based approach to be independent of row order.
+    
     Args:
         df: DataFrame to hash
         
     Returns:
         8-character hex hash
     """
-    # Create a stable string representation
-    # Use text + all label columns, sorted by index
-    df_sorted = df.sort_index()
-    
-    # Concatenate text and labels into a single string
-    content_str = ""
+    # Create a set of row hashes for order-independence
+    row_hashes = set()
     text_col = 'text'
     label_cols = [col for col in df.columns if col != text_col and col != 'Unnamed: 0']
     
-    for idx, row in df_sorted.iterrows():
-        content_str += str(row[text_col])
+    for idx, row in df.iterrows():
+        # Create a string for this row
+        row_str = str(row[text_col])
         for label_col in sorted(label_cols):
-            content_str += str(row[label_col])
+            row_str += str(row[label_col])
+        # Hash this row and add to set
+        row_hash = hashlib.sha256(row_str.encode('utf-8')).hexdigest()
+        row_hashes.add(row_hash)
     
-    # Calculate SHA256 hash
-    hash_obj = hashlib.sha256(content_str.encode('utf-8'))
+    # Sort the row hashes for determinism and concatenate
+    combined_str = ''.join(sorted(row_hashes))
+    
+    # Calculate final hash
+    hash_obj = hashlib.sha256(combined_str.encode('utf-8'))
     return hash_obj.hexdigest()[:8]
 
 

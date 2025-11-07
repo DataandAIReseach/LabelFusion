@@ -1240,38 +1240,69 @@ class FusionEnsemble(BaseEnsemble):
             self.fusion_wrapper.train()  # Back to training mode
     
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
-                              ml_predictions: List, llm_predictions: List):
-        """Create dataset for fusion training using pre-computed ML and LLM predictions."""
+                              ml_predictions: List, llm_predictions: List,
+                              ml_probabilities: Optional[List[Dict[str, float]]] = None,
+                              llm_probabilities: Optional[List[Dict[str, float]]] = None):
+        """Create dataset for fusion training using pre-computed ML and LLM predictions.
         
-        # Convert ML predictions to tensor format (binary vectors)
+        Priority:
+        1. Use probabilities if available (much better for learning!)
+        2. Fall back to binary predictions if probabilities not available
+        """
+        
+        # Convert ML predictions/probabilities to tensor format
         ml_tensor = torch.zeros(len(ml_predictions), self.num_labels)
-        for i, prediction in enumerate(ml_predictions):
-            if isinstance(prediction, list) and len(prediction) == self.num_labels:
-                # Already in binary vector format
-                ml_tensor[i] = torch.tensor(prediction, dtype=torch.float)
-            elif isinstance(prediction, str):
-                # Convert class name to binary vector
-                if prediction in self.classes_:
-                    class_idx = self.classes_.index(prediction)
-                    ml_tensor[i, class_idx] = 1.0
+        if ml_probabilities is not None and len(ml_probabilities) > 0:
+            # Use probabilities - much better for the MLP to learn from!
+            for i, prob_dict in enumerate(ml_probabilities):
+                for class_name, prob in prob_dict.items():
+                    if class_name in self.classes_:
+                        class_idx = self.classes_.index(class_name)
+                        ml_tensor[i, class_idx] = prob
+        else:
+            # Fallback to binary predictions
+            for i, prediction in enumerate(ml_predictions):
+                if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                    # Already in binary vector format
+                    ml_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+                elif isinstance(prediction, str):
+                    # Convert class name to binary vector
+                    if prediction in self.classes_:
+                        class_idx = self.classes_.index(prediction)
+                        ml_tensor[i, class_idx] = 1.0
+                elif isinstance(prediction, list):
+                    # List of class names (multi-label)
+                    for pred_class in prediction:
+                        if pred_class in self.classes_:
+                            class_idx = self.classes_.index(pred_class)
+                            ml_tensor[i, class_idx] = 1.0
         
-        # Convert LLM predictions to tensor format (binary vectors)
+        # Convert LLM predictions/probabilities to tensor format
         llm_tensor = torch.zeros(len(llm_predictions), self.num_labels)
-        for i, prediction in enumerate(llm_predictions):
-            if isinstance(prediction, list) and len(prediction) == self.num_labels:
-                # Already in binary vector format
-                llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
-            elif isinstance(prediction, str):
-                # Convert class name to binary vector
-                if prediction in self.classes_:
-                    class_idx = self.classes_.index(prediction)
-                    llm_tensor[i, class_idx] = 1.0
-            elif isinstance(prediction, list):
-                # List of class names (multi-label)
-                for pred_class in prediction:
-                    if pred_class in self.classes_:
-                        class_idx = self.classes_.index(pred_class)
+        if llm_probabilities is not None and len(llm_probabilities) > 0:
+            # Use probabilities - much better for the MLP to learn from!
+            for i, prob_dict in enumerate(llm_probabilities):
+                for class_name, prob in prob_dict.items():
+                    if class_name in self.classes_:
+                        class_idx = self.classes_.index(class_name)
+                        llm_tensor[i, class_idx] = prob
+        else:
+            # Fallback to binary predictions
+            for i, prediction in enumerate(llm_predictions):
+                if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                    # Already in binary vector format
+                    llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+                elif isinstance(prediction, str):
+                    # Convert class name to binary vector
+                    if prediction in self.classes_:
+                        class_idx = self.classes_.index(prediction)
                         llm_tensor[i, class_idx] = 1.0
+                elif isinstance(prediction, list):
+                    # List of class names (multi-label)
+                    for pred_class in prediction:
+                        if pred_class in self.classes_:
+                            class_idx = self.classes_.index(pred_class)
+                            llm_tensor[i, class_idx] = 1.0
         
         # Create tensor dataset with predictions only (no tokenization needed)
         labels_tensor = torch.FloatTensor(labels)

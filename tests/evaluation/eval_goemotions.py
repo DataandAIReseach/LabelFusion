@@ -79,6 +79,29 @@ def create_stratified_subset(df: pd.DataFrame, percentage: float, label_columns:
     return subset_df.reset_index(drop=True)
 
 
+def calculate_dataset_hash(df: pd.DataFrame, label_columns: list) -> str:
+    """Calculate hash of a dataset based on its content.
+    
+    Uses a simple deterministic approach based on dataset size and random_state.
+    This ensures that subsets created with the same percentage and random_state
+    always get the same hash, regardless of implementation details.
+    
+    Args:
+        df: DataFrame to hash
+        label_columns: List of label column names
+        
+    Returns:
+        8-character hex hash
+    """
+    # Use dataset size as the primary identifier
+    # This is deterministic: same percentage → same size → same hash
+    size_str = f"goemotions_train_size_{len(df)}_labels_{len(label_columns)}_seed_42"
+    
+    # Calculate hash
+    hash_obj = hashlib.sha256(size_str.encode('utf-8'))
+    return hash_obj.hexdigest()[:8]
+
+
 def create_ml_model(text_column: str, label_columns: list, output_dir: str, experiment_name: str, 
                     auto_save_path: str = None) -> RoBERTaClassifier:
     """Create and configure ML (RoBERTa) model."""
@@ -246,8 +269,12 @@ def evaluate_with_data_percentage(
     subset_dist = df_train_subset[label_columns].sum()
     print(subset_dist)
     
-    # Setup cache paths - save directly in cache directory
-    ml_cache_path = os.path.join(cache_dir, f"fusion_roberta_model_{percentage_str}")
+    # Calculate hash of the training subset for cache lookup
+    dataset_hash = calculate_dataset_hash(df_train_subset, label_columns)
+    print(f"\nTraining subset hash: {dataset_hash}")
+    
+    # Setup cache paths - use hash-based naming
+    ml_cache_path = os.path.join(cache_dir, f"fusion_roberta_model_{dataset_hash}")
     val_cache_path = os.path.join(cache_dir, "val")
     test_cache_path = os.path.join(cache_dir, "test")
     
@@ -264,15 +291,34 @@ def evaluate_with_data_percentage(
     # Dictionary to store all results
     all_model_results = {}
     
+    # ===== Check and load cached RoBERTa model if available =====
+    ml_model_loaded_from_cache = False
+    if os.path.exists(ml_cache_path):
+        print(f"\n📦 Loading cached RoBERTa model from: {ml_cache_path}")
+        try:
+            ml_model.load_model(ml_cache_path)
+            print("✅ Successfully loaded cached model")
+            ml_model_loaded_from_cache = True
+        except Exception as e:
+            print(f"⚠️ Failed to load cached model: {e}")
+            print("Will train a new model...")
+    
     # ===== BASELINE 1: Evaluate RoBERTa alone (if requested) =====
     if evaluate_baselines:
         print("\n" + "-"*80)
         print("BASELINE 1: Evaluating RoBERTa (ML) model alone...")
         print("-"*80)
         
-        # Train RoBERTa
-        print(f"Training RoBERTa on {len(df_train_subset)} samples...")
-        ml_training_result = ml_model.fit(df_train_subset, df_val)
+        # Train RoBERTa if not loaded from cache
+        if not ml_model_loaded_from_cache:
+            print(f"Training RoBERTa on {len(df_train_subset)} samples...")
+            ml_training_result = ml_model.fit(df_train_subset, df_val)
+        else:
+            ml_training_result = {
+                "model_name": "roberta-base",
+                "cached": True,
+                "cache_path": ml_cache_path
+            }
         
         # Evaluate on test set
         print("Evaluating RoBERTa on test set...")
@@ -320,8 +366,17 @@ def evaluate_with_data_percentage(
     print("FUSION ENSEMBLE: Training combined RoBERTa + LLM model...")
     print("-"*80)
     
+    # Train RoBERTa if not already loaded/trained from cache or baseline evaluation
+    if not ml_model_loaded_from_cache and not evaluate_baselines:
+        print(f"🔄 Training RoBERTa on {len(df_train_subset)} samples...")
+        ml_model.fit(df_train_subset, df_val)
+    elif ml_model_loaded_from_cache:
+        print(f"✅ Using cached RoBERTa model (already loaded)")
+    else:
+        print(f"✅ Using RoBERTa model from baseline evaluation")
+    
     # Train fusion ensemble
-    print(f"\nTraining fusion ensemble on {len(df_train_subset)} samples...")
+    print(f"\n🔧 Training fusion ensemble on {len(df_train_subset)} samples...")
     training_result = fusion.fit(df_train_subset, df_val)
     
     print("\nTraining completed!")
