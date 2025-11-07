@@ -622,15 +622,22 @@ class RoBERTaClassifier(BaseMLClassifier):
                 else:
                     # Multi-label classification
                     probabilities = torch.sigmoid(logits)
-                    threshold = self.config.parameters.get('threshold', 0.5)
+                    threshold = self.config.parameters.get('threshold', 0.3)
                     predictions = (probabilities > threshold).cpu().numpy()
                     
-                    # Convert predictions to class names
+                    # Convert predictions to class names with dynamic fallback
                     for pred_array, prob_vector in zip(predictions, probabilities.cpu().numpy()):
                         active_classes = []
                         for i, is_active in enumerate(pred_array):
                             if is_active and i < len(self.classes_):
                                 active_classes.append(self.classes_[i])
+                        
+                        # Dynamic fallback: if no predictions above threshold, take top label
+                        if len(active_classes) == 0:
+                            top_idx = prob_vector.argmax()
+                            if top_idx < len(self.classes_):
+                                active_classes = [self.classes_[top_idx]]
+                        
                         all_predictions.append(active_classes)
                         
                         # Create probability dictionary for all classes
@@ -891,13 +898,20 @@ class RoBERTaClassifier(BaseMLClassifier):
                 else:
                     # Multi-label classification
                     probabilities = torch.sigmoid(logits)
-                    threshold = self.config.parameters.get('threshold', 0.5)
+                    threshold = self.config.parameters.get('threshold', 0.3)
                     predictions = (probabilities > threshold).cpu().numpy()
                     batch_probabilities = probabilities.cpu().numpy()
                     
-                    # Convert predictions to class names using self.classes_
+                    # Convert predictions to class names using self.classes_ with dynamic fallback
                     for i, pred_array in enumerate(predictions):
                         active_labels = [self.classes_[j] for j, is_active in enumerate(pred_array) if is_active]
+                        
+                        # Dynamic fallback: if no predictions above threshold, take top label
+                        if len(active_labels) == 0:
+                            top_idx = batch_probabilities[i].argmax()
+                            if top_idx < len(self.classes_):
+                                active_labels = [self.classes_[top_idx]]
+                        
                         all_predictions.append(active_labels)
                         
                         # Create probability dictionary
