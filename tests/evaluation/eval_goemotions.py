@@ -416,17 +416,16 @@ def run_data_availability_experiments(
     
     Args:
         data_dir: Directory containing GoEmotions data
-        percentages: List of training data percentages to test (default: 0.1%-1% in 0.1% steps, 10%-100% in 10% steps)
+        percentages: List of training data percentages to test (default: 10%-100% in 10% steps)
         llm_provider: LLM provider ('openai' or 'deepseek')
         base_output_dir: Base directory for experiment outputs
         auto_use_cache: Whether to use cached LLM predictions
         cache_dir: Directory for LLM prediction caches
         evaluate_baselines: Whether to evaluate individual models (RoBERTa, LLM) separately
     """
-    # Default percentages: 0.1% to 1% in 0.1% steps, then 10% to 100% in 10% steps
+    # Default percentages: 10% to 100% in 10% steps
     if percentages is None:
-        percentages = [i * 0.001 for i in range(1, 11)]  # 0.1% to 1.0%
-        percentages += [i * 0.1 for i in range(1, 11)]   # 10% to 100%
+        percentages = [i * 0.1 for i in range(1, 11)]    # 10% to 100%
     
     # Create output directory
     os.makedirs(base_output_dir, exist_ok=True)
@@ -562,10 +561,8 @@ if __name__ == "__main__":
         """Parse a comma- or whitespace-separated string of floats into a list of floats."""
         import re
         if not s:
-            # Default: 0.1% to 1% in 0.1% steps, then 10% to 100% in 10% steps
-            percentages = [i * 0.001 for i in range(1, 11)]  # 0.1% to 1.0%
-            percentages.insert(0, 0.00001)
-            percentages += [i * 0.1 for i in range(1, 11)]   # 10% to 100%
+            # Default: 10% to 100% in 10% steps
+            percentages = [i * 0.1 for i in range(1, 11)]    # 10% to 100%
             return percentages
         parts = [p for p in re.split('[,\s]+', s.strip()) if p]
         try:
