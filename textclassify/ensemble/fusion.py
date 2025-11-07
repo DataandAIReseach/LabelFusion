@@ -19,15 +19,19 @@ from .base import BaseEnsemble
 class FusionMLP(nn.Module):
     """Trainable MLP for fusing ML and LLM predictions."""
     
-    def __init__(self, input_dim: int, output_dim: int, hidden_dims: List[int] = [64, 32]):
+    def __init__(self, input_dim: int, output_dim: int, hidden_dims: List[int] = [64, 32], 
+                 task: str = "multiclass"):
         """Initialize Fusion MLP.
         
         Args:
             input_dim: Input dimension (ML logits + LLM scores)
             output_dim: Output dimension (number of classes)
             hidden_dims: Hidden layer dimensions
+            task: "multiclass" or "multilabel"
         """
         super().__init__()
+        
+        self.task = task
         
         layers = []
         prev_dim = input_dim
@@ -44,10 +48,21 @@ class FusionMLP(nn.Module):
         layers.append(nn.Linear(prev_dim, output_dim))
         
         self.network = nn.Sequential(*layers)
+        
+        # Trainable threshold for multilabel classification (initialized at 0.3)
+        # Using logit of 0.3 ≈ -0.847 (inverse sigmoid: logit = log(p/(1-p)))
+        if task == "multilabel":
+            self.threshold_logit = nn.Parameter(torch.tensor(-0.847))
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through fusion MLP."""
         return self.network(x)
+    
+    def get_threshold(self) -> float:
+        """Get current threshold value (sigmoid of threshold_logit)."""
+        if self.task == "multilabel":
+            return torch.sigmoid(self.threshold_logit).item()
+        return 0.5  # Default for multiclass
 
 
 class FusionWrapper(nn.Module):
@@ -70,7 +85,7 @@ class FusionWrapper(nn.Module):
         
         # Fusion MLP takes ML logits + LLM scores
         fusion_input_dim = num_labels * 2  # ML logits + LLM scores
-        self.fusion_mlp = FusionMLP(fusion_input_dim, num_labels, hidden_dims)
+        self.fusion_mlp = FusionMLP(fusion_input_dim, num_labels, hidden_dims, task=task)
         
         # Device management
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -1209,7 +1224,13 @@ class FusionEnsemble(BaseEnsemble):
             avg_train_loss = total_train_loss / len(train_loader)
             avg_val_loss = total_val_loss / len(val_loader)
             
-            print(f"   Epoch {epoch + 1}/{self.num_epochs} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+            # Log threshold for multilabel tasks
+            threshold_info = ""
+            if self.classification_type == ClassificationType.MULTI_LABEL:
+                current_threshold = self.fusion_wrapper.fusion_mlp.get_threshold()
+                threshold_info = f", Threshold: {current_threshold:.4f}"
+            
+            print(f"   Epoch {epoch + 1}/{self.num_epochs} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}{threshold_info}")
             
             # Save best model based on validation loss
             if avg_val_loss < best_val_loss:
@@ -1399,10 +1420,19 @@ class FusionEnsemble(BaseEnsemble):
                         all_predictions.append(self.classes_[pred_idx])
                 else:
                     probabilities = torch.sigmoid(fused_logits)
-                    threshold = 0.5
+                    # Use trainable threshold
+                    threshold = self.fusion_wrapper.fusion_mlp.get_threshold()
                     predictions = (probabilities > threshold).cpu().numpy()
-                    for pred_array in predictions:
+                    
+                    # Dynamic fallback: if no labels above threshold, take top label
+                    for idx, pred_array in enumerate(predictions):
                         active_labels = [self.classes_[i] for i, is_active in enumerate(pred_array) if is_active]
+                        
+                        # If no predictions above threshold, take label with highest probability
+                        if len(active_labels) == 0:
+                            top_idx = torch.argmax(probabilities[idx]).item()
+                            active_labels = [self.classes_[top_idx]]
+                        
                         all_predictions.append(active_labels)
         
         return self._create_result(predictions=all_predictions, true_labels=true_labels)
