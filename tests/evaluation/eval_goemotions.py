@@ -11,6 +11,7 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime
 import json
+import hashlib
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
