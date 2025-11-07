@@ -11,6 +11,13 @@ except ImportError:
     np = None
     NUMPY_AVAILABLE = False
 
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    np = None
+    NUMPY_AVAILABLE = False
+
 
 class ClassificationType(Enum):
     """Type of classification task."""
@@ -73,7 +80,7 @@ class TrainingData:
     """Training data for classification models."""
     
     texts: List[str]
-    labels: List[List[int]]  # Binary/one-hot encoded labels for both multi-class and multi-label
+    labels: Union[List[str], List[List[str]], List[List[int]]]  # String labels or binary/one-hot encoded labels
     classification_type: ClassificationType
     
     # Optional metadata
@@ -88,18 +95,21 @@ class TrainingData:
         if not self.texts:
             raise ValueError("Training data cannot be empty")
         
-        # Validate label format - all labels should be lists of integers
-        if not all(isinstance(label, list) for label in self.labels):
-            raise ValueError("All labels must be lists of integers")
-        
-        for label_list in self.labels:
-            if not all(isinstance(label, int) for label in label_list):
-                raise ValueError("All labels must be lists of integers")
-            if not all(label in [0, 1] for label in label_list):
-                raise ValueError("All label values must be 0 or 1 (binary encoding)")
-        
-        # Additional validation based on classification type
+        # Validate based on classification type and label format
         if self.classification_type == ClassificationType.MULTI_CLASS:
+            # Check if labels are string format or binary encoded format
+            first_label = self.labels[0]
+            
+            if isinstance(first_label, str):
+                # String format: all labels should be strings
+                if not all(isinstance(label, str) for label in self.labels):
+                    raise ValueError("Multi-class labels must all be strings when using string format")
+            elif isinstance(first_label, (list, tuple)) or (NUMPY_AVAILABLE and isinstance(first_label, np.ndarray)):
+                # Binary encoded format: validate one-hot encoding
+                self._validate_binary_encoded_labels(is_multi_class=True)
+            else:
+                raise ValueError("Multi-class labels must be strings or binary encoded vectors")
+                
             # Check if labels are string format or binary encoded format
             first_label = self.labels[0]
             
@@ -161,6 +171,36 @@ class TrainingData:
             
             # Multi-label specific validation: at least one value should be 1 (optional, can be all zeros)
             # No additional validation needed for multi-label as multiple 1s are allowed
+    
+    def __len__(self) -> int:
+        """Return the number of samples in the training data."""
+        return len(self.texts)
+    
+    def get_classes(self) -> List[str]:
+        """Get unique classes from the labels."""
+        if not self.labels:
+            return []
+        
+        first_label = self.labels[0]
+        
+        if isinstance(first_label, str):
+            # Multi-class string format
+            return sorted(list(set(self.labels)))
+        elif isinstance(first_label, list) and all(isinstance(item, str) for item in first_label):
+            # Multi-label string format
+            all_classes = set()
+            for label_list in self.labels:
+                all_classes.update(label_list)
+            return sorted(list(all_classes))
+        else:
+            # Binary encoded format - would need class names mapping
+            # For now, return generic class names
+            if self.classification_type == ClassificationType.MULTI_CLASS:
+                num_classes = len(first_label)
+                return [f"class_{i}" for i in range(num_classes)]
+            else:
+                num_classes = len(first_label)
+                return [f"label_{i}" for i in range(num_classes)]
 
 
 @dataclass
@@ -196,10 +236,17 @@ class EnsembleConfig:
     
     # General parameters
     parameters: Dict[str, Any] = field(default_factory=dict)
+    ensemble_method: str  # "voting", "weighted", "routing", "fusion"
+    models: Optional[List] = None  # List of model instances or configs
     
+    # General parameters
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    
+    # Method-specific parameters  
     # Method-specific parameters  
     weights: Optional[List[float]] = None  # For weighted ensemble
     routing_rules: Optional[Dict[str, str]] = None  # For class routing
+    parameters: Dict[str, Any] = field(default_factory=dict)  # General parameters
     parameters: Dict[str, Any] = field(default_factory=dict)  # General parameters
     
     # Ensemble behavior

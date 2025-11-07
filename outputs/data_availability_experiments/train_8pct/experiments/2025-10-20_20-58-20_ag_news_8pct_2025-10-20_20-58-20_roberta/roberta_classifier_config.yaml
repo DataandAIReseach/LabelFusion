@@ -1,0 +1,19 @@
+config:
+  batch_size: 8
+  classes: &id001
+  - label_1
+  - label_2
+  - label_3
+  - label_4
+  label_columns: *id001
+  learning_rate: 2.0e-05
+  max_length: 256
+  model_name: roberta-base
+  multi_label: false
+  num_epochs: 2
+  num_labels: 4
+  text_column: description
+metadata:
+  experiment_id: 2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20_roberta
+  model_name: roberta_classifier
+  timestamp: '2025-10-20T20:58:48.601013'

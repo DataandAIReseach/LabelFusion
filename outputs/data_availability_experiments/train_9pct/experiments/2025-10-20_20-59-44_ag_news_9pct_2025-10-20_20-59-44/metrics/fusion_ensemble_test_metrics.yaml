@@ -1,0 +1,12 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44
+  git_commit: 24f5d3e9febffa43560e191bcce5d720ba82fb21
+  model_name: fusion_ensemble
+  timestamp: '2025-10-20T21:00:55.923833'
+metrics:
+  accuracy: 0.9
+  auc: 0.9333333333333332
+  f1: 0.9001142165839875
+  precision: 0.9016165837859059
+  recall: 0.8999999999999999

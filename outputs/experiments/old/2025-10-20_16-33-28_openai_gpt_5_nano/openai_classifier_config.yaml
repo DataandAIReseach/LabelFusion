@@ -1,0 +1,23 @@
+config:
+  batch_size: 32
+  cache_dir: cache
+  classes: &id001
+  - label_1
+  - label_2
+  - label_3
+  - label_4
+  classification_type: single_label
+  enable_cache: true
+  few_shot_mode: few_shot
+  label_columns: *id001
+  max_completion_tokens: 150
+  model_name: gpt-5-nano
+  multi_label: false
+  provider: openai
+  temperature: 0.1
+  text_column: description
+  threshold: 0.5
+metadata:
+  experiment_id: 2025-10-20_16-33-28_openai_gpt_5_nano
+  model_name: openai_classifier
+  timestamp: '2025-10-20T17:17:23.433942'

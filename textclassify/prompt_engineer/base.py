@@ -765,9 +765,9 @@ class PromptEngineer:
         if self.multi_label:
             prompt = f"""Classify the following text into one or more of these categories: {labels_str}
 
-Text: {text}
+        Text: {text}
 
-Please respond with the relevant category names separated by commas, or "none" if no categories apply."""
+        Please respond with the relevant category names separated by commas, or "none" if no categories apply."""
         else:
             prompt = f"""Classify the following text into one of these categories: {labels_str}
 

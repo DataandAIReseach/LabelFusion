@@ -1,0 +1,40 @@
+created_at: '2025-10-20T20:21:35.170932'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq003
+    platform: Linux-4.18.0-553.74.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /mnt/vast-standard/home/schlee2/u19147/repos/LabelFusion
+  experiment_id: 2025-10-20_20-20-44_ag_news_20pct_2025-10-20_20-20-44_roberta
+  git_commit: 24f5d3e9febffa43560e191bcce5d720ba82fb21
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-10-20T20:20:44.908829'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/roberta_classifier_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/validation_predictions_aa42076db442.csv
+  - predictions/validation_predictions_aa42076db442.json
+test_results: null
+training_results:
+  classes:
+  - label_1
+  - label_2
+  - label_3
+  - label_4
+  device: cuda
+  model_name: roberta-base
+  num_labels: 4
+  training_samples: 800
+  validation_predictions:
+    accuracy: 0.908
+    num_samples: 500
+  validation_samples: 500
