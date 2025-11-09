@@ -73,14 +73,25 @@ We support both multi-class setups (one label per input) and multi-label scenari
 ```python
 from textclassify import AutoFusionClassifier
 
-config = {
-    'llm_provider': 'deepseek',
-    'label_columns': ['positive', 'negative', 'neutral']
+# Multi-class: exactly one of the sentiment labels applies
+multiclass_config = {
+  'llm_provider': 'deepseek',
+  'label_columns': ['positive', 'negative', 'neutral'],
+  'multi_label': False
 }
+multiclass_clf = AutoFusionClassifier(multiclass_config)
+multiclass_clf.fit(train_dataframe)
+multiclass_pred = multiclass_clf.predict(["This is amazing!"])
 
-clf = AutoFusionClassifier(config)
-clf.fit(train_dataframe)              # trains ML backbone, gathers LLM scores, fits fusion MLP
-pred = clf.predict(["This is amazing!"])  # fused prediction
+# Multi-label: news article can belong to several topics simultaneously
+multilabel_config = {
+  'llm_provider': 'deepseek',
+  'label_columns': ['politics', 'economy', 'technology'],
+  'multi_label': True
+}
+multilabel_clf = AutoFusionClassifier(multilabel_config)
+multilabel_clf.fit(train_dataframe)
+multilabel_pred = multilabel_clf.predict(["New investment in AI chips"])
 ```
 
 ### CLI and Configuration
