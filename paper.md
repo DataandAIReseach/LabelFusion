@@ -66,14 +66,7 @@ Key features:
 - **Flexible interfaces**: Command‑line training via `train_fusion.py` with YAML configs for research; or minimal AutoFusion API for quick deployment.
 - **Composable design**: LabelFusion can serve as a strong base learner in higher-level ensembles (e.g., voting/weighted combinations of multiple fusion models).
 
-Formally, multi-class classification assigns each input $x \in \mathcal{X}$ to exactly one label among $K$ mutually exclusive classes:
-$$
-f_{\text{mc}}: \mathcal{X} \rightarrow \{1,\dots,K\}.
-$$
-In contrast, multi-label classification predicts a subset of relevant classes, represented as a binary indicator vector $\mathbf{y} \in \{0,1\}^K$, where $y_k = 1$ denotes membership in class $k$:
-$$
-f_{\text{ml}}: \mathcal{X} \rightarrow \{0,1\}^K.
-$$
+We support both multi-class setups (one label per input) and multi-label scenarios (multiple labels per input), and point readers to Appendix A for formal definitions and training implications.
 
 ### Minimal Example (AutoFusion)
 
@@ -165,5 +158,18 @@ The approach enables pragmatic cost control (e.g., the fusion layer learns when 
 ## Acknowledgements
 
 We thank contributors and users who reported issues and shared datasets. LabelFusion builds on the open‑source ecosystem, notably Hugging Face Transformers [@wolf2019huggingface], scikit‑learn [@pedregosa2011scikit], PyTorch [@paszke2019pytorch], and LLM provider SDKs. The work presented in this paper was conducted independently by the author Melchizedek Mashiku and is not affiliated with Tanaq Management Services LLC, Contracting Agency to the Division of Viral Diseases, Centers for Disease Control and Prevention, Chamblee, Georgia, USA. We acknowledge the use of the AG News and GoEmotions benchmark datasets for evaluation.
+
+## Appendix A: Task Formalization
+
+Formally, multi-class classification assigns each input $x \in \mathcal{X}$ to exactly one label among $K$ mutually exclusive classes:
+$$
+f_{\text{mc}}: \mathcal{X} \rightarrow \{1,\dots,K\}.
+$$
+In contrast, multi-label classification predicts a subset of relevant classes, represented as a binary indicator vector $\mathbf{y} \in \{0,1\}^K$, where $y_k = 1$ denotes membership in class $k$:
+$$
+f_{\text{ml}}: \mathcal{X} \rightarrow \{0,1\}^K.
+$$
+
+This distinction shapes the training and inference stack. Multi-class models typically pair a softmax activation with categorical cross-entropy, yielding normalized class probabilities [@goodfellow2016deep]. Multi-label classifiers instead apply independent sigmoid activations with binary cross-entropy, producing class-wise confidence scores that require calibrated thresholds at prediction time [@goodfellow2016deep]. LabelFusion preserves these per-class semantics when concatenating transformer logits and LLM scores, allowing the fusion network to learn how much to trust each source under either regime.
 
 ## References
