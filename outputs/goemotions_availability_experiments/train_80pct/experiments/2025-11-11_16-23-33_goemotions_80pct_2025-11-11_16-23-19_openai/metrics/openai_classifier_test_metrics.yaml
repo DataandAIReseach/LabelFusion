@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-11-11_16-23-33_goemotions_80pct_2025-11-11_16-23-19_openai
+  git_commit: f8bc36cd78b47b94557e48b353b85ac1fd17bf73
+  model_name: openai_classifier
+  timestamp: '2025-11-11T16:23:47.402841'
+metrics:
+  f1: 0.2616
+  hamming_loss: 0.056857142857142856
+  micro_f1: 0.9431428571428572
+  micro_precision: 0.9431428571428572
+  micro_recall: 0.9431428571428572
+  precision: 0.294
+  recall: 0.247
+  subset_accuracy: 0.206
