@@ -594,14 +594,21 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.model.eval()
         all_predictions = []
         all_probabilities = []
+        all_embeddings = []  # Store embeddings for fusion ensemble
         
         with torch.no_grad():
             for batch in dataloader:
                 input_ids = batch['input_ids'].to(self.device)
                 attention_mask = batch['attention_mask'].to(self.device)
                 
-                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+                # Get both logits and hidden states (embeddings)
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
                 logits = outputs.logits
+                hidden_states = outputs.hidden_states[-1]  # Last layer hidden states
+                
+                # Extract [CLS] token embeddings (first token)
+                cls_embeddings = hidden_states[:, 0, :]  # Shape: [batch_size, 768]
+                all_embeddings.extend(cls_embeddings.cpu().numpy())
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
                     # Get probabilities using softmax
@@ -648,7 +655,8 @@ class RoBERTaClassifier(BaseMLClassifier):
         result = self._create_result(
             predictions=all_predictions,
             probabilities=all_probabilities if all_probabilities else None,
-            true_labels=true_labels if true_labels is not None else None
+            true_labels=true_labels if true_labels is not None else None,
+            embeddings=all_embeddings if all_embeddings else None  # Add embeddings to result
         )
         
         # Save prediction results using ResultsManager (if it's the main predict call)

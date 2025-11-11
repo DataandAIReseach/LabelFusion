@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-11-11_14-39-50_goemotions_30pct_2025-11-11_14-39-36
+  git_commit: 04a9d080a5f09968d8d3c2db7968382971388af4
+  model_name: fusion_ensemble
+  timestamp: '2025-11-11T14:40:08.191746'
+metrics:
+  f1: 0.07528044994221464
+  hamming_loss: 0.3287857142857143
+  micro_f1: 0.6712142857142858
+  micro_precision: 0.6712142857142858
+  micro_recall: 0.6712142857142858
+  precision: 0.04358327783327783
+  recall: 0.31793333333333335
+  subset_accuracy: 0.0

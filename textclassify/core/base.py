@@ -90,6 +90,7 @@ class BaseClassifier(ABC):
         probabilities: Optional[List[Dict[str, float]]] = None,
         confidence_scores: Optional[List[float]] = None,
         processing_time: Optional[float] = None,
+        embeddings: Optional[List] = None,
         **metadata
     ) -> ClassificationResult:
         """Create a ClassificationResult with standard metadata.
@@ -99,6 +100,7 @@ class BaseClassifier(ABC):
             probabilities: Class probabilities (optional)
             confidence_scores: Confidence scores (optional)
             processing_time: Time taken for processing (optional)
+            embeddings: Embeddings (optional, e.g., [CLS] token embeddings)
             **metadata: Additional metadata
             
         Returns:
@@ -108,6 +110,7 @@ class BaseClassifier(ABC):
             predictions=predictions,
             probabilities=probabilities,
             confidence_scores=confidence_scores,
+            embeddings=embeddings,
             model_name=self.config.model_name,
             model_type=self.config.model_type,
             classification_type=self.classification_type,

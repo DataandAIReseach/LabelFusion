@@ -1,0 +1,64 @@
+created_at: '2025-11-11T16:02:17.578496'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq002
+    platform: Linux-4.18.0-553.77.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2025-11-11_16-02-05_goemotions_30pct_2025-11-11_16-01-51
+  git_commit: 04a9d080a5f09968d8d3c2db7968382971388af4
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-11-11T16:02:05.971103'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/fusion_ensemble_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/validation_predictions_6af59bb951cc.json
+  - predictions/validation_predictions_6af59bb951cc.csv
+test_results: null
+training_results:
+  classes:
+  - admiration
+  - amusement
+  - anger
+  - annoyance
+  - approval
+  - caring
+  - confusion
+  - curiosity
+  - desire
+  - disappointment
+  - disapproval
+  - disgust
+  - embarrassment
+  - excitement
+  - fear
+  - gratitude
+  - grief
+  - joy
+  - love
+  - nervousness
+  - optimism
+  - pride
+  - realization
+  - relief
+  - remorse
+  - sadness
+  - surprise
+  - neutral
+  classification_type: multi_label
+  ensemble_method: fusion
+  fusion_mlp_trained: true
+  ml_model_trained: true
+  num_labels: 28
+  training_samples: 62216
+  used_cached_val_llm_predictions: false
+  validation_samples: 500

@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: validation
+  experiment_id: 2025-11-11_14-39-17_goemotions_20pct_2025-11-11_14-39-03
+  git_commit: 04a9d080a5f09968d8d3c2db7968382971388af4
+  model_name: fusion_ensemble
+  timestamp: '2025-11-11T14:39:30.392276'
+metrics:
+  f1: 0.08965960409049496
+  hamming_loss: 0.8298571428571428
+  micro_f1: 0.17014285714285715
+  micro_precision: 0.17014285714285715
+  micro_recall: 0.17014285714285715
+  precision: 0.04749916354177224
+  recall: 0.9383333333333334
+  subset_accuracy: 0.0
