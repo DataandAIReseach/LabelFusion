@@ -1,0 +1,2 @@
+percentage,model,train_samples,accuracy,f1,precision,recall
+10%,Fusion,20738,0.0,0.09319200352626646,0.049585932942659956,0.8995

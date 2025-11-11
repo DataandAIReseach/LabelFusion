@@ -179,9 +179,7 @@ def create_fusion_ensemble(ml_model, llm_model, output_dir: str, experiment_name
         output_dir=output_dir,
         experiment_name=experiment_name,
         auto_save_results=True,
-        save_intermediate_llm_predictions=False,  # Disable intermediate LLM prediction saving
-        auto_use_cache=auto_use_cache,  # Enable automatic cache usage for LLM predictions
-        cache_dir=cache_dir
+        save_intermediate_llm_predictions=False  # Disable intermediate LLM prediction saving
     )
     
     fusion.add_ml_model(ml_model)
