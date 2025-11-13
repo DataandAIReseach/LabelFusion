@@ -303,77 +303,21 @@ def evaluate_with_data_percentage(
             print(f"⚠️ Failed to load cached model: {e}")
             print("Will train a new model...")
     
-    # ===== BASELINE 1: Evaluate RoBERTa alone (if requested) =====
-    if evaluate_baselines:
-        print("\n" + "-"*80)
-        print("BASELINE 1: Evaluating RoBERTa (ML) model alone...")
-        print("-"*80)
-        
-        # Train RoBERTa if not loaded from cache
-        if not ml_model_loaded_from_cache:
-            print(f"Training RoBERTa on {len(df_train_subset)} samples...")
-            ml_training_result = ml_model.fit(df_train_subset, df_val)
-        else:
-            ml_training_result = {
-                "model_name": "roberta-base",
-                "cached": True,
-                "cache_path": ml_cache_path
-            }
-        
-        # Evaluate on test set
-        print("Evaluating RoBERTa on test set...")
-        ml_test_result = ml_model.predict(df_test)
-        ml_test_metrics = ml_test_result.metadata.get('metrics', {}) if ml_test_result.metadata else {}
-        
-        print("\nRoBERTa Test Results:")
-        print(f"  Accuracy: {ml_test_metrics.get('accuracy', 0.0):.4f}")
-        print(f"  F1 Score (Weighted): {ml_test_metrics.get('f1_weighted', 0.0):.4f}")
-        print(f"  Precision (Weighted): {ml_test_metrics.get('precision_weighted', 0.0):.4f}")
-        print(f"  Recall (Weighted): {ml_test_metrics.get('recall_weighted', 0.0):.4f}")
-        
-        all_model_results['roberta'] = {
-            'test_metrics': ml_test_metrics,
-            'training_result': ml_training_result
-        }
-    
-    # ===== BASELINE 2: Evaluate LLM alone (if requested) =====
-    # NOTE: LLM predictions are cached and identical for all experiments (same test set)
-    # LLM always uses FULL training data for consistency across all experiments
-    if evaluate_baselines:
-        print("\n" + "-"*80)
-        print(f"BASELINE 2: Evaluating {llm_provider.upper()} (LLM) model alone...")
-        print("-"*80)
-        
-        # LLM predictions are cached (test set is constant across all experiments)
-        # Using FULL training data (not subset) for LLM baseline
-        print(f"Evaluating {llm_provider.upper()} on test set with FULL training data (with caching enabled)...")
-        llm_test_result = llm_model.predict(train_df=df_train_full, test_df=df_test.sample(n=2))
-        llm_test_metrics = llm_test_result.metadata.get('metrics', {}) if llm_test_result.metadata else {}
-        
-        print(f"\n{llm_provider.upper()} Test Results (trained on {len(df_train_full)} samples):")
-        print(f"  Accuracy: {llm_test_metrics.get('accuracy', 0.0):.4f}")
-        print(f"  F1 Score: {llm_test_metrics.get('f1', 0.0):.4f}")
-        print(f"  Precision: {llm_test_metrics.get('precision', 0.0):.4f}")
-        print(f"  Recall: {llm_test_metrics.get('recall', 0.0):.4f}")
-        
-        all_model_results['llm'] = {
-            'test_metrics': llm_test_metrics,
-            'model_name': llm_provider
-        }
+    # Baselines removed: only Fusion Ensemble will be trained.
+    # The RoBERTa model will be trained as part of the fusion workflow below
+    # unless a cached ML model was loaded earlier.
     
     # ===== MAIN: Train and evaluate Fusion Ensemble =====
     print("\n" + "-"*80)
     print("FUSION ENSEMBLE: Training combined RoBERTa + LLM model...")
     print("-"*80)
     
-    # Train RoBERTa if not already loaded/trained from cache or baseline evaluation
-    if not ml_model_loaded_from_cache and not evaluate_baselines:
+    # Train RoBERTa if not already loaded from cache
+    if not ml_model_loaded_from_cache:
         print(f"🔄 Training RoBERTa on {len(df_train_subset)} samples...")
         ml_model.fit(df_train_subset, df_val)
-    elif ml_model_loaded_from_cache:
-        print(f"✅ Using cached RoBERTa model (already loaded)")
     else:
-        print(f"✅ Using RoBERTa model from baseline evaluation")
+        print(f"✅ Using cached RoBERTa model (already loaded)")
     
     # Train fusion ensemble
     print(f"\n🔧 Training fusion ensemble on {len(df_train_subset)} samples...")
