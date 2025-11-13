@@ -19,19 +19,15 @@ from .base import BaseEnsemble
 class FusionMLP(nn.Module):
     """Trainable MLP for fusing ML and LLM predictions."""
     
-    def __init__(self, input_dim: int, output_dim: int, hidden_dims: List[int] = [64, 32], 
-                 task: str = "multiclass"):
+    def __init__(self, input_dim: int, output_dim: int, hidden_dims: List[int] = [64, 32]):
         """Initialize Fusion MLP.
         
         Args:
             input_dim: Input dimension (ML logits + LLM scores)
             output_dim: Output dimension (number of classes)
             hidden_dims: Hidden layer dimensions
-            task: "multiclass" or "multilabel"
         """
         super().__init__()
-        
-        self.task = task
         
         layers = []
         prev_dim = input_dim
@@ -48,74 +44,61 @@ class FusionMLP(nn.Module):
         layers.append(nn.Linear(prev_dim, output_dim))
         
         self.network = nn.Sequential(*layers)
-        
-        # Trainable threshold for multilabel classification (initialized at 0.3)
-        # Using logit of 0.3 ≈ -0.847 (inverse sigmoid: logit = log(p/(1-p)))
-        if task == "multilabel":
-            self.threshold_logit = nn.Parameter(torch.tensor(-0.847))
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through fusion MLP."""
         return self.network(x)
-    
-    def get_threshold(self) -> float:
-        """Get current threshold value (sigmoid of threshold_logit)."""
-        if self.task == "multilabel":
-            return torch.sigmoid(self.threshold_logit).item()
-        return 0.5  # Default for multiclass
 
 
 class FusionWrapper(nn.Module):
-    """Wrapper that combines ML embeddings with LLM embeddings via Fusion MLP."""
+    """Wrapper that combines ML model with frozen LLM scores via Fusion MLP."""
     
-    def __init__(self, ml_embedding_dim: int, llm_embedding_dim: int, num_labels: int, 
-                 task: str = "multiclass", hidden_dims: List[int] = [64, 32]):
+    def __init__(self, ml_model, num_labels: int, task: str = "multiclass", 
+                 hidden_dims: List[int] = [64, 32]):
         """Initialize Fusion Wrapper.
         
         Args:
-            ml_embedding_dim: Dimension of ML embeddings (768 for RoBERTa [CLS])
-            llm_embedding_dim: Dimension of LLM embeddings (28 for GoEmotions)
+            ml_model: Pre-trained ML model (e.g., RoBERTa)
             num_labels: Number of output labels
             task: "multiclass" or "multilabel"
             hidden_dims: Hidden dimensions for fusion MLP
         """
         super().__init__()
-        self.ml_embedding_dim = ml_embedding_dim
-        self.llm_embedding_dim = llm_embedding_dim
+        self.ml_model = ml_model
         self.num_labels = num_labels
         self.task = task
         
-        # Fusion MLP takes concatenated embeddings: [ml_embedding + llm_embedding]
-        fusion_input_dim = ml_embedding_dim + llm_embedding_dim
-        self.fusion_mlp = FusionMLP(fusion_input_dim, num_labels, hidden_dims, task=task)
+        # Fusion MLP takes ML logits + LLM scores
+        fusion_input_dim = num_labels * 2  # ML logits + LLM scores
+        self.fusion_mlp = FusionMLP(fusion_input_dim, num_labels, hidden_dims)
         
         # Device management
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
     
-    def forward(self, ml_embeddings: torch.Tensor, llm_embeddings: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """Forward pass combining ML and LLM embeddings.
+    def forward(self, ml_predictions: torch.Tensor, llm_predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Forward pass combining ML and LLM predictions.
         
         Args:
-            ml_embeddings: ML embeddings [batch, 768] from RoBERTa [CLS]
-            llm_embeddings: LLM embeddings [batch, 28] prediction vectors
+            ml_predictions: Pre-computed ML predictions/logits
+            llm_predictions: Pre-computed LLM predictions/scores
             
         Returns:
-            Dict containing embeddings and fused logits
+            Dict containing ML predictions, LLM predictions, and fused logits
         """
-        # Ensure embeddings are detached (no gradient flow to original models)
-        ml_embeddings = ml_embeddings.detach()
-        llm_embeddings = llm_embeddings.detach()
+        # Ensure predictions are detached (no gradient flow to original models)
+        ml_predictions = ml_predictions.detach()
+        llm_predictions = llm_predictions.detach()
         
-        # Concatenate ML and LLM embeddings: [batch, 768+28=796]
-        fusion_input = torch.cat([ml_embeddings, llm_embeddings], dim=1)
+        # Concatenate ML and LLM predictions
+        fusion_input = torch.cat([ml_predictions, llm_predictions], dim=1)
         
         # Generate fused predictions through MLP
         fused_logits = self.fusion_mlp(fusion_input)
         
         return {
-            "ml_embeddings": ml_embeddings,
-            "llm_embeddings": llm_embeddings,
+            "ml_predictions": ml_predictions,
+            "llm_predictions": llm_predictions,
             "fused_logits": fused_logits
         }
 
@@ -152,7 +135,7 @@ class FusionEnsemble(BaseEnsemble):
         self.fusion_hidden_dims = ensemble_config.parameters.get('fusion_hidden_dims', [64, 32])
         self.ml_lr = ensemble_config.parameters.get('ml_lr', 1e-5)  # Small LR for ML backbone
         self.fusion_lr = ensemble_config.parameters.get('fusion_lr', 1e-3)  # Larger LR for fusion MLP
-        self.num_epochs = ensemble_config.parameters.get('num_epochs', 100)
+        self.num_epochs = ensemble_config.parameters.get('num_epochs', 10)
         self.batch_size = ensemble_config.parameters.get('batch_size', 16)
         self.save_intermediate_llm_predictions = save_intermediate_llm_predictions
         
@@ -333,8 +316,7 @@ class FusionEnsemble(BaseEnsemble):
         print("Creating fusion wrapper...")
         task = "multilabel" if self.classification_type == ClassificationType.MULTI_LABEL else "multiclass"
         self.fusion_wrapper = FusionWrapper(
-            ml_embedding_dim=768,  # RoBERTa [CLS] token embedding dimension
-            llm_embedding_dim=self.num_labels,  # LLM embedding = prediction vector
+            ml_model=self.ml_model,
             num_labels=self.num_labels,
             task=task,
             hidden_dims=self.fusion_hidden_dims
@@ -687,7 +669,7 @@ class FusionEnsemble(BaseEnsemble):
         """Try to load cached LLM predictions from file with dataset validation.
         
         Args:
-            base_cache_path: Base path without hash extension (e.g., 'cache/path/test')
+            base_cache_path: Base path without datetime extension
             df: DataFrame to validate against
             
         Returns:
@@ -699,15 +681,20 @@ class FusionEnsemble(BaseEnsemble):
         try:
             import json
             import os
+            import glob
             
             # Calculate current dataset hash
             current_hash = self._create_dataset_hash(df)
             
-            # Try to find file with exact hash match (new format: test_hash.json)
-            cache_filename = f"{base_cache_path}_{current_hash}.json"
+            # First, try to find files with matching hash
+            pattern = f"{base_cache_path}_*_{current_hash}.json"
+            matching_files = glob.glob(pattern)
             
-            if os.path.exists(cache_filename):
-                with open(cache_filename, 'r') as f:
+            if matching_files:
+                # Get the most recent file with matching hash
+                latest_file = max(matching_files, key=os.path.getctime)
+                
+                with open(latest_file, 'r') as f:
                     cache_data = json.load(f)
                 
                 # Handle both new format (with metadata) and old format (just predictions)
@@ -717,21 +704,20 @@ class FusionEnsemble(BaseEnsemble):
                     
                     # Validate sample count
                     if metadata.get('num_samples') == len(df):
-                        print(f"✅ Loaded cached predictions: {cache_filename} (Hash: {current_hash})")
+                        print(f"✅ Loaded matching cached predictions: {latest_file} (Hash: {current_hash})")
                         return predictions
                     else:
-                        print(f"⚠️ Sample count mismatch in cache: {cache_filename}")
+                        print(f"⚠️ Sample count mismatch in cache: {latest_file}")
                 elif isinstance(cache_data, list):
                     # Old format - just validate sample count
                     if len(cache_data) == len(df):
-                        print(f"✅ Loaded cached predictions: {cache_filename} (Hash: {current_hash})")
+                        print(f"✅ Loaded compatible cached predictions: {latest_file} (Hash: {current_hash})")
                         return cache_data
             
-            # Fallback: Look for old files with timestamp (backward compatibility)
-            import glob
-            print(f"🔍 No exact match found, checking backward compatibility...")
-            old_pattern = f"{base_cache_path}_*_{current_hash}.json"
-            old_files = glob.glob(old_pattern)
+            # Fallback: Look for old files without hash (backward compatibility)
+            print(f"🔍 No hash-matched cache found, checking backward compatibility...")
+            old_pattern = f"{base_cache_path}_*.json"
+            old_files = [f for f in glob.glob(old_pattern) if not f.endswith(f"_{current_hash}.json")]
             
             for file_path in sorted(old_files, key=os.path.getctime, reverse=True):
                 try:
@@ -762,11 +748,11 @@ class FusionEnsemble(BaseEnsemble):
             return None
     
     def _save_cached_llm_predictions(self, predictions: List[Union[str, List[str]]], base_cache_path: str, df: pd.DataFrame):
-        """Save LLM predictions to cache file with dataset hash only.
+        """Save LLM predictions to cache file with datetime stamp and dataset hash.
         
         Args:
             predictions: LLM predictions to save
-            base_cache_path: Base path for the cache file (e.g., 'cache/path/test')
+            base_cache_path: Base path for the cache file
             df: DataFrame for hash calculation and metadata
         """
         if not base_cache_path or not base_cache_path.strip():
@@ -785,17 +771,19 @@ class FusionEnsemble(BaseEnsemble):
             # Calculate dataset hash
             dataset_hash = self._create_dataset_hash(df)
             
-            # Create filename with only hash (format: test_hash.json or val_hash.json)
-            cache_filename = f"{base_cache_path}_{dataset_hash}.json"
+            # Create filename with datetime stamp and hash
+            timestamp = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+            cache_filename = f"{base_cache_path}_{timestamp}_{dataset_hash}.json"
             
             # Create cache data with metadata
             cache_data = {
                 'predictions': predictions,
                 'metadata': {
-                    'timestamp': datetime.now().isoformat(),
+                    'timestamp': timestamp,
                     'num_samples': len(df),
                     'dataset_hash': dataset_hash,
-                    'columns': list(df.columns)
+                    'columns': list(df.columns),
+                    'created_at': datetime.now().isoformat()
                 }
             }
             
@@ -1144,92 +1132,56 @@ class FusionEnsemble(BaseEnsemble):
         fusion_train_llm_predictions = llm_val_result.predictions[:split_idx]
         fusion_val_llm_predictions = llm_val_result.predictions[split_idx:]
         
-        # Extract embeddings (with fallback for cached models without embeddings)
-        if ml_val_result.embeddings is None:
-            print("   ⚠️  ML embeddings not in cache, extracting from model...")
-            ml_embeddings = self._extract_embeddings_from_ml_model(val_df[text_column].tolist())
-        else:
-            ml_embeddings = ml_val_result.embeddings
-            
-        if llm_val_result.embeddings is None:
-            print("   ⚠️  LLM embeddings not in cache, creating from predictions...")
-            llm_embeddings = self._create_llm_embeddings_from_predictions(llm_val_result.predictions)
-        else:
-            llm_embeddings = llm_val_result.embeddings
-        
-        # Split embeddings
-        fusion_train_ml_embeddings = ml_embeddings[:split_idx]
-        fusion_val_ml_embeddings = ml_embeddings[split_idx:]
-        
-        fusion_train_llm_embeddings = llm_embeddings[:split_idx]
-        fusion_val_llm_embeddings = llm_embeddings[split_idx:]
-        
-        # Debug: Print embedding shapes
-        import numpy as np
         print(f"   🔧 Fusion training: {len(fusion_train_df)} samples")
         print(f"   🔧 Fusion validation: {len(fusion_val_df)} samples")
-        print(f"   📊 ML embedding shape: {np.array(ml_embeddings[0]).shape}")
-        print(f"   📊 LLM embedding shape: {np.array(llm_embeddings[0]).shape}")
-        print(f"   📊 Fusion input will be: {np.array(ml_embeddings[0]).shape[0] + np.array(llm_embeddings[0]).shape[0]} dim")
         
-        # Create data loaders using embeddings (not predictions)
+        # Create data loaders using both ML and LLM predictions
         train_dataset = self._create_fusion_dataset(
             fusion_train_df[text_column].tolist(), 
             fusion_train_df[label_columns].values.tolist(), 
-            fusion_train_ml_embeddings,
-            fusion_train_llm_embeddings
+            fusion_train_ml_predictions,
+            fusion_train_llm_predictions
         )
         val_dataset = self._create_fusion_dataset(
             fusion_val_df[text_column].tolist(), 
             fusion_val_df[label_columns].values.tolist(), 
-            fusion_val_ml_embeddings,
-            fusion_val_llm_embeddings
+            fusion_val_ml_predictions,
+            fusion_val_llm_predictions
         )
         
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
         
-        # Setup optimizer for fusion MLP only (embeddings are pre-computed)
+        # Freeze ML model parameters - only optimize the fusion MLP
+        for param in self.fusion_wrapper.ml_model.model.parameters():
+            param.requires_grad = False
+        
+        # Setup optimizer for fusion MLP only
         fusion_params = list(self.fusion_wrapper.fusion_mlp.parameters())
         optimizer = torch.optim.AdamW(fusion_params, lr=self.fusion_lr)
         
-        # Loss function with class balancing for multilabel
+        # Loss function
         if self.classification_type == ClassificationType.MULTI_CLASS:
             criterion = nn.CrossEntropyLoss()
         else:
-            # Calculate pos_weight to handle class imbalance
-            # pos_weight[i] = (num_negative / num_positive) for each class
-            label_counts = torch.tensor(fusion_train_df[label_columns].sum(axis=0).values, dtype=torch.float32)
-            num_samples = len(fusion_train_df)
-            pos_weight = (num_samples - label_counts) / (label_counts + 1e-5)  # Avoid division by zero
-            pos_weight = pos_weight.to(self.device)
-            
-            print(f"   📊 Class imbalance correction:")
-            print(f"      Min weight: {pos_weight.min():.2f} (most frequent)")
-            print(f"      Max weight: {pos_weight.max():.2f} (most rare)")
-            print(f"      Mean weight: {pos_weight.mean():.2f}")
-            
-            criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+            criterion = nn.BCEWithLogitsLoss()
         
         # Training loop with validation monitoring
         self.fusion_wrapper.train()
         best_val_loss = float('inf')
-        patience = 15  # Early stopping patience
-        patience_counter = 0
-        best_model_state = None
         
         for epoch in range(self.num_epochs):
             # Training phase
             total_train_loss = 0
             for batch in train_loader:
-                ml_embeddings, llm_embeddings, labels = batch
-                ml_embeddings = ml_embeddings.to(self.device)
-                llm_embeddings = llm_embeddings.to(self.device)
+                ml_predictions, llm_predictions, labels = batch
+                ml_predictions = ml_predictions.to(self.device)
+                llm_predictions = llm_predictions.to(self.device)
                 labels = labels.to(self.device)
                 
                 optimizer.zero_grad()
                 
-                outputs = self.fusion_wrapper(ml_embeddings, llm_embeddings)
+                outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
                 fused_logits = outputs['fused_logits']
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
@@ -1246,12 +1198,12 @@ class FusionEnsemble(BaseEnsemble):
             total_val_loss = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    ml_embeddings, llm_embeddings, labels = batch
-                    ml_embeddings = ml_embeddings.to(self.device)
-                    llm_embeddings = llm_embeddings.to(self.device)
+                    ml_predictions, llm_predictions, labels = batch
+                    ml_predictions = ml_predictions.to(self.device)
+                    llm_predictions = llm_predictions.to(self.device)
                     labels = labels.to(self.device)
                     
-                    outputs = self.fusion_wrapper(ml_embeddings, llm_embeddings)
+                    outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
                     fused_logits = outputs['fused_logits']
                     
                     if self.classification_type == ClassificationType.MULTI_CLASS:
@@ -1263,218 +1215,50 @@ class FusionEnsemble(BaseEnsemble):
             avg_train_loss = total_train_loss / len(train_loader)
             avg_val_loss = total_val_loss / len(val_loader)
             
-            # Log threshold for multilabel tasks
-            threshold_info = ""
-            if self.classification_type == ClassificationType.MULTI_LABEL:
-                current_threshold = self.fusion_wrapper.fusion_mlp.get_threshold()
-                threshold_info = f", Threshold: {current_threshold:.4f}"
+            print(f"   Epoch {epoch + 1}/{self.num_epochs} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
             
-            print(f"   📈 Epoch {epoch + 1}/{self.num_epochs} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}{threshold_info}")
-            
-            # Save best model based on validation loss with early stopping
+            # Save best model based on validation loss
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
-                patience_counter = 0
-                best_model_state = {
-                    'fusion_mlp': self.fusion_wrapper.fusion_mlp.state_dict(),
-                    'epoch': epoch + 1
-                }
-                print(f"   ✨ New best validation loss: {best_val_loss:.4f}")
-            else:
-                patience_counter += 1
-                if patience_counter >= patience:
-                    print(f"   🛑 Early stopping triggered after {epoch + 1} epochs (patience: {patience})")
-                    break
+                # Could save model state here if needed
             
             self.fusion_wrapper.train()  # Back to training mode
-        
-        # Restore best model
-        if best_model_state is not None:
-            self.fusion_wrapper.fusion_mlp.load_state_dict(best_model_state['fusion_mlp'])
-            print(f"   🔄 Restored best model from epoch {best_model_state['epoch']}")
-        
-        # After training, optimize threshold on validation set for multilabel
-        if self.classification_type == ClassificationType.MULTI_LABEL:
-            print("\n   🎯 Optimizing threshold on validation set...")
-            best_threshold = self._optimize_threshold(val_loader)
-            print(f"   ✨ Optimal threshold: {best_threshold:.4f}")
-            
-            # Update the threshold in the model
-            import math
-            self.fusion_wrapper.fusion_mlp.threshold_logit.data = torch.tensor(
-                math.log(best_threshold / (1 - best_threshold + 1e-10))
-            ).to(self.device)
-    
-    def _optimize_threshold(self, val_loader) -> float:
-        """Optimize classification threshold on validation set to maximize F1 score.
-        
-        Args:
-            val_loader: DataLoader for validation set
-            
-        Returns:
-            Optimal threshold value
-        """
-        from sklearn.metrics import f1_score
-        
-        self.fusion_wrapper.eval()
-        
-        # Collect all predictions and labels
-        all_probs = []
-        all_labels = []
-        
-        with torch.no_grad():
-            for batch in val_loader:
-                ml_embeddings, llm_embeddings, labels = batch
-                ml_embeddings = ml_embeddings.to(self.device)
-                llm_embeddings = llm_embeddings.to(self.device)
-                
-                outputs = self.fusion_wrapper(ml_embeddings, llm_embeddings)
-                fused_logits = outputs['fused_logits']
-                probs = torch.sigmoid(fused_logits)
-                
-                all_probs.append(probs.cpu().numpy())
-                all_labels.append(labels.numpy())
-        
-        all_probs = np.vstack(all_probs)
-        all_labels = np.vstack(all_labels)
-        
-        # Try different thresholds
-        best_f1 = 0
-        best_threshold = 0.5
-        
-        thresholds = np.arange(0.1, 0.9, 0.05)
-        for threshold in thresholds:
-            predictions = (all_probs > threshold).astype(int)
-            
-            # Ensure at least one label per sample (fallback to highest probability)
-            for i in range(len(predictions)):
-                if predictions[i].sum() == 0:
-                    predictions[i, all_probs[i].argmax()] = 1
-            
-            f1 = f1_score(all_labels, predictions, average='samples', zero_division=0)
-            
-            if f1 > best_f1:
-                best_f1 = f1
-                best_threshold = threshold
-        
-        print(f"      Threshold search: tried {len(thresholds)} values")
-        print(f"      Best F1: {best_f1:.4f} at threshold {best_threshold:.4f}")
-        
-        return best_threshold
-    
-    def _extract_embeddings_from_ml_model(self, texts: List[str]) -> List:
-        """Extract [CLS] token embeddings from ML model for texts.
-        
-        Args:
-            texts: List of texts to extract embeddings for
-            
-        Returns:
-            List of numpy arrays with shape [768] (RoBERTa embedding dimension)
-        """
-        import numpy as np
-        from torch.utils.data import DataLoader
-        from ..ml.roberta_classifier import TextDataset
-        from ..ml.preprocessing import clean_text, normalize_text
-        
-        # Prepare texts
-        processed_texts = []
-        for text in texts:
-            cleaned = clean_text(text)
-            normalized = normalize_text(cleaned)
-            preprocessed = self.ml_model.preprocessor.preprocess_text(normalized)
-            processed_texts.append(preprocessed if preprocessed else text)
-        
-        # Create dataset
-        dummy_labels = [[0] * self.num_labels] * len(processed_texts)
-        dataset = TextDataset(
-            processed_texts, dummy_labels, 
-            self.ml_model.tokenizer, 
-            self.ml_model.max_length,
-            self.ml_model.classification_type
-        )
-        dataloader = DataLoader(dataset, batch_size=self.ml_model.batch_size, shuffle=False)
-        
-        # Extract embeddings
-        self.ml_model.model.eval()
-        all_embeddings = []
-        
-        with torch.no_grad():
-            for batch in dataloader:
-                input_ids = batch['input_ids'].to(self.ml_model.device)
-                attention_mask = batch['attention_mask'].to(self.ml_model.device)
-                
-                # Get hidden states
-                outputs = self.ml_model.model(
-                    input_ids=input_ids, 
-                    attention_mask=attention_mask, 
-                    output_hidden_states=True
-                )
-                hidden_states = outputs.hidden_states[-1]
-                
-                # Extract [CLS] token embeddings
-                cls_embeddings = hidden_states[:, 0, :]  # Shape: [batch_size, 768]
-                all_embeddings.extend(cls_embeddings.cpu().numpy())
-        
-        return all_embeddings
-    
-    def _create_llm_embeddings_from_predictions(self, predictions: List) -> List:
-        """Create LLM embeddings from predictions (as surrogate).
-        
-        Args:
-            predictions: List of predictions (class names or lists of class names)
-            
-        Returns:
-            List of numpy arrays with shape [num_labels] representing binary vectors
-        """
-        import numpy as np
-        
-        embeddings = []
-        for pred in predictions:
-            # Create binary vector
-            binary_vector = [0.0] * self.num_labels
-            
-            if isinstance(pred, str):
-                # Single-label: one-hot vector
-                if pred in self.classes_:
-                    class_idx = self.classes_.index(pred)
-                    binary_vector[class_idx] = 1.0
-            elif isinstance(pred, list):
-                # Multi-label: multi-hot vector
-                for class_name in pred:
-                    if class_name in self.classes_:
-                        class_idx = self.classes_.index(class_name)
-                        binary_vector[class_idx] = 1.0
-            
-            embeddings.append(np.array(binary_vector, dtype=np.float32))
-        
-        return embeddings
     
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
-                              ml_embeddings: List, llm_embeddings: List):
-        """Create dataset for fusion training using embeddings from ML and LLM models.
+                              ml_predictions: List, llm_predictions: List):
+        """Create dataset for fusion training using pre-computed ML and LLM predictions."""
         
-        Args:
-            texts: List of texts (not used, kept for compatibility)
-            labels: Binary label vectors
-            ml_embeddings: List of ML embeddings (768-dim [CLS] token embeddings from RoBERTa)
-            llm_embeddings: List of LLM embeddings (28-dim prediction vectors as surrogate)
-        """
-        import numpy as np
+        # Convert ML predictions to tensor format (binary vectors)
+        ml_tensor = torch.zeros(len(ml_predictions), self.num_labels)
+        for i, prediction in enumerate(ml_predictions):
+            if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                # Already in binary vector format
+                ml_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+            elif isinstance(prediction, str):
+                # Convert class name to binary vector
+                if prediction in self.classes_:
+                    class_idx = self.classes_.index(prediction)
+                    ml_tensor[i, class_idx] = 1.0
         
-        # Convert embeddings to tensors
-        # ML embeddings: [batch, 768] from RoBERTa [CLS] token
-        if isinstance(ml_embeddings[0], np.ndarray):
-            ml_tensor = torch.FloatTensor(np.stack(ml_embeddings))
-        else:
-            ml_tensor = torch.FloatTensor(ml_embeddings)
+        # Convert LLM predictions to tensor format (binary vectors)
+        llm_tensor = torch.zeros(len(llm_predictions), self.num_labels)
+        for i, prediction in enumerate(llm_predictions):
+            if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                # Already in binary vector format
+                llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+            elif isinstance(prediction, str):
+                # Convert class name to binary vector
+                if prediction in self.classes_:
+                    class_idx = self.classes_.index(prediction)
+                    llm_tensor[i, class_idx] = 1.0
+            elif isinstance(prediction, list):
+                # List of class names (multi-label)
+                for pred_class in prediction:
+                    if pred_class in self.classes_:
+                        class_idx = self.classes_.index(pred_class)
+                        llm_tensor[i, class_idx] = 1.0
         
-        # LLM embeddings: [batch, 28] prediction vectors as embedding surrogate
-        if isinstance(llm_embeddings[0], np.ndarray):
-            llm_tensor = torch.FloatTensor(np.stack(llm_embeddings))
-        else:
-            llm_tensor = torch.FloatTensor(llm_embeddings)
-        
-        # Create tensor dataset with embeddings
+        # Create tensor dataset with predictions only (no tokenization needed)
         labels_tensor = torch.FloatTensor(labels)
         
         return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
@@ -1596,37 +1380,23 @@ class FusionEnsemble(BaseEnsemble):
         return result
     
     def _predict_with_fusion(self, ml_result, llm_result, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
-        """Generate fusion predictions using trained MLP with embeddings."""
-        # Extract embeddings with fallback if not available
-        if ml_result.embeddings is None:
-            print("   ⚠️  ML embeddings not available, extracting from model...")
-            ml_embeddings = self._extract_embeddings_from_ml_model(texts)
-        else:
-            ml_embeddings = ml_result.embeddings
-            
-        if llm_result.embeddings is None:
-            print("   ⚠️  LLM embeddings not available, creating from predictions...")
-            llm_embeddings = self._create_llm_embeddings_from_predictions(llm_result.predictions)
-        else:
-            llm_embeddings = llm_result.embeddings
-        
-        # Create dataset using embeddings
+        """Generate fusion predictions using trained MLP."""
+        # Create dataset using both ML and LLM predictions
         dummy_labels = [[0] * self.num_labels] * len(texts)
-        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_embeddings, llm_embeddings)
+        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_result.predictions, llm_result.predictions)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         
         # Generate predictions
         self.fusion_wrapper.eval()
         all_predictions = []
-        debug_batch_count = 0
         
         with torch.no_grad():
             for batch in dataloader:
-                ml_embeddings, llm_embeddings, _ = batch
-                ml_embeddings = ml_embeddings.to(self.device)
-                llm_embeddings = llm_embeddings.to(self.device)
+                ml_predictions, llm_predictions, _ = batch
+                ml_predictions = ml_predictions.to(self.device)
+                llm_predictions = llm_predictions.to(self.device)
                 
-                outputs = self.fusion_wrapper(ml_embeddings, llm_embeddings)
+                outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
                 fused_logits = outputs['fused_logits']
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
@@ -1635,32 +1405,10 @@ class FusionEnsemble(BaseEnsemble):
                         all_predictions.append(self.classes_[pred_idx])
                 else:
                     probabilities = torch.sigmoid(fused_logits)
-                    # Use trainable threshold
-                    threshold = self.fusion_wrapper.fusion_mlp.get_threshold()
+                    threshold = 0.5
                     predictions = (probabilities > threshold).cpu().numpy()
-                    
-                    # DEBUG: Print first batch predictions
-                    if debug_batch_count == 0:
-                        print(f"\n🔍 DEBUG: First batch prediction details:")
-                        print(f"   Threshold: {threshold:.4f}")
-                        for i in range(min(3, len(probabilities))):
-                            probs = probabilities[i].cpu().numpy()
-                            print(f"   Sample {i}:")
-                            print(f"      Max prob: {probs.max():.4f} at index {probs.argmax()} ({self.classes_[probs.argmax()]})")
-                            print(f"      Probs > threshold: {(probs > threshold).sum()} labels")
-                            top_5_indices = probs.argsort()[-5:][::-1]
-                            print(f"      Top 5: {[(self.classes_[j], f'{probs[j]:.4f}') for j in top_5_indices]}")
-                        debug_batch_count += 1
-                    
-                    # Dynamic fallback: if no labels above threshold, take top label
-                    for idx, pred_array in enumerate(predictions):
+                    for pred_array in predictions:
                         active_labels = [self.classes_[i] for i, is_active in enumerate(pred_array) if is_active]
-                        
-                        # If no predictions above threshold, take label with highest probability
-                        if len(active_labels) == 0:
-                            top_idx = torch.argmax(probabilities[idx]).item()
-                            active_labels = [self.classes_[top_idx]]
-                        
                         all_predictions.append(active_labels)
         
         return self._create_result(predictions=all_predictions, true_labels=true_labels)
