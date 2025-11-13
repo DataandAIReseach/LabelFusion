@@ -1,9 +1,0 @@
-config:
-  max_completion_tokens: 150
-  model: gpt-5-nano
-  temperature: 0.1
-  top_p: 1.0
-metadata:
-  experiment_id: 2025-11-07_18-30-56_goemotions_30pct_2025-11-07_18-30-42_openai
-  model_name: openai_classifier
-  timestamp: '2025-11-07T18:31:10.125199'
