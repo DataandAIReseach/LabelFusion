@@ -75,3 +75,47 @@ class PersistenceError(TextClassifyError):
         super().__init__(message, "PERSISTENCE_ERROR")
         self.operation = operation
 
+
+class CudaOutOfMemoryError(ModelTrainingError):
+    """Raised when CUDA/GPU memory allocation fails during model operations.
+
+    This exception wraps PyTorch's OutOfMemoryError and provides structured
+    information that callers can use to present clearer diagnostics and
+    remediation steps to users.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        attempted_allocation: Optional[str] = None,
+        total_memory: Optional[str] = None,
+        free_memory: Optional[str] = None,
+        process_id: Optional[int] = None,
+        suggestion: Optional[str] = None,
+        model_name: Optional[str] = None,
+    ):
+        full_message = message
+        details = []
+        if attempted_allocation:
+            details.append(f"attempted_allocation={attempted_allocation}")
+        if total_memory:
+            details.append(f"total_memory={total_memory}")
+        if free_memory:
+            details.append(f"free_memory={free_memory}")
+        if process_id is not None:
+            details.append(f"process_id={process_id}")
+        if details:
+            full_message = full_message + " | " + ", ".join(details)
+
+        super().__init__(full_message, model_name)
+
+        self.attempted_allocation = attempted_allocation
+        self.total_memory = total_memory
+        self.free_memory = free_memory
+        self.process_id = process_id
+        self.suggestion = suggestion or (
+            "Possible remedies: free GPU memory, set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True, "
+            "reduce batch size, or run on CPU."
+        )
+        self.model_name = model_name
+
