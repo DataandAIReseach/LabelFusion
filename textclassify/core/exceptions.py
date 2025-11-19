@@ -1,4 +1,5 @@
 """Custom exceptions for the textclassify package."""
+from typing import Optional
 
 
 class TextClassifyError(Exception):

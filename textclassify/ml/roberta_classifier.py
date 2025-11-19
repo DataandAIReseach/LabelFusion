@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 
 from ..core.types import ClassificationResult, ClassificationType, ModelType
-from ..core.exceptions import ModelTrainingError, PredictionError, ValidationError
+from ..core.exceptions import ModelTrainingError, PredictionError, ValidationError, CudaOutOfMemoryError
 from ..utils.results_manager import ResultsManager, ModelResultsManager
 from .base import BaseMLClassifier
 from .preprocessing import TextPreprocessor, clean_text, normalize_text
@@ -247,7 +247,14 @@ class RoBERTaClassifier(BaseMLClassifier):
             num_labels=self.num_labels,
             problem_type="multi_label_classification" if self.multi_label else "single_label_classification"
         )
-        self.model.to(self.device)
+        # Move model to device with explicit OOM handling
+        try:
+            self.model.to(self.device)
+        except Exception as e:
+            if 'out of memory' in str(e).lower():
+                # Raise a structured CUDA OOM exception with parsed details
+                self._handle_cuda_oom(e, context="moving model to device")
+            raise
         
         # Create datasets
         train_dataset = TextDataset(
@@ -316,9 +323,9 @@ class RoBERTaClassifier(BaseMLClassifier):
                     print(f"  [epoch {epoch+1}] processing batch {batch_idx}")
 
                 try:
-                    input_ids = batch['input_ids'].to(self.device)
-                    attention_mask = batch['attention_mask'].to(self.device)
-                    labels = batch['labels'].to(self.device)
+                    input_ids = self._to_device(batch['input_ids'], name='input_ids')
+                    attention_mask = self._to_device(batch['attention_mask'], name='attention_mask')
+                    labels = self._to_device(batch['labels'], name='labels')
 
                     optimizer.zero_grad()
 
@@ -362,9 +369,9 @@ class RoBERTaClassifier(BaseMLClassifier):
                 
                 with torch.no_grad():
                     for batch in val_loader:
-                        input_ids = batch['input_ids'].to(self.device)
-                        attention_mask = batch['attention_mask'].to(self.device)
-                        labels = batch['labels'].to(self.device)
+                        input_ids = self._to_device(batch['input_ids'], name='input_ids')
+                        attention_mask = self._to_device(batch['attention_mask'], name='attention_mask')
+                        labels = self._to_device(batch['labels'], name='labels')
                         
                         outputs = self.model(
                             input_ids=input_ids,
@@ -598,8 +605,8 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         with torch.no_grad():
             for batch in dataloader:
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
+                input_ids = self._to_device(batch['input_ids'], name='input_ids')
+                attention_mask = self._to_device(batch['attention_mask'], name='attention_mask')
                 
                 # Get both logits and hidden states (embeddings)
                 outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
@@ -875,8 +882,8 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         with torch.no_grad():
             for batch in dataloader:
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
+                input_ids = self._to_device(batch['input_ids'], name='input_ids')
+                attention_mask = self._to_device(batch['attention_mask'], name='attention_mask')
                 
                 outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
                 logits = outputs.logits
@@ -938,6 +945,65 @@ class RoBERTaClassifier(BaseMLClassifier):
             confidence_scores=all_confidence_scores,
             true_labels=true_labels if true_labels is not None else None
         )
+
+    # --- Helper methods for robust CUDA OOM handling ---
+    def _handle_cuda_oom(self, exc: Exception, context: str = ""):
+        """Parse PyTorch CUDA OOM message and raise a structured CudaOutOfMemoryError.
+
+        The parser attempts to extract commonly included details from the
+        PyTorch CUDA OOM message (attempted allocation, total/free memory,
+        process id). These are best-effort and may be None if parsing fails.
+        """
+        import re
+
+        msg = str(exc)
+        attempted = None
+        total = None
+        free = None
+        pid = None
+
+        m = re.search(r"Tried to allocate ([0-9\.]+) MiB", msg)
+        if m:
+            attempted = f"{m.group(1)} MiB"
+
+        m = re.search(r"has a total capacity of ([0-9\.]+) GiB", msg)
+        if m:
+            total = f"{m.group(1)} GiB"
+
+        m = re.search(r"of which ([0-9\.]+) MiB is free", msg)
+        if m:
+            free = f"{m.group(1)} MiB"
+
+        m = re.search(r"Process (\d+)", msg)
+        if m:
+            try:
+                pid = int(m.group(1))
+            except Exception:
+                pid = None
+
+        suggestion = (
+            "Try freeing GPU memory, set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True, "
+            "reduce batch size, run on CPU, or reboot the node to clear defunct allocations."
+        )
+
+        raise CudaOutOfMemoryError(
+            message=f"CUDA out of memory while {context}: {msg}",
+            attempted_allocation=attempted,
+            total_memory=total,
+            free_memory=free,
+            process_id=pid,
+            suggestion=suggestion,
+            model_name=getattr(self, 'model_name', None)
+        ) from exc
+
+    def _to_device(self, tensor: torch.Tensor, name: str = "tensor") -> torch.Tensor:
+        """Move a tensor to the configured device and convert CUDA OOM into a structured exception."""
+        try:
+            return tensor.to(self.device)
+        except Exception as e:
+            if 'out of memory' in str(e).lower():
+                self._handle_cuda_oom(e, context=f"moving {name} to device")
+            raise
     
     @property
     def model_info(self) -> Dict[str, Any]:

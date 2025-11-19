@@ -21,7 +21,7 @@ class LLMPredictionCache:
         self,
         cache_dir: str = "cache/llm",
         session_id: Optional[str] = None,
-        auto_save_interval: int = 10,  # Save every N predictions
+        auto_save_interval: int = 5,  # Save every N predictions
         enable_compression: bool = True,
         verbose: bool = True
     ):
