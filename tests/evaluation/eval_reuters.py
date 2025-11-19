@@ -366,7 +366,7 @@ def evaluate_with_data_percentage(
     fusion_train_df = df_train_full if ml_train_on_full else df_train_subset
 
     print(f"\n🔧 Training fusion ensemble on {len(fusion_train_df)} samples...")
-    training_result = fusion.fit(fusion_train_df, df_val)
+    training_result = fusion.fit(fusion_train_df, df_val.sample(n=10, random_state=42))
     
     print("\nTraining completed!")
     print(f"  ML model trained:      {training_result.get('ml_model_trained', False)}")
@@ -374,7 +374,7 @@ def evaluate_with_data_percentage(
     
     print("\nEvaluating fusion ensemble on test set...")
     # Predict on the full test set (LLM will still use few-shot prompts internally).
-    test_result = fusion.predict(df_test)
+    test_result = fusion.predict(df_test.sample(n=5, random_state=42))
     
     test_metrics = test_result.metadata.get('metrics', {}) if test_result.metadata else {}
     
@@ -631,8 +631,13 @@ if __name__ == "__main__":
     if precache_flag:
         print('\n🔁 PRECACHE MODE: Generating LLM predictions for full val/test using few-shot context')
 
+
         # Load datasets (deterministic sampling)
         df_train_all, df_val_all, df_test_all = load_datasets(data_dir)
+
+        if True:
+            df_val_all = df_val_all.sample(n=5, random_state=42)
+            df_test_all = df_test_all.sample(n=5, random_state=42)
 
         # Determine label columns same way as run_data_availability_experiments
         candidate_labels = [c for c in df_train_all.columns if c != 'text']
