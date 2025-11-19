@@ -104,6 +104,65 @@ class FusionWrapper(nn.Module):
 
 
 class FusionEnsemble(BaseEnsemble):
+    def load_processed_indices_from_ndjson(self, ndjson_path):
+        """
+        Load processed row indices from an NDJSON cache file.
+        Returns a set of row indices that have already been predicted.
+        """
+        import json
+        import os
+        processed_indices = set()
+        if os.path.exists(ndjson_path):
+            with open(ndjson_path, "r", encoding="utf8") as f:
+                for line in f:
+                    obj = json.loads(line)
+                    idx = obj.get("row_index")
+                    if idx is not None:
+                        processed_indices.add(idx)
+        return processed_indices
+    def generate_llm_predictions_incremental(self, df, cache_path, batch_size=8):
+        """
+        Generate LLM predictions with incremental caching.
+        Writes each prediction to cache_path.ndjson as soon as it's generated.
+        On resume, skips already-cached rows.
+        """
+        import json
+        import os
+
+        ndjson_path = f"{cache_path}.ndjson"
+        processed_indices = set()
+        predictions = []
+
+        # Load already processed indices
+        if os.path.exists(ndjson_path):
+            with open(ndjson_path, "r", encoding="utf8") as f:
+                for line in f:
+                    obj = json.loads(line)
+                    processed_indices.add(obj.get("row_index"))
+                    predictions.append(obj)
+
+        for start in range(0, len(df), batch_size):
+            batch_indices = list(range(start, min(start + batch_size, len(df))) )
+            batch_df = df.iloc[batch_indices]
+            # Skip already processed
+            batch_to_predict = [i for i in batch_indices if i not in processed_indices]
+            if not batch_to_predict:
+                continue
+            batch_df_to_predict = df.iloc[batch_to_predict]
+            # Generate predictions for this batch
+            batch_preds = self.llm_model.predict(train_df=None, test_df=batch_df_to_predict)
+            # Write each prediction to cache
+            with open(ndjson_path, "a", encoding="utf8") as f:
+                for i, pred in zip(batch_to_predict, batch_preds.predictions):
+                    obj = {
+                        "row_index": i,
+                        "prediction": pred,
+                        "text": df.iloc[i][self.llm_model.text_column] if hasattr(self.llm_model, 'text_column') else None
+                    }
+                    f.write(json.dumps(obj) + "\n")
+                    processed_indices.add(i)
+                    predictions.append(obj)
+        return predictions
     """Ensemble that fuses ML and LLM classifiers with trainable MLP."""
     
     def __init__(
