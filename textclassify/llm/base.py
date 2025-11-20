@@ -17,6 +17,7 @@ from ..prompt_engineer.base import PromptEngineer
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
 from ..utils.results_manager import ResultsManager, ModelResultsManager
+from .prediction_cache import LLMPredictionCache
 
 class BaseLLMClassifier(AsyncBaseClassifier):
     """Base class for all LLM-based text classifiers."""
@@ -35,7 +36,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         experiment_name: Optional[str] = None,
         auto_save_results: bool = True,
         # Cache management parameters
-        auto_use_cache: bool = False,
+        auto_use_cache: bool = True,
         cache_dir: str = "cache"
     ):
         """Initialize the LLM classifier.
@@ -224,6 +225,20 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                         print("🔄 Falling back to normal inference...")
             elif self.verbose:
                 print("ℹ️  No cached predictions found, running inference...")
+
+        # Initialize incremental prediction cache for resume/skip functionality
+        if self.auto_use_cache:
+            try:
+                # LLMPredictionCache will load any existing per-session cache files
+                self._prediction_cache = LLMPredictionCache(cache_dir=self.cache_dir, verbose=self.verbose)
+                if self.verbose:
+                    self.logger.info(f"Prediction cache initialized (session: {self._prediction_cache.session_id})")
+            except Exception as e:
+                if self.verbose:
+                    self.logger.warning(f"Could not initialize prediction cache: {e}")
+                    self._prediction_cache = None
+        else:
+            self._prediction_cache = None
         
         try:
             if self.verbose:
@@ -491,32 +506,96 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         Returns:
             List[List[int]]: List of binary vectors representing predictions
         """
-        predictions = []
-        total_batches = (len(df) + self.batch_size - 1) // self.batch_size
+        # If an incremental prediction cache is available, skip already-predicted rows
+        predictions: List[Optional[List[int]]] = [None] * len(df)
+
+        # Build list of indices for which we need to run inference
+        if hasattr(self, '_prediction_cache') and self._prediction_cache:
+            uncached_positions: List[int] = []
+            for pos, (_, row) in enumerate(df.iterrows()):
+                text = row.get(text_column, "")
+                try:
+                    if self._prediction_cache.has_prediction(text):
+                        cached = self._prediction_cache.get_prediction(text)
+                        pred = cached.get('prediction') if isinstance(cached, dict) else None
+                        if isinstance(pred, list):
+                            predictions[pos] = pred
+                            continue
+                except Exception:
+                    # On any cache error, treat as uncached and continue
+                    pass
+                uncached_positions.append(pos)
+
+            if len(uncached_positions) == 0:
+                # All samples cached — return formatted cached predictions
+                final_preds = [p for p in predictions if p is not None]
+                return final_preds
+
+            # Create a DataFrame with only uncached rows (preserve order)
+            df_uncached = df.iloc[uncached_positions]
+            total_batches = (len(df_uncached) + self.batch_size - 1) // self.batch_size
+        else:
+            df_uncached = df
+            total_batches = (len(df) + self.batch_size - 1) // self.batch_size
         
         if self.verbose:
             self.logger.info(f"Processing {len(df)} samples in {total_batches} batches of size {self.batch_size}")
             print(f"Processing in {total_batches} batches...")
         
         # Use tqdm for progress bar if verbose mode is enabled
-        batch_iterator = range(0, len(df), self.batch_size)
+        batch_iterator = range(0, len(df_uncached), self.batch_size)
         if self.verbose:
             batch_iterator = tqdm(batch_iterator, desc="Processing batches", total=total_batches)
         
         for i, batch_start in enumerate(batch_iterator):
-            batch_df = df.iloc[batch_start:batch_start + self.batch_size]
+            batch_df = df_uncached.iloc[batch_start:batch_start + self.batch_size]
             
             if self.verbose and not isinstance(batch_iterator, tqdm):
                 self.logger.info(f"Processing batch {i+1}/{total_batches} ({len(batch_df)} samples)")
                 print(f"Batch {i+1}/{total_batches} processing...")
             
             batch_predictions = await self._process_batch(batch_df, text_column)
-            predictions.extend(batch_predictions)
+
+            # If using an incremental cache, write batch predictions back into the
+            # main predictions list at their original positions
+            if hasattr(self, '_prediction_cache') and self._prediction_cache and df_uncached is not df:
+                # Map batch_df positions back to original df indices
+                batch_positions = df_uncached.index[batch_start: batch_start + self.batch_size].tolist()
+                for rel_idx, orig_pos in enumerate(batch_positions):
+                    if rel_idx < len(batch_predictions):
+                        predictions[orig_pos] = batch_predictions[rel_idx]
+            else:
+                # No cache in use or full run — append sequentially
+                # When not using cache, predictions list may be all None placeholders,
+                # so we append to build the final list
+                if all(p is None for p in predictions):
+                    # fresh append mode
+                    predictions = []
+                    predictions.extend(batch_predictions)
+                else:
+                    # mix-mode: fill next available None slots
+                    fill_idx = 0
+                    for j in range(len(predictions)):
+                        if predictions[j] is None and fill_idx < len(batch_predictions):
+                            predictions[j] = batch_predictions[fill_idx]
+                            fill_idx += 1
             
             if self.verbose and not isinstance(batch_iterator, tqdm):
                 self.logger.info(f"Batch {i+1} completed ({len(batch_predictions)} predictions)")
         
-        return predictions
+        # Final cleanup: ensure no None remain (fallback defaults)
+        final_predictions: List[List[int]] = []
+        for p in predictions:
+            if p is None:
+                # fallback to a safe default
+                if self.multi_label:
+                    final_predictions.append([0] * len(self.classes_))
+                else:
+                    final_predictions.append([1] + [0] * (len(self.classes_) - 1) if self.classes_ else [1])
+            else:
+                final_predictions.append(p)
+
+        return final_predictions
 
     def _get_batches(
         self,
@@ -596,7 +675,48 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                             self.logger.warning(f"After {max_retries} retries, still wrong label count. Using best-effort prediction.")
             
             predictions.append(prediction)
-        
+
+        # If incremental cache is enabled, store the raw responses + parsed predictions
+        try:
+            if hasattr(self, '_prediction_cache') and self._prediction_cache:
+                for idx, pred in enumerate(predictions):
+                    # Determine success and response text
+                    resp = responses[idx]
+                    success = not isinstance(resp, Exception)
+                    response_text = resp if success else ''
+                    prompt = prompts[idx] if idx < len(prompts) else ''
+                    text_val = batch_df.iloc[idx].get(self.text_column, '')
+
+                    # Attempt to lift an identifier from the DataFrame row if present
+                    meta = {}
+                    for id_key in ('id', 'ID', 'Id', 'index', 'row_id'):
+                        if id_key in batch_df.columns:
+                            try:
+                                meta['id'] = batch_df.iloc[idx][id_key]
+                                break
+                            except Exception:
+                                pass
+
+                    try:
+                        # store_prediction expects binary vector as prediction
+                        self._prediction_cache.store_prediction(
+                            text_val,
+                            pred,
+                            response_text,
+                            prompt,
+                            success=success,
+                            error_message=None if success else str(resp),
+                            metadata=meta or None
+                        )
+                    except Exception:
+                        # non-fatal: continue without failing the batch
+                        if self.verbose:
+                            self.logger.debug("Could not store prediction to cache for a sample")
+        except Exception:
+            # If anything goes wrong with caching, do not fail predictions
+            if self.verbose:
+                self.logger.debug("Prediction caching encountered an error; continuing without persisting this batch")
+
         return predictions
 
     def _parse_prediction_response(self, response: str) -> List[int]:
