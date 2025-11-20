@@ -26,7 +26,7 @@ class OpenAIClassifier(BaseLLMClassifier):
         experiment_name: Optional[str] = None,
         auto_save_results: bool = True,
         # Cache management parameters
-        auto_use_cache: bool = False
+        auto_use_cache: bool = True
     ):
         """Initialize OpenAI classifier.
         

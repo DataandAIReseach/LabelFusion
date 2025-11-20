@@ -120,6 +120,7 @@ class FusionEnsemble(BaseEnsemble):
                     if idx is not None:
                         processed_indices.add(idx)
         return processed_indices
+    
     def generate_llm_predictions_incremental(self, df, cache_path, batch_size=8):
         """
         Generate LLM predictions with incremental caching.

@@ -1,0 +1,186 @@
+{
+  "metadata": {
+    "experiment_id": "2025-11-20_21-09-33_reuters_10pct_2025-11-20_21-09-33_roberta",
+    "model_name": "roberta-base",
+    "model_type": "traditional_ml",
+    "classification_type": "multi_label",
+    "timestamp": "2025-11-20T21:09:55.980351",
+    "dataset_name": "test",
+    "dataset_hash": "e3ab3c502161",
+    "num_predictions": 5,
+    "git_commit": "9ac239ba2b22d557e441f478f1794b52b69d6991"
+  },
+  "predictions": [
+    [
+      "earn"
+    ],
+    [
+      "earn"
+    ],
+    [
+      "money-fx"
+    ],
+    [
+      "earn"
+    ],
+    [
+      "acq"
+    ]
+  ],
+  "probabilities": [
+    {
+      "earn": 0.8565820455551147,
+      "acq": 0.12797947227954865,
+      "money-fx": 0.07130851596593857,
+      "grain": 0.07969481498003006,
+      "crude": 0.07195950299501419,
+      "trade": 0.07749227434396744,
+      "interest": 0.0766991674900055,
+      "ship": 0.05714905634522438,
+      "wheat": 0.05726689472794533,
+      "corn": 0.06652222573757172
+    },
+    {
+      "earn": 0.7510201334953308,
+      "acq": 0.1415267288684845,
+      "money-fx": 0.06692247837781906,
+      "grain": 0.0755225121974945,
+      "crude": 0.0656343623995781,
+      "trade": 0.08343848586082458,
+      "interest": 0.0695435032248497,
+      "ship": 0.051954444497823715,
+      "wheat": 0.04667407274246216,
+      "corn": 0.05963141471147537
+    },
+    {
+      "earn": 0.10320621728897095,
+      "acq": 0.13603226840496063,
+      "money-fx": 0.22187472879886627,
+      "grain": 0.16021616756916046,
+      "crude": 0.1617085486650467,
+      "trade": 0.1774635910987854,
+      "interest": 0.13206280767917633,
+      "ship": 0.12074289470911026,
+      "wheat": 0.13027478754520416,
+      "corn": 0.10217875242233276
+    },
+    {
+      "earn": 0.8560208678245544,
+      "acq": 0.10889730602502823,
+      "money-fx": 0.07503759115934372,
+      "grain": 0.08273927122354507,
+      "crude": 0.07148464024066925,
+      "trade": 0.07617759704589844,
+      "interest": 0.08047885447740555,
+      "ship": 0.054610226303339005,
+      "wheat": 0.055976949632167816,
+      "corn": 0.06536437571048737
+    },
+    {
+      "earn": 0.16957996785640717,
+      "acq": 0.7312827110290527,
+      "money-fx": 0.08781624585390091,
+      "grain": 0.08505898714065552,
+      "crude": 0.09375914931297302,
+      "trade": 0.07545623183250427,
+      "interest": 0.08250126987695694,
+      "ship": 0.08757621794939041,
+      "wheat": 0.09031122922897339,
+      "corn": 0.09211202710866928
+    }
+  ],
+  "confidence_scores": null,
+  "metrics": {
+    "exact_match_accuracy": 0.8,
+    "hamming_loss": 0.04,
+    "precision_weighted": 0.8,
+    "recall_weighted": 0.8,
+    "f1_weighted": 0.8,
+    "classification_report": {
+      "earn": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 3.0
+      },
+      "acq": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 1.0
+      },
+      "money-fx": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 0.0
+      },
+      "grain": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 1.0
+      },
+      "crude": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 0.0
+      },
+      "trade": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 0.0
+      },
+      "interest": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 0.0
+      },
+      "ship": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 0.0
+      },
+      "wheat": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 0.0
+      },
+      "corn": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1-score": 0.0,
+        "support": 0.0
+      },
+      "micro avg": {
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1-score": 0.8,
+        "support": 5.0
+      },
+      "macro avg": {
+        "precision": 0.2,
+        "recall": 0.2,
+        "f1-score": 0.2,
+        "support": 5.0
+      },
+      "weighted avg": {
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1-score": 0.8,
+        "support": 5.0
+      },
+      "samples avg": {
+        "precision": 0.8,
+        "recall": 0.8,
+        "f1-score": 0.8,
+        "support": 5.0
+      }
+    }
+  }
+}
