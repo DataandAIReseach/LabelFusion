@@ -1,0 +1,191 @@
+id,text,earn,acq,money-fx,grain,crude,trade,interest,ship,wheat,corn,predicted,probabilities
+test/17773,"BRITISH LAND OF AMERICA INC &lt;BLA> YEAR MARCH 31
+  Shr loss 36 cts vs loss 57 cts
+      Net loss 4,589,000 vs loss 7,339,000
+      Revs 19.9 mln vs 19.6 mln
+      Avg shrs 14.7 mln vs 13.3 mln
+      NOTE: Company is a subsidiary of &lt;British Land Co PLC>
+  
+
+",1,0,0,0,0,0,0,0,0,0,['earn'],"{""earn"": 0.8758246302604675, ""acq"": 0.1002884954214096, ""money-fx"": 0.08548672497272491, ""grain"": 0.06408986449241638, ""crude"": 0.07744793593883514, ""trade"": 0.07039543986320496, ""interest"": 0.0782470852136612, ""ship"": 0.061410143971443176, ""wheat"": 0.059583935886621475, ""corn"": 0.07316070795059204}"
+test/15274,"CATERPILLAR &lt;CAT> REAFFIRMS FIRST QUARTER OUTLOOK
+  Caterpillar Inc, in remarks
+  delivered at its annual meeting in San Francisco, reiterated
+  its expectation of a loss in the first quarter.
+      It said results would be hurt by a 25 mln dlr one-time
+  charge by Caterpillar Mitsubishi, a 50-pct owned affiliate. The
+  company said it expected profit from operations for the full
+  year to improve over 1986.
+      In remarks prepared for delivery to shareholders, President
+  Peter Donis said Caterpillar's targeted five pct cost reduction
+  in 1987 ""will be difficult to achieve because the weaker dollar
+  has limited opportunities to obtain lower material costs.""
+  
+
+",1,0,0,0,0,0,0,0,0,0,['earn'],"{""earn"": 0.8741894960403442, ""acq"": 0.10491696000099182, ""money-fx"": 0.08818821609020233, ""grain"": 0.06691589206457138, ""crude"": 0.07979167252779007, ""trade"": 0.0802445262670517, ""interest"": 0.08238475769758224, ""ship"": 0.06430820375680923, ""wheat"": 0.06502626836299896, ""corn"": 0.07628268748521805}"
+test/18642,"INDONESIA REJECTS WORLD BANK FARM REFORM IDEAS
+  Indonesia rejected World Bank
+  recommendations for sweeping reforms to its farm economy, as
+  the country's foreign aid donors met to consider giving it 2.5
+  billion dlrs in grants and soft loans.
+      Agriculture Minister Achmad Affandi, in written remarks
+  distributed today as Indonesia's 14 foreign donor nations met
+  at The Hague, said, ""The general argument presented by the Bank
+  for this free trade, open economy view is weak.""
+      The Bank called for overhauls in how Indonesia manages the
+  largest farm area in South-east Asia, and said agricultural
+  growth was stagnating under subsidies for rice farming.
+      The Bank report said Indonesia's rice production had peaked
+  and the subsidies are a waste of money.
+      Affandi replied that rice is the main staple and provides
+  an income for 17 pct of the workforce. The subsidies were
+  needed to support the fertilizer industry, including importers,
+  exporters, producers and distributors, he said, as well as
+  assisting in small part the majority of Indonesian farmers.
+      Affandi agreed with a bank recommendation that farmers
+  should be free to choose their own crops, but he said the
+  government would continue to maintain production targets for
+  ""strategic commodities"" such as rice and sugar.
+      The Bank report was especially critical of Indonesia's
+  drive to plant sugar, saying domestic sugar prices are double
+  the world average because of inefficiencies, and the country
+  would save money by importing the commodity.
+      However, Affandi said volatile world sugar prices, the need
+  to save foreign exchange and an already up-and-running sugar
+  industry were good arguments for continuing the sugar drive.
+      He also said import barriers and trade monopolies in the
+  agricultural sector were needed to help domestic industry
+  develop and because of ""over-production and price intervention
+  in the developed nations.""
+  
+
+",0,0,0,1,0,0,0,0,0,0,['money-fx'],"{""earn"": 0.06497222930192947, ""acq"": 0.15176817774772644, ""money-fx"": 0.2626262903213501, ""grain"": 0.1880304515361786, ""crude"": 0.19229581952095032, ""trade"": 0.2011050432920456, ""interest"": 0.14045701920986176, ""ship"": 0.13194003701210022, ""wheat"": 0.13841977715492249, ""corn"": 0.11160817742347717}"
+test/20913,"CADE INDUSTRIES INC &lt;CADE.O> 3RD QTR NET
+  Shr three cts vs two cts
+      Net 456,000 vs 272,000
+      Sales 15 mln vs 14.4 mln
+      Nine mths
+      Shr six cts vs 23 cts
+      Net 992,000 vs 3,812,000
+      Sales 41.1 mln vs 45.4 mln
+      Order backlog 46 mln vs 24.3 mln
+      Note: 1986 figures include a gain of 2.9 mln dlr or 17 cts
+  a share from life insurance proceeds.
+  
+
+",1,0,0,0,0,0,0,0,0,0,['earn'],"{""earn"": 0.8800413608551025, ""acq"": 0.08989948034286499, ""money-fx"": 0.0909176841378212, ""grain"": 0.06586792320013046, ""crude"": 0.08073155581951141, ""trade"": 0.07070749998092651, ""interest"": 0.08295746892690659, ""ship"": 0.06289144605398178, ""wheat"": 0.060457125306129456, ""corn"": 0.07434707880020142}"
+test/19763,"CYCARE &lt;CYCR.O> BUYS CONTROL DATA &lt;CAD> UNIT
+  Cycare Systems Inc, an
+  information processing systems company, said it purchased the
+  assets of Control Data Corp's MedTec unit for undisclosed
+  terms.
+      MedTec is a provider of patient accounting and scheduling
+  systems for large scale group medical practices.
+  
+
+",0,1,0,0,0,0,0,0,0,0,['acq'],"{""earn"": 0.11519511789083481, ""acq"": 0.6690822243690491, ""money-fx"": 0.09965316951274872, ""grain"": 0.10242811590433121, ""crude"": 0.10678800940513611, ""trade"": 0.1068619042634964, ""interest"": 0.09493815153837204, ""ship"": 0.10043477267026901, ""wheat"": 0.08909144997596741, ""corn"": 0.08487797528505325}"
+test/21511," Bundesbank adds money market liquidity at 3.70-3.80 pct -dealers
+
+   Bundesbank adds money market liquidity at 3.70-3.80 pct -dealers
+  
+
+",0,0,1,0,0,0,1,0,0,0,"['money-fx', 'interest']","{""earn"": 0.1590319573879242, ""acq"": 0.12914392352104187, ""money-fx"": 0.503629207611084, ""grain"": 0.1390238106250763, ""crude"": 0.17007134854793549, ""trade"": 0.12983855605125427, ""interest"": 0.3004492521286011, ""ship"": 0.13532669842243195, ""wheat"": 0.12032072991132736, ""corn"": 0.13235688209533691}"
+test/21205,"ANCHOR FINANCIAL CORP &lt;AFCX.O> 3RD QTR NET
+  Shr 28 cts vs 41 cts
+      Net 205,000 vs 229,000
+      Nine mths
+      Shr 86 cts vs 1.01 dlrs
+      Net 622,000 vs 566,000
+      NOTE: Share reflects issuance of 166,750 common shares in
+  December 1986.
+  
+
+",1,0,0,0,0,0,0,0,0,0,['earn'],"{""earn"": 0.8799572587013245, ""acq"": 0.09584552049636841, ""money-fx"": 0.09009518474340439, ""grain"": 0.06517720967531204, ""crude"": 0.07707066833972931, ""trade"": 0.06785943359136581, ""interest"": 0.0815773457288742, ""ship"": 0.0613204762339592, ""wheat"": 0.06027383729815483, ""corn"": 0.07264287024736404}"
+test/15790,"VLSI TECHNOLOGY INC &lt;VLSI> 1ST QTR NET
+  Shr seven cts vs six cts
+      Net 1,612,000 vs 1,406,000
+      Revs 38.2 mln vs 34.3 mln
+      Avg shrs 23,742,000 vs 22,945,000
+  
+
+",1,0,0,0,0,0,0,0,0,0,['earn'],"{""earn"": 0.8777143359184265, ""acq"": 0.0964391678571701, ""money-fx"": 0.09155263006687164, ""grain"": 0.064048632979393, ""crude"": 0.07737890630960464, ""trade"": 0.0675564631819725, ""interest"": 0.08030573278665543, ""ship"": 0.060703907161951065, ""wheat"": 0.060168419033288956, ""corn"": 0.07307553291320801}"
+test/17929,"SAUDI ARABIA WILL NOT AGREE ""MAD"" OIL PRICE RISE
+  Saudi Arabia's Oil Minister Hisham Nazer
+  said Riyadh would not agree to a cut in oil prices and would
+  not accept a ""mad"" increase that would drive consumers away.
+      He told al-Riyadh newspaper, ""Saudi Arabia follows a
+  balanced petroleum policy. It does not approve of a decrease in
+  prices from current levels and it also does not accept a mad
+  increase that would drive consumers away and make them try and
+  find alternative sources (for energy).""
+      OPEC agreed last December to cut production after world
+  prices hit new lows in 1986. They agreed on a pricing system
+  aimed to stabilise the market around 18 dlrs a barrel.
+      OPEC is scheduled to meet in Vienna on June 25, where it
+  will review its current oil price and production policy.
+      Saudi Arabia's King Fahd said last month that he wanted oil
+  prices to remain stable for the next two years.
+      Saudi Arabia is the architect of the current pricing and
+  production pact, which is backed by Kuwait and the UAE. The
+  current pact set a production ceiling for first half 1987 of
+  15.8 mln bpd, and implemented fixed prices based on an 18 dlrs
+  a barrel average.
+  
+
+",0,0,0,0,1,0,0,0,0,0,['money-fx'],"{""earn"": 0.07762427628040314, ""acq"": 0.1256275624036789, ""money-fx"": 0.25281935930252075, ""grain"": 0.1658070981502533, ""crude"": 0.18653610348701477, ""trade"": 0.1791197955608368, ""interest"": 0.15702496469020844, ""ship"": 0.1174926832318306, ""wheat"": 0.11924921721220016, ""corn"": 0.11145118623971939}"
+test/16130,"OFFER FOR DOME MAY SHORT-CIRCUIT ITS DEBT TALKS
+  A 3.22 billion dlr offer for Dome
+  Petroleum Ltd &lt;DMP.MO> by TransCanada Pipelines Ltd &lt;TRP.TO>
+  may short-circuit Dome's restructuring plan and open the door
+  for more takeover bids, oil analysts said.
+      Dome is trying to get approval for a plan to refinance debt
+  of more than 4.5 billion dlrs by July 1, 1987, when an interim
+  debt plan that allowed the Canadian oil and gas firm to defer
+  substantial payments to creditors will expire.
+      Analysts said TransCanada's bid signals Dome's debtholders
+  that an alternative exists to Dome's debt plan.
+      Dome announced its plan to 56 major creditors as well as
+  public noteholders in March after several months of delicate
+  negotiations.
+      TransCanada's proposal ""amounts to a quasi debt
+  restructuring,"" oil analyst Doug Gowland of Brown Baldwin Nisker
+  Ltd said from Toronto.
+      Calgary-based Dome's restructuring plan would allow
+  creditors to convert debt to common shares under a formula yet
+  to be negotiated. Payments on remaining debt would be linked to
+  cash flow generated by assets pledged against the debt.
+      ""The weakness of the whole debt-refinancing proposal is that
+  even with approval of creditors, there is no assurance that
+  Dome will in fact be able to repay all of its debt obligations,""
+  said Wilf Gobert, an oil analyst for Peters and Co Ltd in
+  Calgary.
+      TransCanada's announcement came as a surprise since Dome
+  was waiting for responses from creditors on its proposed
+  refinancing packages, Gobert said.
+      The TransCanada proposal could open the bidding for Dome
+  since other potential buyers were probably waiting for lenders
+  to agree to a restructuring, he added.
+      ""I would think that the debtholders would want to entertain
+  any and all offers (for Dome),"" Gobert said.
+      Dome spokesman David Annesley said in New York that
+  TransCanada's announcement could be seen as an attempt to fix
+  the bidding price for Dome and an effort to preclude other
+  possible buyers from making an offer. ""By drawing attention to
+  us in our discussions, it means that others may be a little
+  reluctant to come forward,"" he said.
+      Dome does not consider TransCanada's proposal a formal
+  offer because the pipeline utility's announcement breached a
+  confidential agreement between the two companies, he said.
+      Dome responded to the statement by suspending discussions
+  with TransCanada in order to pursue talks with other
+  unidentified parties. However, Dome said its management and
+  financial advisers would evaluate all proposals, including
+  TransCanada's.
+      Gowland said TransCanada's offer is probably a fair price
+  for the company's 36.1 mln acres of oil and gas land holdings.
+      However, he said not enough financial details are known
+  about Dome's debt restructuring to compare the value of
+  TransCanada's proposed offer.
+  
+
+",0,1,0,0,0,0,0,0,0,0,['acq'],"{""earn"": 0.11819896847009659, ""acq"": 0.5491316318511963, ""money-fx"": 0.105893574655056, ""grain"": 0.07775257527828217, ""crude"": 0.09772193431854248, ""trade"": 0.09704676270484924, ""interest"": 0.08725657314062119, ""ship"": 0.08803445100784302, ""wheat"": 0.07344375550746918, ""corn"": 0.0745372548699379}"

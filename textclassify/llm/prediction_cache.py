@@ -91,6 +91,39 @@ class LLMPredictionCache:
                     self.metadata.update(saved_metadata)
                     if self.verbose:
                         self.logger.info(f"Loaded existing metadata: {len(saved_metadata)} items")
+            else:
+                # If there's no metadata for this session id, try to find the most
+                # recent metadata/cache files in the cache directory and load them.
+                meta_files = sorted(self.cache_dir.glob('metadata_*.json'), reverse=True)
+                cache_files = sorted(self.cache_dir.glob('cache_*.pkl'), reverse=True)
+                if meta_files or cache_files:
+                    # Prefer metadata file to pick session id, otherwise pick cache file
+                    chosen_meta = meta_files[0] if meta_files else None
+                    chosen_cache = cache_files[0] if cache_files else None
+                    if chosen_meta:
+                        try:
+                            with open(chosen_meta, 'r') as f:
+                                saved_metadata = json.load(f)
+                                self.metadata.update(saved_metadata)
+                                # update session id and file paths to match discovered file
+                                sid = chosen_meta.stem.replace('metadata_', '')
+                                self.session_id = sid
+                                self.metadata_file = chosen_meta
+                                self.predictions_file = self.cache_dir / f"predictions_{sid}.csv"
+                                self.cache_file = self.cache_dir / f"cache_{sid}.pkl"
+                                if self.verbose:
+                                    self.logger.info(f"Auto-loaded metadata from {chosen_meta.name}")
+                        except Exception:
+                            pass
+                    elif chosen_cache:
+                        # derive session id from cache filename
+                        sid = chosen_cache.stem.replace('cache_', '')
+                        self.session_id = sid
+                        self.metadata_file = self.cache_dir / f"metadata_{sid}.json"
+                        self.predictions_file = self.cache_dir / f"predictions_{sid}.csv"
+                        self.cache_file = chosen_cache
+                        if self.verbose:
+                            self.logger.info(f"Auto-selected cache file {chosen_cache.name}")
             
             # Load cache
             if self.cache_file.exists():

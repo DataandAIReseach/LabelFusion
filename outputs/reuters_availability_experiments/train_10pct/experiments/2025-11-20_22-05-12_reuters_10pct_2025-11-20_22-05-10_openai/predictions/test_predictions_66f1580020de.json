@@ -1,0 +1,57 @@
+{
+  "metadata": {
+    "experiment_id": "2025-11-20_22-05-12_reuters_10pct_2025-11-20_22-05-10_openai",
+    "model_name": "gpt-5-nano",
+    "model_type": "llm",
+    "classification_type": "multi_label",
+    "timestamp": "2025-11-20T22:09:49.687592",
+    "dataset_name": "test",
+    "dataset_hash": "66f1580020de",
+    "num_predictions": 10,
+    "git_commit": "9ac239ba2b22d557e441f478f1794b52b69d6991"
+  },
+  "predictions": [
+    [
+      "acq"
+    ],
+    [
+      "earn"
+    ],
+    [
+      "acq"
+    ],
+    [
+      "money-fx"
+    ],
+    [
+      "acq"
+    ],
+    [
+      "interest"
+    ],
+    [
+      "earn"
+    ],
+    [
+      "trade"
+    ],
+    [
+      "acq"
+    ],
+    [
+      "earn"
+    ]
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "subset_accuracy": 1.0,
+    "hamming_loss": 0.0,
+    "micro_precision": 1.0,
+    "micro_recall": 1.0,
+    "micro_f1": 1.0
+  }
+}

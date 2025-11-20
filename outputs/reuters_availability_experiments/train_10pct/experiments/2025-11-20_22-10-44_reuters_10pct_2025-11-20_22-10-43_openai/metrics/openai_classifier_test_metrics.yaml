@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-11-20_22-10-44_reuters_10pct_2025-11-20_22-10-43_openai
+  git_commit: 9ac239ba2b22d557e441f478f1794b52b69d6991
+  model_name: openai_classifier
+  timestamp: '2025-11-20T22:24:22.697986'
+metrics:
+  f1: 0.9666666666666666
+  hamming_loss: 0.01
+  micro_f1: 0.99
+  micro_precision: 0.99
+  micro_recall: 0.99
+  precision: 1.0
+  recall: 0.95
+  subset_accuracy: 0.9
