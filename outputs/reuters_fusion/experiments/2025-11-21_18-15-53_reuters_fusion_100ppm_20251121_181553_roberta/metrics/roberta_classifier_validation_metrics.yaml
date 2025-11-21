@@ -1,0 +1,83 @@
+metadata:
+  dataset_name: validation
+  experiment_id: 2025-11-21_18-15-53_reuters_fusion_100ppm_20251121_181553_roberta
+  git_commit: ac2b314f11cdee4a695a68be5f5be6f0bf7a5f39
+  model_name: roberta_classifier
+  timestamp: '2025-11-21T18:15:57.585987'
+metrics:
+  classification_report:
+    acq:
+      f1-score: 0.4523809523809524
+      precision: 0.2923076923076923
+      recall: 1.0
+      support: 19.0
+    corn:
+      f1-score: 0.05970149253731343
+      precision: 0.03076923076923077
+      recall: 1.0
+      support: 2.0
+    crude:
+      f1-score: 0.08823529411764706
+      precision: 0.046153846153846156
+      recall: 1.0
+      support: 3.0
+    earn:
+      f1-score: 0.6458333333333334
+      precision: 0.47692307692307695
+      recall: 1.0
+      support: 31.0
+    grain:
+      f1-score: 0.16901408450704225
+      precision: 0.09230769230769231
+      recall: 1.0
+      support: 6.0
+    interest:
+      f1-score: 0.030303030303030304
+      precision: 0.015384615384615385
+      recall: 1.0
+      support: 1.0
+    macro avg:
+      f1-score: 0.18252890318052936
+      precision: 0.11538461538461538
+      recall: 1.0
+      support: 75.0
+    micro avg:
+      f1-score: 0.20689655172413793
+      precision: 0.11538461538461539
+      recall: 1.0
+      support: 75.0
+    money-fx:
+      f1-score: 0.11594202898550725
+      precision: 0.06153846153846154
+      recall: 1.0
+      support: 4.0
+    samples avg:
+      f1-score: 0.20476958938497405
+      precision: 0.11538461538461536
+      recall: 1.0
+      support: 75.0
+    ship:
+      f1-score: 0.11594202898550725
+      precision: 0.06153846153846154
+      recall: 1.0
+      support: 4.0
+    trade:
+      f1-score: 0.08823529411764706
+      precision: 0.046153846153846156
+      recall: 1.0
+      support: 3.0
+    weighted avg:
+      f1-score: 0.4180828391020788
+      precision: 0.29066666666666674
+      recall: 1.0
+      support: 75.0
+    wheat:
+      f1-score: 0.05970149253731343
+      precision: 0.03076923076923077
+      recall: 1.0
+      support: 2.0
+  exact_match_accuracy: 0.0
+  f1_weighted: 0.4180828391020788
+  hamming_loss: 0.8846153846153846
+  precision_weighted: 0.29066666666666674
+  recall_weighted: 1.0

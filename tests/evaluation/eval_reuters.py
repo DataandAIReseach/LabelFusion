@@ -26,8 +26,8 @@ from textclassify.core.types import ModelConfig, EnsembleConfig, ModelType
 
 def load_datasets(data_dir: str = "/scratch/users/u19147/LabelFusion/data/reuters"):
     df_train = pd.read_csv(os.path.join(data_dir, "train.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
-    df_val = pd.read_csv(os.path.join(data_dir, "val.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
-    df_test = pd.read_csv(os.path.join(data_dir, "test.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
+    df_val = pd.read_csv(os.path.join(data_dir, "val.csv")).sample(frac=0.1, random_state=42).reset_index(drop=True)
+    df_test = pd.read_csv(os.path.join(data_dir, "test.csv")).sample(frac=0.1, random_state=42).reset_index(drop=True)
     return df_train, df_val, df_test
 
 
@@ -85,10 +85,10 @@ def run_once(data_dir: str, output_dir: str, percentage: float = 0.001, few_shot
     fusion = create_fusion_ensemble(ml_model, llm_model, output_dir, experiment_name)
 
     print(f"Training fusion on {len(fusion_train_df)} samples (labels: {label_columns})")
-    fusion.fit(fusion_train_df, df_val.sample(n=2, random_state=42))
+    fusion.fit(fusion_train_df, df_val)
 
     print("Predicting on test set...")
-    result = fusion.predict(df_test.sample(n=2, random_state=42))
+    result = fusion.predict(df_test)
     metrics = result.metadata.get('metrics', {}) if result.metadata else {}
     print(f"Test metrics: {metrics}")
 
