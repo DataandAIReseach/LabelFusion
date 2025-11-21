@@ -1,0 +1,25 @@
+id,text,earn,acq,money-fx,grain,crude,trade,interest,ship,wheat,corn,predicted,probabilities
+test/17773,"BRITISH LAND OF AMERICA INC &lt;BLA> YEAR MARCH 31
+  Shr loss 36 cts vs loss 57 cts
+      Net loss 4,589,000 vs loss 7,339,000
+      Revs 19.9 mln vs 19.6 mln
+      Avg shrs 14.7 mln vs 13.3 mln
+      NOTE: Company is a subsidiary of &lt;British Land Co PLC>
+  
+
+",1,0,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.48065438866615295, ""acq"": 0.4724765717983246, ""money-fx"": 0.5066433548927307, ""grain"": 0.5190800428390503, ""crude"": 0.5125043988227844, ""trade"": 0.4899590313434601, ""interest"": 0.5448940396308899, ""ship"": 0.5170136094093323, ""wheat"": 0.46395063400268555, ""corn"": 0.4987964928150177}"
+test/15274,"CATERPILLAR &lt;CAT> REAFFIRMS FIRST QUARTER OUTLOOK
+  Caterpillar Inc, in remarks
+  delivered at its annual meeting in San Francisco, reiterated
+  its expectation of a loss in the first quarter.
+      It said results would be hurt by a 25 mln dlr one-time
+  charge by Caterpillar Mitsubishi, a 50-pct owned affiliate. The
+  company said it expected profit from operations for the full
+  year to improve over 1986.
+      In remarks prepared for delivery to shareholders, President
+  Peter Donis said Caterpillar's targeted five pct cost reduction
+  in 1987 ""will be difficult to achieve because the weaker dollar
+  has limited opportunities to obtain lower material costs.""
+  
+
+",1,0,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.48165762424468994, ""acq"": 0.47494426369667053, ""money-fx"": 0.5072060823440552, ""grain"": 0.5182008743286133, ""crude"": 0.5151612162590027, ""trade"": 0.487040251493454, ""interest"": 0.5445051193237305, ""ship"": 0.5202896595001221, ""wheat"": 0.4553854465484619, ""corn"": 0.4935578405857086}"
