@@ -1288,35 +1288,78 @@ class FusionEnsemble(BaseEnsemble):
                               ml_predictions: List, llm_predictions: List):
         """Create dataset for fusion training using pre-computed ML and LLM predictions."""
         
+        # Helper to map various prediction formats to binary vector
+        def _prediction_to_vector(pred):
+            import ast
+            # Start with zero vector
+            vec = np.zeros(self.num_labels, dtype=float)
+
+            # Numpy arrays or lists of numeric values
+            if isinstance(pred, (list, tuple, np.ndarray)):
+                # If numeric vector (ints/floats), accept directly
+                if all(isinstance(x, (int, float, np.integer, np.floating)) for x in pred):
+                    arr = np.asarray(pred, dtype=float)
+                    if arr.size == self.num_labels:
+                        return arr
+                    # If numbers but not the right size, try to interpret as indices
+                    for x in arr:
+                        idx = int(x)
+                        if 0 <= idx < self.num_labels:
+                            vec[idx] = 1.0
+                    return vec
+                # If list/array of strings -> list of class names
+                if all(isinstance(x, str) for x in pred):
+                    for cls in pred:
+                        if cls in self.classes_:
+                            vec[self.classes_.index(cls)] = 1.0
+                    return vec
+
+            # If prediction is a string, it may be a single class name or a serialized list
+            if isinstance(pred, str):
+                # Try to parse JSON/py-list string like "['a','b']"
+                try:
+                    parsed = ast.literal_eval(pred)
+                    if isinstance(parsed, (list, tuple, np.ndarray)):
+                        return _prediction_to_vector(parsed)
+                except Exception:
+                    # Not a literal list - treat as class name or numeric index
+                    pass
+
+                # Single class name
+                if pred in self.classes_:
+                    vec[self.classes_.index(pred)] = 1.0
+                    return vec
+
+                # Try numeric index in string
+                try:
+                    idx = int(float(pred))
+                    if 0 <= idx < self.num_labels:
+                        vec[idx] = 1.0
+                        return vec
+                except Exception:
+                    pass
+
+            # If prediction is numeric (single index)
+            if isinstance(pred, (int, float, np.integer, np.floating)):
+                idx = int(pred)
+                if 0 <= idx < self.num_labels:
+                    vec[idx] = 1.0
+                    return vec
+
+            # Fallback: return zero-vector
+            return vec
+
         # Convert ML predictions to tensor format (binary vectors)
         ml_tensor = torch.zeros(len(ml_predictions), self.num_labels)
         for i, prediction in enumerate(ml_predictions):
-            if isinstance(prediction, list) and len(prediction) == self.num_labels:
-                # Already in binary vector format
-                ml_tensor[i] = torch.tensor(prediction, dtype=torch.float)
-            elif isinstance(prediction, str):
-                # Convert class name to binary vector
-                if prediction in self.classes_:
-                    class_idx = self.classes_.index(prediction)
-                    ml_tensor[i, class_idx] = 1.0
-        
+            vec = _prediction_to_vector(prediction)
+            ml_tensor[i] = torch.tensor(vec, dtype=torch.float)
+
         # Convert LLM predictions to tensor format (binary vectors)
         llm_tensor = torch.zeros(len(llm_predictions), self.num_labels)
         for i, prediction in enumerate(llm_predictions):
-            if isinstance(prediction, list) and len(prediction) == self.num_labels:
-                # Already in binary vector format
-                llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
-            elif isinstance(prediction, str):
-                # Convert class name to binary vector
-                if prediction in self.classes_:
-                    class_idx = self.classes_.index(prediction)
-                    llm_tensor[i, class_idx] = 1.0
-            elif isinstance(prediction, list):
-                # List of class names (multi-label)
-                for pred_class in prediction:
-                    if pred_class in self.classes_:
-                        class_idx = self.classes_.index(pred_class)
-                        llm_tensor[i, class_idx] = 1.0
+            vec = _prediction_to_vector(prediction)
+            llm_tensor[i] = torch.tensor(vec, dtype=torch.float)
         
         # Create tensor dataset with predictions only (no tokenization needed)
         labels_tensor = torch.FloatTensor(labels)
