@@ -1,0 +1,53 @@
+id,text,earn,acq,money-fx,grain,crude,trade,interest,ship,wheat,corn,predicted,probabilities
+training/1164,"BENEFICIAL CORP TO SELL INSURANCE UNIT, REMOVING COMPANY FROM INSURANCE BUSINESS
+
+  BENEFICIAL CORP TO SELL INSURANCE UNIT, REMOVING COMPANY FROM INSURANCE BUSINESS
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.47192949056625366, ""acq"": 0.5004063844680786, ""money-fx"": 0.49172723293304443, ""grain"": 0.4620213806629181, ""crude"": 0.5036442875862122, ""trade"": 0.5081998705863953, ""interest"": 0.5137841701507568, ""ship"": 0.45806872844696045, ""wheat"": 0.48616257309913635, ""corn"": 0.4650742709636688}"
+training/4412,"WAL-MART STORES INC &lt;WMT> RAISES QUARTERLY
+  Qtly div six cts vs 4-1/4 cts prior
+      Pay April 10
+      Record March 23
+  
+
+",1,0,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.47046440839767456, ""acq"": 0.4997192919254303, ""money-fx"": 0.4955378770828247, ""grain"": 0.4632384479045868, ""crude"": 0.4996323883533478, ""trade"": 0.5096982717514038, ""interest"": 0.5118128657341003, ""ship"": 0.4577801525592804, ""wheat"": 0.48432233929634094, ""corn"": 0.46745234727859497}"
+training/8023,"ROGERS &lt;ROG> ADOPTS RIGHTS PLAN
+  Rogers Corp said its board
+  approved a shareholder rights plan designed to protect its
+  shareholders in the event of an attempted hostile takeover.
+      Rogers said the plan is not being adopted in response to
+  any specific takeover attempt.
+      Under the plan, shareholders may buy one share of common
+  stock at 65 dlrs for each share held. The rights will be
+  exercisable only if a person or group acquires 20 pct or more
+  of Rogers' shares or announces an offer for 30 pct or more.
+      The dividend distribution will be made March 30 to holders
+  or record on that date.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.4725115895271301, ""acq"": 0.4985654950141907, ""money-fx"": 0.4905272126197815, ""grain"": 0.45960813760757446, ""crude"": 0.5009168982505798, ""trade"": 0.5106660723686218, ""interest"": 0.5112265348434448, ""ship"": 0.45443832874298096, ""wheat"": 0.4864814579486847, ""corn"": 0.46304118633270264}"
+training/4038,"TREASURY SECRETARY BAKER DECLINES COMMENT ON G-6
+  U.S. Treasury Secretary James Baker
+  declined comment on the February 22 Paris accord between the
+  six major industrial nations under which they agreed to foster
+  exchange rate stability.
+      Asked by reporters after a speech before the National
+  Fitness Foundation banquet what, if any, currency intervention
+  levels had been set in Paris, Baker replied: ""We never talk
+  about intervention.""
+      Baker also declined to comment on his views about the
+  foreign exchange markets' reaction to the accord.
+  
+
+",0,0,1,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.4678270220756531, ""acq"": 0.4964783787727356, ""money-fx"": 0.4901973605155945, ""grain"": 0.4588133692741394, ""crude"": 0.501685619354248, ""trade"": 0.5117128491401672, ""interest"": 0.5070249438285828, ""ship"": 0.4524068236351013, ""wheat"": 0.48593565821647644, ""corn"": 0.46422895789146423}"
+training/10961,"GOLDEN POULTRY &lt;CHIK> TO MAKE ACQUISITION
+  golden Poultry Co Inc said it has
+  signed a letter of intent to purchase privately-held food
+  distributor Don Lowe Foods Inc of Pompano Beach, Fla., for
+  undisclosed terms, subject to approval by both boards.
+      It said Tampa operations of Lowe are not involved in the
+  sale.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.47337016463279724, ""acq"": 0.49647873640060425, ""money-fx"": 0.4919675886631012, ""grain"": 0.45996397733688354, ""crude"": 0.4983103275299072, ""trade"": 0.511584460735321, ""interest"": 0.5139924883842468, ""ship"": 0.45289888978004456, ""wheat"": 0.48296424746513367, ""corn"": 0.4617287218570709}"

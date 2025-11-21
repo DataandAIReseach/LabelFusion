@@ -559,8 +559,17 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             # If using an incremental cache, write batch predictions back into the
             # main predictions list at their original positions
             if hasattr(self, '_prediction_cache') and self._prediction_cache and df_uncached is not df:
-                # Map batch_df positions back to original df indices
-                batch_positions = df_uncached.index[batch_start: batch_start + self.batch_size].tolist()
+                # Map batch_df positions back to original positional indices in `predictions`.
+                # `df_uncached.index` contains DataFrame index labels which may not be
+                # 0..N-1 contiguous positions; using them directly as list indices
+                # causes IndexError when labels are large or non-sequential. Use the
+                # previously-built `uncached_positions` (positional offsets) instead.
+                try:
+                    batch_positions = uncached_positions[batch_start: batch_start + self.batch_size]
+                except Exception:
+                    # Fallback: compute positional indices from labels (slower)
+                    batch_positions = [df.index.get_loc(lbl) for lbl in df_uncached.index[batch_start: batch_start + self.batch_size]]
+
                 for rel_idx, orig_pos in enumerate(batch_positions):
                     if rel_idx < len(batch_predictions):
                         predictions[orig_pos] = batch_predictions[rel_idx]

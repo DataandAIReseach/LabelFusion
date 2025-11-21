@@ -1,0 +1,14 @@
+id,text,earn,acq,money-fx,grain,crude,trade,interest,ship,wheat,corn,predicted,probabilities
+training/1164,"BENEFICIAL CORP TO SELL INSURANCE UNIT, REMOVING COMPANY FROM INSURANCE BUSINESS
+
+  BENEFICIAL CORP TO SELL INSURANCE UNIT, REMOVING COMPANY FROM INSURANCE BUSINESS
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5301244854927063, ""acq"": 0.4853743314743042, ""money-fx"": 0.5168023705482483, ""grain"": 0.5262051224708557, ""crude"": 0.5030210614204407, ""trade"": 0.5078284740447998, ""interest"": 0.49350541830062866, ""ship"": 0.509893000125885, ""wheat"": 0.49440819025039673, ""corn"": 0.4896068274974823}"
+training/4412,"WAL-MART STORES INC &lt;WMT> RAISES QUARTERLY
+  Qtly div six cts vs 4-1/4 cts prior
+      Pay April 10
+      Record March 23
+  
+
+",1,0,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5337146520614624, ""acq"": 0.48640090227127075, ""money-fx"": 0.5165979266166687, ""grain"": 0.5268099308013916, ""crude"": 0.5048863291740417, ""trade"": 0.506232738494873, ""interest"": 0.49029070138931274, ""ship"": 0.5103340744972229, ""wheat"": 0.4910205006599426, ""corn"": 0.49070143699645996}"

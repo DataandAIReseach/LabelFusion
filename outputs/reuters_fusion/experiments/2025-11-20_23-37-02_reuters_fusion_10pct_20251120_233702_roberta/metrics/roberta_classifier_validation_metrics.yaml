@@ -1,0 +1,83 @@
+metadata:
+  dataset_name: validation
+  experiment_id: 2025-11-20_23-37-02_reuters_fusion_10pct_20251120_233702_roberta
+  git_commit: ac1314294dd92906c5c9ca90cbb5284ae124a918
+  model_name: roberta_classifier
+  timestamp: '2025-11-20T23:37:30.701190'
+metrics:
+  classification_report:
+    acq:
+      f1-score: 1.0
+      precision: 1.0
+      recall: 1.0
+      support: 3.0
+    corn:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 0.0
+    crude:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 0.0
+    earn:
+      f1-score: 1.0
+      precision: 1.0
+      recall: 1.0
+      support: 1.0
+    grain:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 0.0
+    interest:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 0.0
+    macro avg:
+      f1-score: 0.3
+      precision: 0.3
+      recall: 0.3
+      support: 5.0
+    micro avg:
+      f1-score: 1.0
+      precision: 1.0
+      recall: 1.0
+      support: 5.0
+    money-fx:
+      f1-score: 1.0
+      precision: 1.0
+      recall: 1.0
+      support: 1.0
+    samples avg:
+      f1-score: 1.0
+      precision: 1.0
+      recall: 1.0
+      support: 5.0
+    ship:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 0.0
+    trade:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 0.0
+    weighted avg:
+      f1-score: 1.0
+      precision: 1.0
+      recall: 1.0
+      support: 5.0
+    wheat:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 0.0
+  exact_match_accuracy: 1.0
+  f1_weighted: 1.0
+  hamming_loss: 0.0
+  precision_weighted: 1.0
+  recall_weighted: 1.0
