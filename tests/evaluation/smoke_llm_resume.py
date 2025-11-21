@@ -1,0 +1,149 @@
+"""
+Smoke test for LLM incremental prediction resume behavior.
+
+- Creates small synthetic train/val/test datasets (n=10 each).
+- Uses a MockLLM that returns deterministic class-name predictions and can simulate a KeyboardInterrupt mid-run.
+- Calls `FusionEnsemble.generate_llm_predictions_incremental` twice: first run is interrupted, second run resumes and completes.
+- Verifies the NDJSON cache contains one entry per row after resumption.
+
+This script does NOT call any external LLM APIs.
+"""
+
+import os
+import json
+from pathlib import Path
+import pandas as pd
+import random
+
+# Add project root to path
+project_root = Path(__file__).parent.parent.parent
+import sys
+sys.path.insert(0, str(project_root))
+
+from textclassify.ensemble.fusion import FusionEnsemble
+from textclassify.core.types import EnsembleConfig
+
+
+class MockLLM:
+    """Mock LLM classifier for incremental prediction testing.
+
+    .predict(train_df, test_df) -> object with .predictions list
+    It can be configured to raise KeyboardInterrupt after a number of predictions
+    to simulate a user cancelation / process kill.
+    """
+    def __init__(self, text_column='text', classes=None, fail_after=None):
+        self.text_column = text_column
+        self.classes_ = classes or [f"class_{i}" for i in range(4)]
+        self.fail_after = fail_after
+        self._counter = 0
+
+    def predict(self, train_df, test_df):
+        preds = []
+        for _idx, row in test_df.iterrows():
+            cls = self.classes_[self._counter % len(self.classes_)]
+            preds.append(cls)
+            self._counter += 1
+            if self.fail_after is not None and self._counter > self.fail_after:
+                # Simulate cancellation
+                raise KeyboardInterrupt("Simulated cancellation during LLM prediction")
+        class R: pass
+        r = R()
+        r.predictions = preds
+        return r
+
+
+def make_small_df(n=10, text_col='text', classes=None):
+    classes = classes or ['World', 'Sports', 'Business', 'Sci/Tech']
+    texts = [f"sample text {i}" for i in range(n)]
+    labels = [random.choice(classes) for _ in range(n)]
+
+    # For compatibility with other code expecting one-hot label columns, create label columns
+    label_columns = [f"label_{i}" for i in range(len(classes))]
+    rows = []
+    for t, l in zip(texts, labels):
+        vec = [1 if c == l else 0 for c in classes]
+        row = {text_col: t}
+        for col, v in zip(label_columns, vec):
+            row[col] = v
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
+    return df, text_col, label_columns, classes
+
+
+def run_resume_test(df, cache_base, classes, text_column='text', batch_size=4, fail_after=3):
+    # Prepare ensemble with minimal config
+    # Provide a non-empty `models` list so BaseEnsemble initialization passes its validation
+    cfg = EnsembleConfig(ensemble_method='fusion', models=[{"placeholder": True}], parameters={})
+    fusion = FusionEnsemble(cfg)
+
+    # Attach mock LLM
+    mock = MockLLM(text_column=text_column, classes=classes, fail_after=fail_after)
+    fusion.add_llm_model(mock)
+
+    ndjson_path = f"{cache_base}.ndjson"
+
+    # Ensure no pre-existing cache
+    if os.path.exists(ndjson_path):
+        os.remove(ndjson_path)
+
+    print(f"\n--- Running first (interrupted) pass for cache '{cache_base}' ---")
+    try:
+        fusion.generate_llm_predictions_incremental(df, cache_base, batch_size=batch_size)
+        print("First pass completed without interruption (unexpected for this test)")
+    except KeyboardInterrupt as e:
+        print(f"First pass interrupted as expected: {e}")
+
+    # Inspect partial cache
+    processed = 0
+    if os.path.exists(ndjson_path):
+        with open(ndjson_path, 'r', encoding='utf8') as f:
+            for _ in f:
+                processed += 1
+    print(f"After interruption, cache contains {processed}/{len(df)} entries")
+
+    print(f"\n--- Running second (resume) pass for cache '{cache_base}' ---")
+    # Attach a non-failing mock for resume so it completes remaining predictions
+    mock2 = MockLLM(text_column=text_column, classes=classes, fail_after=None)
+    fusion.llm_model = mock2  # replace model in ensemble
+
+    try:
+        preds = fusion.generate_llm_predictions_incremental(df, cache_base, batch_size=batch_size)
+        print(f"Second pass returned {len(preds)} items (including previously saved ones)")
+    except Exception as e:
+        print(f"Second pass failed unexpectedly: {e}")
+        raise
+
+    # Validate final NDJSON count matches df rows
+    final_count = 0
+    with open(ndjson_path, 'r', encoding='utf8') as f:
+        for line in f:
+            final_count += 1
+    success = final_count == len(df)
+    print(f"After resume, cache contains {final_count}/{len(df)} entries -> {'SUCCESS' if success else 'FAIL'}")
+    return success
+
+
+if __name__ == '__main__':
+    base_cache_dir = Path('cache/smoke_llm_resume')
+    base_cache_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create small datasets (n=10 each)
+    df_train, text_col, label_cols, classes = make_small_df(n=10)
+    df_val, _, _, _ = make_small_df(n=10)
+    df_test, _, _, _ = make_small_df(n=10)
+
+    all_ok = True
+
+    # Run for train/val/test with separate caches
+    for name, df in [('train', df_train), ('val', df_val), ('test', df_test)]:
+        cache_base = str(base_cache_dir / f"{name}_preds")
+        ok = run_resume_test(df, cache_base, classes, text_column=text_col, batch_size=4, fail_after=3)
+        all_ok = all_ok and ok
+
+    if all_ok:
+        print("\nALL RESUME TESTS PASSED")
+        sys.exit(0)
+    else:
+        print("\nSOME RESUME TESTS FAILED")
+        sys.exit(2)
