@@ -2,7 +2,7 @@
 
 Performs a single FusionEnsemble training + evaluation run.
 Environment variables:
-  - PERCENTAGE: fraction of training data to use (default 0.001)
+    - PERCENTAGE: fraction of training data to use (default 1.0 = 100%)
   - FEW_SHOT: few-shot examples for LLM (default 10)
   - DATA_DIR: path to Reuters data (default /scratch/users/u19147/LabelFusion/data/reuters)
   - OUTPUT_DIR: path to write outputs (default outputs/reuters_fusion)
@@ -26,8 +26,8 @@ from textclassify.core.types import ModelConfig, EnsembleConfig, ModelType
 
 def load_datasets(data_dir: str = "/scratch/users/u19147/LabelFusion/data/reuters"):
     df_train = pd.read_csv(os.path.join(data_dir, "train.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
-    df_val = pd.read_csv(os.path.join(data_dir, "val.csv")).sample(frac=0.1, random_state=42).reset_index(drop=True)
-    df_test = pd.read_csv(os.path.join(data_dir, "test.csv")).sample(frac=0.1, random_state=42).reset_index(drop=True)
+    df_val = pd.read_csv(os.path.join(data_dir, "val.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
+    df_test = pd.read_csv(os.path.join(data_dir, "test.csv")).sample(frac=1, random_state=42).reset_index(drop=True)
     return df_train, df_val, df_test
 
 
@@ -66,7 +66,7 @@ def create_fusion_ensemble(ml_model, llm_model, output_dir: str, experiment_name
     return fusion
 
 
-def run_once(data_dir: str, output_dir: str, percentage: float = 0.001, few_shot: int = 10, ml_train_on_full: bool = False):
+def run_once(data_dir: str, output_dir: str, percentage: float = 1.0, few_shot: int = 10, ml_train_on_full: bool = False):
     df_train, df_val, df_test = load_datasets(data_dir)
     text_column = 'text'
     label_columns = detect_label_columns(df_train, text_column)
@@ -97,7 +97,7 @@ if __name__ == '__main__':
     data_dir = os.getenv('DATA_DIR', '/scratch/users/u19147/LabelFusion/data/reuters')
     output_dir = os.getenv('OUTPUT_DIR', 'outputs/reuters_fusion')
     try:
-        percentage = float(os.getenv('PERCENTAGE', '0.001'))
+        percentage = float(os.getenv('PERCENTAGE', '1.0'))
     except Exception:
         percentage = 0.001
     try:
