@@ -1,0 +1,23 @@
+config:
+  batch_size: 32
+  few_shot_mode: 10
+  label_columns:
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  model_name: gpt-5-nano
+  multi_label: true
+  provider: openai
+  text_column: text
+  threshold: 0.5
+metadata:
+  experiment_id: 2025-11-22_19-26-09_reuters_fusion_100000ppm_20251122_192609_openai
+  model_name: openai_classifier
+  timestamp: '2025-11-22T19:28:15.376409'
