@@ -80,7 +80,26 @@ def run_once(data_dir: str, output_dir: str, percentage: float = 1.0, few_shot: 
     os.makedirs(output_dir, exist_ok=True)
     experiment_name = f"reuters_fusion_{int(percentage*100000)}ppm_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-    ml_model = create_ml_model(text_column, label_columns, output_dir, experiment_name, auto_save_path=None)
+    # Try to discover a cached RoBERTa model in the `cache/` folder.
+    # Looks for files starting with `fusion_roberta_model_...` and loads the newest one if available.
+    import glob
+    cache_base_pattern = os.path.join('cache', 'fusion_roberta_model_*')
+    cached_files = sorted(glob.glob(cache_base_pattern), key=os.path.getctime, reverse=True)
+    ml_model = None
+    if cached_files:
+        latest_cache = cached_files[0]
+        print(f"Found candidate cached ML model: {latest_cache} -> attempting to load")
+        # Create model instance (no auto_save_path required to load)
+        ml_model = create_ml_model(text_column, label_columns, output_dir, experiment_name, auto_save_path=None)
+        try:
+            ml_model.load_model(latest_cache)
+            print(f"✅ Loaded RoBERTa model from cache: {latest_cache}")
+        except Exception as e:
+            print(f"⚠️ Failed to load cached RoBERTa model ({latest_cache}): {e}")
+            print("Will train a new RoBERTa model instead.")
+            ml_model = create_ml_model(text_column, label_columns, output_dir, experiment_name, auto_save_path=None)
+    else:
+        ml_model = create_ml_model(text_column, label_columns, output_dir, experiment_name, auto_save_path=None)
     llm_model = create_llm_model(text_column, label_columns, output_dir, experiment_name, few_shot_examples=few_shot)
     fusion = create_fusion_ensemble(ml_model, llm_model, output_dir, experiment_name)
 
