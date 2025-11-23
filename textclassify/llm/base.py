@@ -1169,9 +1169,14 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         df_with_prompts = test_df.copy()
 
         if self.verbose:
-            self.logger.info(f"Engineering prompts for {len(test_df)} test samples")
-            if train_df is not None:
-                self.logger.info(f"Using {len(train_df)} training samples for few-shot learning")
+            # Prefer displaying the size of the few-shot training data when available
+            if train_df is not None and not train_df.empty:
+                self.logger.info(
+                    f"Engineering prompts using {len(train_df)} training samples for few-shot learning; "
+                    f"generating prompts for {len(test_df)} test samples"
+                )
+            else:
+                self.logger.info(f"Engineering prompts for {len(test_df)} test samples")
 
         # Engineer prompts using PromptEngineer
         engineered_prompts = await self.prompt_engineer.engineer_prompts(
@@ -1187,10 +1192,17 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Convert prompts to strings and add as new column
         if self.verbose:
             print("Rendering prompts...")
-            
+
         rendered_prompts = []
-        for i, prompt in enumerate(engineered_prompts):
-            if self.verbose and i % 10 == 0:  # Log every 10th prompt
+        # Choose progress total: prefer training-sample count when available, else prompt count
+        progress_total = len(train_df) if (train_df is not None and not train_df.empty) else len(engineered_prompts)
+        # Use tqdm to show progress; fall back to simple iteration if verbose is False
+        iterator = enumerate(engineered_prompts)
+        if self.verbose:
+            iterator = enumerate(tqdm(engineered_prompts, desc="Rendering prompts", total=progress_total))
+
+        for i, prompt in iterator:
+            if self.verbose and i % 10 == 0:
                 self.logger.debug(f"Rendering prompt {i+1}/{len(engineered_prompts)}")
             rendered_prompts.append(prompt.render())
         

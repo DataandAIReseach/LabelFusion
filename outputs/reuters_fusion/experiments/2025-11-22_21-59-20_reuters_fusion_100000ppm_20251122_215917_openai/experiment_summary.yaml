@@ -1,0 +1,50 @@
+created_at: '2025-11-22T22:00:39.806866'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq002
+    platform: Linux-4.18.0-553.81.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2025-11-22_21-59-20_reuters_fusion_100000ppm_20251122_215917_openai
+  git_commit: a3151dc909f4addf8b94dfb0ec91bd2a771baa08
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-11-22T21:59:20.329731'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/openai_classifier_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/validation_predictions_aa685a6f1bc6.csv
+  - predictions/validation_predictions_aa685a6f1bc6.json
+test_results: null
+training_results:
+  accuracy: null
+  avg_time_per_sample: 7.259632080793381
+  completed: true
+  few_shot_mode: 10
+  label_columns:
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  model_name: gpt-5-nano
+  model_type: llm
+  multi_label: true
+  prediction_samples: 8
+  processing_time_seconds: 58.077056646347046
+  provider: openai
+  text_column: text
+  training_samples: 5842
