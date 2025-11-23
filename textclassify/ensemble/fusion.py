@@ -142,7 +142,39 @@ class FusionEnsemble(BaseEnsemble):
                     processed_indices.add(obj.get("row_index"))
                     predictions.append(obj)
 
-        for start in range(0, len(df), batch_size):
+        # Show total test samples and how many remain to predict
+        total_samples = len(df)
+        remaining = total_samples - len(processed_indices)
+        print(f"Generating LLM predictions incrementally: total={total_samples}, remaining={remaining}", flush=True)
+
+        # Create a batch iterator and show progress per batch (use tqdm when available)
+        batch_range = range(0, len(df), batch_size)
+
+        try:
+            from tqdm import tqdm
+            _tqdm = tqdm
+        except Exception:
+            _tqdm = None
+
+        total_batches = (len(df) + batch_size - 1) // batch_size if batch_size > 0 else 0
+
+        # Count how many batches are already fully processed so we can set an initial position
+        initial_batches_processed = 0
+        for s in batch_range:
+            b_idx = list(range(s, min(s + batch_size, len(df))))
+            if b_idx and all(i in processed_indices for i in b_idx):
+                initial_batches_processed += 1
+
+        if _tqdm is not None:
+            import sys
+            try:
+                batch_iter = _tqdm(batch_range, total=total_batches, desc="LLM batches", initial=initial_batches_processed, file=sys.stdout)
+            except Exception:
+                batch_iter = _tqdm(batch_range, total=total_batches, desc="LLM batches")
+        else:
+            batch_iter = batch_range
+
+        for start in batch_iter:
             batch_indices = list(range(start, min(start + batch_size, len(df))) )
             batch_df = df.iloc[batch_indices]
             # Skip already processed
@@ -535,18 +567,8 @@ class FusionEnsemble(BaseEnsemble):
             final_predictions = self._generate_llm_predictions(df, train_df)
             predictions_source = "generated"
         else:
-            # Ensure we have a non-empty few-shot training DataFrame for LLM calls
-            few_shot_df = None
-            if train_df is not None and isinstance(train_df, pd.DataFrame) and not train_df.empty:
-                few_shot_df = train_df
-            elif hasattr(self, 'train_df_cache') and isinstance(self.train_df_cache, pd.DataFrame) and not self.train_df_cache.empty:
-                few_shot_df = self.train_df_cache
-            else:
-                # Fallback: use target df as few-shot when nothing else available
-                few_shot_df = df
-
             # Try to load from cache first (with dataset validation)
-            cached_predictions = self._load_cached_llm_predictions(cache_path, df, dataset_type=dataset_type)
+            cached_predictions = self._load_cached_llm_predictions(cache_path, df)
             if cached_predictions is not None:
                 print(f"Loaded cached LLM predictions for {dataset_type} set from {cache_path}")
                 final_predictions = cached_predictions
@@ -554,9 +576,9 @@ class FusionEnsemble(BaseEnsemble):
             else:
                 # Generate new predictions and save to cache
                 print(f"Generating new LLM predictions for {dataset_type} set...")
-                final_predictions = self._generate_llm_predictions(df, few_shot_df)
+                final_predictions = self._generate_llm_predictions(df, train_df)
                 predictions_source = "generated"
-
+                
                 # Save to cache with datetime stamp and dataset hash
                 self._save_cached_llm_predictions(final_predictions, cache_path, df)
         
@@ -735,7 +757,7 @@ class FusionEnsemble(BaseEnsemble):
         from datetime import datetime
         return datetime.now().isoformat()
     
-    def _load_cached_llm_predictions(self, base_cache_path: str, df: pd.DataFrame, dataset_type: Optional[str] = None) -> Optional[List[Union[str, List[str]]]]:
+    def _load_cached_llm_predictions(self, base_cache_path: str, df: pd.DataFrame) -> Optional[List[Union[str, List[str]]]]:
         """Try to load cached LLM predictions from file with dataset validation.
         
         Args:
@@ -756,51 +778,28 @@ class FusionEnsemble(BaseEnsemble):
             # Calculate current dataset hash
             current_hash = self._create_dataset_hash(df)
             
-            # Prepare preferred prefix based on dataset_type
-            preferred_prefix = None
-            if dataset_type:
-                if dataset_type.lower().startswith('val') or dataset_type.lower().startswith('validation'):
-                    preferred_prefix = 'val_'
-                elif dataset_type.lower().startswith('test'):
-                    preferred_prefix = 'test_'
-
             # First, try to find files with matching hash
             pattern = f"{base_cache_path}_*_{current_hash}.json"
             matching_files = glob.glob(pattern)
-
-            # If we have a preferred prefix try to prefer files that start with that prefix
-            if preferred_prefix and matching_files:
-                pref_files = [f for f in matching_files if os.path.basename(f).startswith(preferred_prefix)]
-                if pref_files:
-                    matching_files = pref_files
             
             if matching_files:
                 # Get the most recent file with matching hash
                 latest_file = max(matching_files, key=os.path.getctime)
-
+                
                 with open(latest_file, 'r') as f:
                     cache_data = json.load(f)
-
+                
                 # Handle both new format (with metadata) and old format (just predictions)
                 if isinstance(cache_data, dict) and 'predictions' in cache_data:
                     predictions = cache_data['predictions']
                     metadata = cache_data.get('metadata', {})
-
-                    # Validate sample count and dataset columns/hash when available
-                    num_samples_ok = metadata.get('num_samples') == len(df)
-                    hash_ok = metadata.get('dataset_hash') == current_hash if metadata.get('dataset_hash') else True
-                    cols_ok = True
-                    if metadata.get('columns'):
-                        try:
-                            cols_ok = set(metadata.get('columns')) == set(df.columns.tolist())
-                        except Exception:
-                            cols_ok = True
-
-                    if num_samples_ok and hash_ok and cols_ok:
+                    
+                    # Validate sample count
+                    if metadata.get('num_samples') == len(df):
                         print(f"✅ Loaded matching cached predictions: {latest_file} (Hash: {current_hash})")
                         return predictions
                     else:
-                        print(f"⚠️ Cache file {latest_file} failed validation (samples/hash/cols): num_samples_ok={num_samples_ok}, hash_ok={hash_ok}, cols_ok={cols_ok}")
+                        print(f"⚠️ Sample count mismatch in cache: {latest_file}")
                 elif isinstance(cache_data, list):
                     # Old format - just validate sample count
                     if len(cache_data) == len(df):
@@ -811,50 +810,25 @@ class FusionEnsemble(BaseEnsemble):
             print(f"🔍 No hash-matched cache found, checking backward compatibility...")
             old_pattern = f"{base_cache_path}_*.json"
             old_files = [f for f in glob.glob(old_pattern) if not f.endswith(f"_{current_hash}.json")]
-
-            # Prefer old files with preferred prefix if available
-            if preferred_prefix and old_files:
-                pref_old = [f for f in old_files if os.path.basename(f).startswith(preferred_prefix)]
-                if pref_old:
-                    old_files = pref_old
             
             for file_path in sorted(old_files, key=os.path.getctime, reverse=True):
                 try:
                     with open(file_path, 'r') as f:
                         data = json.load(f)
-
+                    
                     # Handle both old and new formats
                     if isinstance(data, list):
                         predictions = data
-                        metadata = {}
                     elif isinstance(data, dict) and 'predictions' in data:
                         predictions = data['predictions']
-                        metadata = data.get('metadata', {})
                     else:
                         continue
-
-                    # Prefer caches that contain matching metadata (columns/hash) in addition to sample count
-                    if len(predictions) != len(df):
-                        continue
-
-                    # If metadata exists, validate columns or dataset_hash where possible
-                    if metadata:
-                        cols_meta = metadata.get('columns')
-                        hash_meta = metadata.get('dataset_hash')
-                        cols_ok = set(cols_meta) == set(df.columns.tolist()) if cols_meta else True
-                        hash_ok = (hash_meta == current_hash) if hash_meta else True
-                        if cols_ok and hash_ok:
-                            print(f"⚠️ Using backward-compatible cache: {file_path} (metadata matched)")
-                            return predictions
-                        else:
-                            # Not a safe match; skip this old cache
-                            print(f"🔎 Skipping old cache {file_path} due to metadata mismatch (cols_ok={cols_ok}, hash_ok={hash_ok})")
-                            continue
-                    else:
-                        # No metadata; accept only if sample count matches (best-effort)
-                        print(f"⚠️ Using backward-compatible cache without metadata: {file_path} (no hash validation)")
+                    
+                    # Validate sample count
+                    if len(predictions) == len(df):
+                        print(f"⚠️ Using backward-compatible cache: {file_path} (no hash validation)")
                         return predictions
-
+                        
                 except Exception:
                     continue
             
@@ -1000,7 +974,7 @@ class FusionEnsemble(BaseEnsemble):
         """
         if dataset_type == "validation" or dataset_type == "auto":
             if self.val_llm_cache_path:
-                cached_predictions = self._load_cached_llm_predictions(self.val_llm_cache_path, df, dataset_type="validation")
+                cached_predictions = self._load_cached_llm_predictions(self.val_llm_cache_path, df)
                 if cached_predictions is not None:
                     print(f"✅ Found cached validation predictions for {len(df)} samples")
                     return cached_predictions
@@ -1010,7 +984,7 @@ class FusionEnsemble(BaseEnsemble):
         
         if dataset_type == "test" or dataset_type == "auto":
             if self.test_llm_cache_path:
-                cached_predictions = self._load_cached_llm_predictions(self.test_llm_cache_path, df, dataset_type="test")
+                cached_predictions = self._load_cached_llm_predictions(self.test_llm_cache_path, df)
                 if cached_predictions is not None:
                     print(f"✅ Found cached test predictions for {len(df)} samples")
                     return cached_predictions
