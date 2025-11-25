@@ -1,0 +1,29 @@
+config:
+  batch_size: 32
+  cache_dir: cache
+  classes: &id001
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  classification_type: multi_label
+  enable_cache: true
+  few_shot_mode: 10
+  label_columns: *id001
+  max_completion_tokens: 150
+  model_name: gpt-5-nano
+  multi_label: true
+  provider: openai
+  temperature: 0.1
+  text_column: text
+  threshold: 0.5
+metadata:
+  experiment_id: 2025-11-24_16-58-18_reuters_fusion_100000ppm_20251124_165815_openai
+  model_name: openai_classifier
+  timestamp: '2025-11-24T17:03:05.822157'

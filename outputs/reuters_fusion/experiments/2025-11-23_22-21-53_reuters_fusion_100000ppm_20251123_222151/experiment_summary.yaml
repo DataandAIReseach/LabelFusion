@@ -1,0 +1,46 @@
+created_at: '2025-11-23T22:36:45.313414'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq002
+    platform: Linux-4.18.0-553.81.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2025-11-23_22-21-53_reuters_fusion_100000ppm_20251123_222151
+  git_commit: e5f858798f447b100973adce6b0310abdae51260
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-11-23T22:21:53.361943'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/fusion_ensemble_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/validation_predictions_aa685a6f1bc6.csv
+  - predictions/validation_predictions_aa685a6f1bc6.json
+test_results: null
+training_results:
+  classes:
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  classification_type: multi_label
+  ensemble_method: fusion
+  fusion_mlp_trained: true
+  ml_model_trained: true
+  num_labels: 10
+  training_samples: 5842
+  used_cached_val_llm_predictions: false
+  validation_samples: 647
