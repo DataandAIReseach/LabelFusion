@@ -107,7 +107,8 @@ def run_once(data_dir: str, output_dir: str, percentage: float = 1.0, few_shot: 
     fusion.fit(fusion_train_df, df_val)
 
     print("Predicting on test set...")
-    result = fusion.predict(df_test)
+    result = fusion.predict(df_test,
+                            df_train)
     metrics = result.metadata.get('metrics', {}) if result.metadata else {}
     print(f"Test metrics: {metrics}")
 

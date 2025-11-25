@@ -60,6 +60,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self.multi_label = multi_label
         self.few_shot_mode = few_shot_mode
         self.verbose = verbose
+        self.mode = None
         
         # Set provider - use parameter if provided, otherwise get from config, default to openai
         self.provider = provider or getattr(self.config, 'provider', 'openai')
@@ -155,6 +156,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 self.logger.info(f"🔬 Experiment ID: {self.results_manager.experiment_id}")
         
         self._setup_config()
+    
+    def set_mode(self, mode: str) -> None:
+        self.mode = mode
 
     def _setup_config(self) -> None:
         """Initialize configuration parameters."""
@@ -1195,7 +1199,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
         rendered_prompts = []
         # Choose progress total: prefer training-sample count when available, else prompt count
-        progress_total = len(train_df) if (train_df is not None and not train_df.empty) else len(engineered_prompts)
+        progress_total = len(test_df) if (test_df is not None and not test_df.empty) else len(engineered_prompts)
         # Use tqdm to show progress; fall back to simple iteration if verbose is False
         iterator = enumerate(engineered_prompts)
         if self.verbose:
