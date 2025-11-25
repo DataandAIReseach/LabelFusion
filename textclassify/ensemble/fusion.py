@@ -104,98 +104,6 @@ class FusionWrapper(nn.Module):
 
 
 class FusionEnsemble(BaseEnsemble):
-    def load_processed_indices_from_ndjson(self, ndjson_path):
-        """
-        Load processed row indices from an NDJSON cache file.
-        Returns a set of row indices that have already been predicted.
-        """
-        import json
-        import os
-        processed_indices = set()
-        if os.path.exists(ndjson_path):
-            with open(ndjson_path, "r", encoding="utf8") as f:
-                for line in f:
-                    obj = json.loads(line)
-                    idx = obj.get("row_index")
-                    if idx is not None:
-                        processed_indices.add(idx)
-        return processed_indices
-    
-    def generate_llm_predictions_incremental(self, df, cache_path, batch_size=8):
-        """
-        Generate LLM predictions with incremental caching.
-        Writes each prediction to cache_path.ndjson as soon as it's generated.
-        On resume, skips already-cached rows.
-        """
-        import json
-        import os
-
-        ndjson_path = f"{cache_path}.ndjson"
-        processed_indices = set()
-        predictions = []
-
-        # Load already processed indices
-        if os.path.exists(ndjson_path):
-            with open(ndjson_path, "r", encoding="utf8") as f:
-                for line in f:
-                    obj = json.loads(line)
-                    processed_indices.add(obj.get("row_index"))
-                    predictions.append(obj)
-
-        # Show total test samples and how many remain to predict
-        total_samples = len(df)
-        remaining = total_samples - len(processed_indices)
-        print(f"Generating LLM predictions incrementally: total={total_samples}, remaining={remaining}", flush=True)
-
-        # Create a batch iterator and show progress per batch (use tqdm when available)
-        batch_range = range(0, len(df), batch_size)
-
-        try:
-            from tqdm import tqdm
-            _tqdm = tqdm
-        except Exception:
-            _tqdm = None
-
-        total_batches = (len(df) + batch_size - 1) // batch_size if batch_size > 0 else 0
-
-        # Count how many batches are already fully processed so we can set an initial position
-        initial_batches_processed = 0
-        for s in batch_range:
-            b_idx = list(range(s, min(s + batch_size, len(df))))
-            if b_idx and all(i in processed_indices for i in b_idx):
-                initial_batches_processed += 1
-
-        if _tqdm is not None:
-            import sys
-            try:
-                batch_iter = _tqdm(batch_range, total=total_batches, desc="LLM batches", initial=initial_batches_processed, file=sys.stdout)
-            except Exception:
-                batch_iter = _tqdm(batch_range, total=total_batches, desc="LLM batches")
-        else:
-            batch_iter = batch_range
-
-        for start in batch_iter:
-            batch_indices = list(range(start, min(start + batch_size, len(df))) )
-            batch_df = df.iloc[batch_indices]
-            # Skip already processed
-            batch_to_predict = [i for i in batch_indices if i not in processed_indices]
-            if not batch_to_predict:
-                continue
-            batch_df_to_predict = df.iloc[batch_to_predict]
-            # Generate predictions for this batch
-            batch_preds = self.llm_model.predict(train_df=None, test_df=batch_df_to_predict)
-            # Write each prediction to cache
-            with open(ndjson_path, "a", encoding="utf8") as f:
-                for i, pred in zip(batch_to_predict, batch_preds.predictions):
-                    obj = {
-                        "row_index": i,
-                        "prediction": pred,
-                        "text": df.iloc[i][self.llm_model.text_column] if hasattr(self.llm_model, 'text_column') else None
-                    }
-                    f.write(json.dumps(obj) + "\n")
-                    processed_indices.add(i)
-                    predictions.append(obj)
-        return predictions
     """Ensemble that fuses ML and LLM classifiers with trainable MLP."""
     
     def __init__(
@@ -351,7 +259,7 @@ class FusionEnsemble(BaseEnsemble):
             df=val_df,
             train_df=train_df,
             cache_path=self.val_llm_cache_path,
-            dataset_type="validation",
+            mode="val",
             provided_predictions=val_llm_predictions
         )
         
@@ -537,7 +445,7 @@ class FusionEnsemble(BaseEnsemble):
         return llm_result.predictions
     
     def _get_or_generate_llm_predictions(self, df: pd.DataFrame, train_df: pd.DataFrame, 
-                                       cache_path: str, dataset_type: str,
+                                       cache_path: str, mode: str,
                                        provided_predictions: Optional[List[Union[str, List[str]]]] = None) -> List[Union[str, List[str]]]:
         """Get LLM predictions either from cache, provided predictions, or generate new ones.
         
@@ -548,7 +456,7 @@ class FusionEnsemble(BaseEnsemble):
             df: DataFrame to get predictions for
             train_df: Training DataFrame for few-shot examples
             cache_path: Base path for caching (without datetime extension)
-            dataset_type: Type of dataset ("validation" or "test") for logging
+            mode: Type of dataset ("validation" or "test") for logging
             provided_predictions: Optional pre-computed predictions
             
         Returns:
@@ -559,24 +467,24 @@ class FusionEnsemble(BaseEnsemble):
         
         # STEP 1: Determine prediction source and get predictions
         if provided_predictions is not None:
-            print(f"Using provided LLM predictions for {dataset_type} set...")
+            print(f"Using provided LLM predictions for {mode} set...")
             final_predictions = provided_predictions
             predictions_source = "provided"
         elif not cache_path or cache_path.strip() == '':
-            print(f"No cache path specified, generating LLM predictions for {dataset_type} set on the fly...")
-            final_predictions = self._generate_llm_predictions(df, train_df)
+            print(f"No cache path specified, generating LLM predictions for {mode} set on the fly...")
+            final_predictions = self._generate_llm_predictions(df, train_df, mode)
             predictions_source = "generated"
         else:
             # Try to load from cache first (with dataset validation)
             cached_predictions = self._load_cached_llm_predictions(cache_path, df)
             if cached_predictions is not None:
-                print(f"Loaded cached LLM predictions for {dataset_type} set from {cache_path}")
+                print(f"Loaded cached LLM predictions for {mode} set from {cache_path}")
                 final_predictions = cached_predictions
                 predictions_source = "cached"
             else:
                 # Generate new predictions and save to cache
-                print(f"Generating new LLM predictions for {dataset_type} set...")
-                final_predictions = self._generate_llm_predictions(df, train_df)
+                print(f"Generating new LLM predictions for {mode} set...")
+                final_predictions = self._generate_llm_predictions(df, train_df, mode)
                 predictions_source = "generated"
                 
                 # Save to cache with datetime stamp and dataset hash
@@ -629,7 +537,7 @@ class FusionEnsemble(BaseEnsemble):
                         
                         # Calculate metrics
                         metrics = self.llm_model._calculate_metrics(binary_predictions, true_labels)
-                        print(f"Calculated metrics for {dataset_type} set: {metrics}")
+                        print(f"Calculated metrics for {mode} set: {metrics}")
                         
                         # Create ClassificationResult for saving
                         from ..core.types import ClassificationResult, ClassificationType, ModelType
@@ -646,7 +554,7 @@ class FusionEnsemble(BaseEnsemble):
                                 'total_samples': len(final_predictions),
                                 'binary_predictions': binary_predictions,
                                 'prediction_source': predictions_source,
-                                'dataset_type': dataset_type
+                                'mode': mode
                             }
                         )
                         
@@ -656,12 +564,12 @@ class FusionEnsemble(BaseEnsemble):
                             
                             # Save predictions using correct ResultsManager methods
                             prediction_files = self.llm_model.results_manager.save_predictions(
-                                llm_result, dataset_type, df
+                                llm_result, mode, df
                             )
                             
                             # Save metrics separately 
                             metrics_file = self.llm_model.results_manager.save_metrics(
-                                metrics, dataset_type, f"{self.llm_model.provider}_classifier"
+                                metrics, mode, f"{self.llm_model.provider}_classifier"
                             )
                             
                             # Save model configuration
@@ -672,7 +580,7 @@ class FusionEnsemble(BaseEnsemble):
                             # Save experiment summary
                             summary_file = self.llm_model.results_manager.save_experiment_summary({
                                 "predictions_source": predictions_source,
-                                "dataset_type": dataset_type,
+                                "mode": mode,
                                 "total_samples": len(final_predictions),
                                 "metrics": metrics,
                                 "model_name": self.llm_model.config.parameters.get("model", "unknown"),
@@ -711,7 +619,7 @@ class FusionEnsemble(BaseEnsemble):
                     print(f"ℹ️ No true labels available in DataFrame - skipping metrics calculation")
                     
             except Exception as e:
-                print(f"⚠️ Warning: Could not save LLM results for {dataset_type} set: {e}")
+                print(f"⚠️ Warning: Could not save LLM results for {mode} set: {e}")
                 print(f"   Continuing with {predictions_source} predictions only...")
         
         # STEP 3: Save predictions to experiments directory (fallback)
@@ -719,15 +627,17 @@ class FusionEnsemble(BaseEnsemble):
         # AND if intermediate LLM prediction saving is enabled
         # Fresh predictions already get saved by predict_texts() above
         if predictions_source in ["cached", "provided"] and self.save_intermediate_llm_predictions:
-            self._save_llm_predictions_to_experiments(final_predictions, df, dataset_type)
+            self._save_llm_predictions_to_experiments(final_predictions, df, mode)
         
         return final_predictions
     
-    def _generate_llm_predictions(self, df: pd.DataFrame, train_df: pd.DataFrame) -> List[Union[str, List[str]]]:
+    def _generate_llm_predictions(self, df: pd.DataFrame, train_df: pd.DataFrame, mode: str) -> List[Union[str, List[str]]]:
         """Generate LLM predictions for a DataFrame."""
         if self.llm_model is None:
             raise EnsembleError("LLM model must be added before generating predictions")
         
+        self.llm_model.set_mode(mode)
+
         llm_result = self.llm_model.predict(
             train_df=train_df,
             test_df=df
@@ -889,13 +799,13 @@ class FusionEnsemble(BaseEnsemble):
             print(f"Warning: Could not save predictions to cache {base_cache_path}: {e}")
     
     def _save_llm_predictions_to_experiments(self, predictions: List[Union[str, List[str]]], 
-                                           df: pd.DataFrame, dataset_type: str):
+                                           df: pd.DataFrame, mode: str):
         """Save LLM predictions to the experiments directory structure.
         
         Args:
             predictions: LLM predictions to save
             df: DataFrame used for predictions (for metadata)
-            dataset_type: Type of dataset ("validation" or "test")
+            mode: Type of dataset ("validation" or "test")
         """
         if not self.results_manager:
             return
@@ -909,7 +819,7 @@ class FusionEnsemble(BaseEnsemble):
                 model_name="llm_model",
                 classification_type=self.classification_type,
                 metadata={
-                    'dataset_type': dataset_type,
+                    'mode': mode,
                     'num_samples': len(df),
                     'dataset_hash': self._create_dataset_hash(df),
                     'timestamp': self._get_timestamp(),
@@ -922,10 +832,10 @@ class FusionEnsemble(BaseEnsemble):
             
             # Save LLM predictions using ResultsManager
             saved_files = self.results_manager.save_predictions(
-                llm_result, f"llm_{dataset_type}", df
+                llm_result, f"llm_{mode}", df
             )
             
-            print(f"📁 LLM {dataset_type} predictions saved to experiments: {saved_files}")
+            print(f"📁 LLM {mode} predictions saved to experiments: {saved_files}")
             
         except Exception as e:
             print(f"Warning: Could not save LLM predictions to experiments: {e}")
@@ -957,42 +867,42 @@ class FusionEnsemble(BaseEnsemble):
         print(f"LLM predictions loaded from {filepath}")
         return predictions
     
-    def load_cached_predictions_for_dataset(self, df: pd.DataFrame, dataset_type: str = "auto") -> Optional[List[Union[str, List[str]]]]:
+    def load_cached_predictions_for_dataset(self, df: pd.DataFrame, mode: str = "auto") -> Optional[List[Union[str, List[str]]]]:
         """Load cached LLM predictions for a specific dataset (validation or test).
         
         This function provides a convenient way to load cached LLM predictions without
         having to train the fusion ensemble. It automatically determines which cache
-        to use based on dataset_type or attempts to match the dataset.
+        to use based on mode or attempts to match the dataset.
         
         Args:
             df: DataFrame to load predictions for
-            dataset_type: Type of dataset - "validation", "test", or "auto" (default)
+            mode: Type of dataset - "validation", "test", or "auto" (default)
                          If "auto", tries both validation and test caches
             
         Returns:
             List of cached LLM predictions if found, None otherwise
         """
-        if dataset_type == "validation" or dataset_type == "auto":
+        if mode == "validation" or mode == "auto":
             if self.val_llm_cache_path:
                 cached_predictions = self._load_cached_llm_predictions(self.val_llm_cache_path, df)
                 if cached_predictions is not None:
                     print(f"✅ Found cached validation predictions for {len(df)} samples")
                     return cached_predictions
-                elif dataset_type == "validation":
+                elif mode == "validation":
                     print(f"❌ No cached validation predictions found for {len(df)} samples")
                     return None
         
-        if dataset_type == "test" or dataset_type == "auto":
+        if mode == "test" or mode == "auto":
             if self.test_llm_cache_path:
                 cached_predictions = self._load_cached_llm_predictions(self.test_llm_cache_path, df)
                 if cached_predictions is not None:
                     print(f"✅ Found cached test predictions for {len(df)} samples")
                     return cached_predictions
-                elif dataset_type == "test":
+                elif mode == "test":
                     print(f"❌ No cached test predictions found for {len(df)} samples")
                     return None
         
-        if dataset_type == "auto":
+        if mode == "auto":
             print(f"❌ No cached predictions found for {len(df)} samples in either validation or test cache")
         
         return None
@@ -1320,85 +1230,44 @@ class FusionEnsemble(BaseEnsemble):
                               ml_predictions: List, llm_predictions: List):
         """Create dataset for fusion training using pre-computed ML and LLM predictions."""
         
-        # Helper to map various prediction formats to binary vector
-        def _prediction_to_vector(pred):
-            import ast
-            # Start with zero vector
-            vec = np.zeros(self.num_labels, dtype=float)
-
-            # Numpy arrays or lists of numeric values
-            if isinstance(pred, (list, tuple, np.ndarray)):
-                # If numeric vector (ints/floats), accept directly
-                if all(isinstance(x, (int, float, np.integer, np.floating)) for x in pred):
-                    arr = np.asarray(pred, dtype=float)
-                    if arr.size == self.num_labels:
-                        return arr
-                    # If numbers but not the right size, try to interpret as indices
-                    for x in arr:
-                        idx = int(x)
-                        if 0 <= idx < self.num_labels:
-                            vec[idx] = 1.0
-                    return vec
-                # If list/array of strings -> list of class names
-                if all(isinstance(x, str) for x in pred):
-                    for cls in pred:
-                        if cls in self.classes_:
-                            vec[self.classes_.index(cls)] = 1.0
-                    return vec
-
-            # If prediction is a string, it may be a single class name or a serialized list
-            if isinstance(pred, str):
-                # Try to parse JSON/py-list string like "['a','b']"
-                try:
-                    parsed = ast.literal_eval(pred)
-                    if isinstance(parsed, (list, tuple, np.ndarray)):
-                        return _prediction_to_vector(parsed)
-                except Exception:
-                    # Not a literal list - treat as class name or numeric index
-                    pass
-
-                # Single class name
-                if pred in self.classes_:
-                    vec[self.classes_.index(pred)] = 1.0
-                    return vec
-
-                # Try numeric index in string
-                try:
-                    idx = int(float(pred))
-                    if 0 <= idx < self.num_labels:
-                        vec[idx] = 1.0
-                        return vec
-                except Exception:
-                    pass
-
-            # If prediction is numeric (single index)
-            if isinstance(pred, (int, float, np.integer, np.floating)):
-                idx = int(pred)
-                if 0 <= idx < self.num_labels:
-                    vec[idx] = 1.0
-                    return vec
-
-            # Fallback: return zero-vector
-            return vec
-
         # Convert ML predictions to tensor format (binary vectors)
         ml_tensor = torch.zeros(len(ml_predictions), self.num_labels)
         for i, prediction in enumerate(ml_predictions):
-            vec = _prediction_to_vector(prediction)
-            ml_tensor[i] = torch.tensor(vec, dtype=torch.float)
-
+            if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                # Already in binary vector format
+                ml_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+            elif isinstance(prediction, str):
+                # Convert class name to binary vector
+                if prediction in self.classes_:
+                    class_idx = self.classes_.index(prediction)
+                    ml_tensor[i, class_idx] = 1.0
+        
         # Convert LLM predictions to tensor format (binary vectors)
         llm_tensor = torch.zeros(len(llm_predictions), self.num_labels)
         for i, prediction in enumerate(llm_predictions):
-            vec = _prediction_to_vector(prediction)
-            llm_tensor[i] = torch.tensor(vec, dtype=torch.float)
+            if isinstance(prediction, list) and len(prediction) == self.num_labels:
+                # Already in binary vector format
+                llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
+            elif isinstance(prediction, str):
+                # Convert class name to binary vector
+                if prediction in self.classes_:
+                    class_idx = self.classes_.index(prediction)
+                    llm_tensor[i, class_idx] = 1.0
+            elif isinstance(prediction, list):
+                # List of class names (multi-label)
+                for pred_class in prediction:
+                    if pred_class in self.classes_:
+                        class_idx = self.classes_.index(pred_class)
+                        llm_tensor[i, class_idx] = 1.0
         
         # Create tensor dataset with predictions only (no tokenization needed)
         labels_tensor = torch.FloatTensor(labels)
         
         return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
     
-    def predict(self, test_df: pd.DataFrame, true_labels: Optional[List[List[int]]] = None,
+    def predict(self, 
+                test_df: pd.DataFrame, true_labels: Optional[List[List[int]]] = None,
+                train_df: Optional[pd.DataFrame] = None,
                 test_llm_predictions: Optional[List[Union[str, List[str]]]] = None) -> ClassificationResult:
         """Predict using fusion ensemble on test DataFrame.
         
@@ -1436,7 +1305,7 @@ class FusionEnsemble(BaseEnsemble):
             df=test_df,
             train_df=getattr(self, 'train_df_cache', test_df),
             cache_path=self.test_llm_cache_path,
-            dataset_type="test",
+            mode="test",
             provided_predictions=test_llm_predictions
         )
         
