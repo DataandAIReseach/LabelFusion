@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Tuple, Iterator
 import pandas as pd
 from tqdm import tqdm
+import datetime
 
 from ..core.base import AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType
@@ -559,6 +560,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         """
         # If an incremental prediction cache is available, skip already-predicted rows
         predictions: List[Optional[List[int]]] = [None] * len(df)
+        
+        # Initialize batch-wise cache file
+        cache_file_path = self._initialize_batch_cache_file(df)
 
         # Build list of indices for which we need to run inference
         if self.has_test_cache_for_dataset(df):
@@ -642,6 +646,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             
             if self.verbose and not isinstance(batch_iterator, tqdm):
                 self.logger.info(f"Batch {i+1} completed ({len(batch_predictions)} predictions)")
+            
+            # Write batch predictions to cache file
+            self._write_batch_to_cache(cache_file_path, batch_df, batch_predictions, text_column, i+1, total_batches)
         
         # Final cleanup: ensure no None remain (fallback defaults)
         final_predictions: List[List[int]] = []
@@ -656,6 +663,112 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 final_predictions.append(p)
 
         return final_predictions
+    
+    def _initialize_batch_cache_file(self, df: pd.DataFrame) -> str:
+        """Initialize a JSON cache file for batch-wise prediction storage.
+        
+        Args:
+            df: DataFrame being processed
+            
+        Returns:
+            str: Path to the cache file
+        """
+        import hashlib
+        from datetime import datetime
+        from pathlib import Path
+        
+        # Create cache directory if it doesn't exist
+        cache_dir = Path(self.cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Compute dataset hash
+        try:
+            hashed = pd.util.hash_pandas_object(df, index=True).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+        except Exception:
+            csv_bytes = df.to_csv(index=True).encode('utf-8')
+            dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+        
+        # Create cache filename with timestamp and dataset hash
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        provider = getattr(self, 'provider', 'llm')
+        model_name = self.config.parameters.get('model', 'unknown').replace('/', '_').replace('-', '_')
+        cache_filename = f"{provider}_{model_name}_test_{timestamp}_{dataset_hash}.json"
+        cache_file_path = cache_dir / cache_filename
+        
+        # Initialize cache file with metadata
+        cache_data = {
+            'metadata': {
+                'provider': provider,
+                'model': self.config.parameters.get('model', 'unknown'),
+                'dataset_hash': dataset_hash,
+                'dataset_size': len(df),
+                'timestamp': timestamp,
+                'multi_label': self.multi_label,
+                'label_columns': self.label_columns,
+                'text_column': self.text_column,
+                'batch_size': self.batch_size
+            },
+            'predictions': []
+        }
+        
+        with open(cache_file_path, 'w') as f:
+            json.dump(cache_data, f, indent=2)
+        
+        if self.verbose:
+            self.logger.info(f"Initialized batch cache file: {cache_file_path}")
+        
+        return str(cache_file_path)
+    
+    def _write_batch_to_cache(self, cache_file_path: str, batch_df: pd.DataFrame, 
+                              batch_predictions: List[List[int]], text_column: str,
+                              batch_num: int, total_batches: int) -> None:
+        """Write batch predictions to the cache JSON file.
+        
+        Args:
+            cache_file_path: Path to cache file
+            batch_df: DataFrame for current batch
+            batch_predictions: Predictions for current batch
+            text_column: Name of text column
+            batch_num: Current batch number
+            total_batches: Total number of batches
+        """
+        try:
+            # Read existing cache data
+            with open(cache_file_path, 'r') as f:
+                cache_data = json.load(f)
+            
+            # Add batch predictions
+            for idx, (_, row) in enumerate(batch_df.iterrows()):
+                if idx < len(batch_predictions):
+                    prediction_entry = {
+                        'text': row.get(text_column, ''),
+                        'prediction': batch_predictions[idx],
+                        'batch_num': batch_num
+                    }
+                    
+                    # Add original labels if available
+                    if self.label_columns:
+                        prediction_entry['true_labels'] = [int(row.get(col, 0)) for col in self.label_columns]
+                    
+                    cache_data['predictions'].append(prediction_entry)
+            
+            # Update metadata
+            cache_data['metadata']['batches_completed'] = batch_num
+            cache_data['metadata']['total_batches'] = total_batches
+            cache_data['metadata']['predictions_count'] = len(cache_data['predictions'])
+            cache_data['metadata']['last_updated'] = datetime.datetime.now().isoformat()
+            
+            # Write updated cache data
+            with open(cache_file_path, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            
+            if self.verbose and batch_num % 5 == 0:  # Log every 5 batches to avoid spam
+                self.logger.info(f"Wrote batch {batch_num}/{total_batches} to cache ({len(batch_predictions)} predictions)")
+                
+        except Exception as e:
+            if self.verbose:
+                self.logger.warning(f"Failed to write batch {batch_num} to cache: {e}")
 
     def _get_batches(
         self,
