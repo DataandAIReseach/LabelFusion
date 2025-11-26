@@ -54,7 +54,8 @@ class OpenAIClassifier(BaseLLMClassifier):
             experiment_name=experiment_name,
             auto_save_results=auto_save_results,
             auto_use_cache=auto_use_cache,
-            cache_dir=cache_dir
+            cache_dir=cache_dir,
+            
         )
         
         # Handle legacy caching parameter
@@ -73,6 +74,51 @@ class OpenAIClassifier(BaseLLMClassifier):
         self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
         
         # No need to create separate client - use the service layer from BaseLLMClassifier
+    
+    def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
+        """Return True if a test cache file matching the given DataFrame exists, else False.
+
+        Computes an 8-char dataset hash from the provided DataFrame and checks
+        cached test JSON filenames and their metadata for a match. Uses self.cache_dir.
+        """
+        from pathlib import Path
+        import hashlib
+        import json
+
+        cache_dir = getattr(self, 'cache_dir', 'cache')
+        p = Path(cache_dir)
+        if not p.exists():
+            return False
+
+        # Compute stable 8-char hash for DataFrame
+        try:
+            hashed = pd.util.hash_pandas_object(df, index=True).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+        except Exception:
+            csv_bytes = df.to_csv(index=True).encode('utf-8')
+            dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+
+        discovered = self.discover_cached_predictions(cache_dir)
+        if not discovered:
+            return False
+
+        candidates = discovered.get('test_predictions', []) or []
+        for file_path in candidates:
+            try:
+                fname = Path(file_path).name
+                if fname.endswith(f"_{dataset_hash}.json"):
+                    return True
+
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                meta = data.get('metadata', {}) if isinstance(data, dict) else {}
+                if meta.get('dataset_hash') == dataset_hash:
+                    return True
+
+            except Exception:
+                continue
+
+        return False
     
     def predict(
         self,

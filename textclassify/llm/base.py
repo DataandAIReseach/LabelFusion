@@ -234,7 +234,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if self.auto_use_cache:
             try:
                 # LLMPredictionCache will load any existing per-session cache files
-                self._prediction_cache = LLMPredictionCache(cache_dir=self.cache_dir, verbose=self.verbose)
+                self._prediction_cache = LLMPredictionCache(cache_dir=self.cache_dir, verbose=self.verbose, auto_save_interval=1)
                 if self.verbose:
                     self.logger.info(f"Prediction cache initialized (session: {self._prediction_cache.session_id})")
             except Exception as e:
@@ -499,6 +499,53 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # few_shot_mode and multi_label are already set in constructor
         label_type = getattr(self.config, 'label_type', 'single')
         self.prompt_engineer.multi_label = (label_type == "multiple")
+    
+    def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
+        """Return True if a test cache file matching the given DataFrame exists, else False.
+
+        Computes an 8-char dataset hash from the provided DataFrame and checks
+        cached test JSON filenames and their metadata for a match. Uses self.cache_dir.
+        """
+        from pathlib import Path
+        import hashlib
+        import json
+
+        cache_dir = getattr(self, 'cache_dir', 'cache')
+        p = Path(cache_dir)
+        if not p.exists():
+            return False
+
+        # Compute stable 8-char hash for DataFrame
+        try:
+            hashed = pd.util.hash_pandas_object(df, index=True).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+        except Exception:
+            csv_bytes = df.to_csv(index=True).encode('utf-8')
+            dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+
+        discovered = self.discover_cached_predictions(cache_dir)
+        if not discovered:
+            return False
+
+        candidates = discovered.get('test_predictions', []) or []
+        for file_path in candidates:
+            try:
+                fname = Path(file_path).name
+                if fname.endswith(f"_{dataset_hash}.json"):
+                    return True
+
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                meta = data.get('metadata', {}) if isinstance(data, dict) else {}
+                if meta.get('dataset_hash') == dataset_hash:
+                    return True
+
+            except Exception:
+                continue
+
+        return False
+
+
 
     async def _generate_predictions(
         self,
@@ -514,7 +561,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         predictions: List[Optional[List[int]]] = [None] * len(df)
 
         # Build list of indices for which we need to run inference
-        if hasattr(self, '_prediction_cache') and self._prediction_cache:
+        if self.has_test_cache_for_dataset(df):
             uncached_positions: List[int] = []
             for pos, (_, row) in enumerate(df.iterrows()):
                 text = row.get(text_column, "")
