@@ -674,7 +674,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             str: Path to the cache file
         """
         import hashlib
-        from datetime import datetime
+        from datetime import datetime as dt
         from pathlib import Path
         
         # Create cache directory if it doesn't exist
@@ -689,14 +689,14 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             csv_bytes = df.to_csv(index=True).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
         
-        # Create cache filename with timestamp and dataset hash
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        provider = getattr(self, 'provider', 'llm')
-        model_name = self.config.parameters.get('model', 'unknown').replace('/', '_').replace('-', '_')
-        cache_filename = f"{provider}_{model_name}_test_{timestamp}_{dataset_hash}.json"
+        # Create cache filename with timestamp and dataset hash in the format
+        # expected by other parts of the code (e.g. test_YYYY-MM-DD-HH-MM-SS_hash.json)
+        timestamp = dt.now().strftime('%Y-%m-%d-%H-%M-%S')
+        cache_filename = f"test_{timestamp}_{dataset_hash}.json"
         cache_file_path = cache_dir / cache_filename
         
         # Initialize cache file with metadata
+        provider = getattr(self, 'provider', 'llm')
         cache_data = {
             'metadata': {
                 'provider': provider,
