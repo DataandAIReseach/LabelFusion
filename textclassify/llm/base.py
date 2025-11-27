@@ -561,9 +561,6 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # If an incremental prediction cache is available, skip already-predicted rows
         predictions: List[Optional[List[int]]] = [None] * len(df)
         
-        # Initialize batch-wise cache file
-        cache_file_path = self._initialize_batch_cache_file(df)
-
         # Build list of indices for which we need to run inference
         if self.has_test_cache_for_dataset(df):
             uncached_positions: List[int] = []
@@ -589,9 +586,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             # Create a DataFrame with only uncached rows (preserve order)
             df_uncached = df.iloc[uncached_positions]
             total_batches = (len(df_uncached) + self.batch_size - 1) // self.batch_size
+            cache_file_path = None  # Don't initialize cache file when using existing cache
         else:
             df_uncached = df
             total_batches = (len(df) + self.batch_size - 1) // self.batch_size
+            # Initialize batch-wise cache file only when there's no existing cache
+            cache_file_path = self._initialize_batch_cache_file(df_uncached)
         
         if self.verbose:
             self.logger.info(f"Processing {len(df)} samples in {total_batches} batches of size {self.batch_size}")
@@ -647,8 +647,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if self.verbose and not isinstance(batch_iterator, tqdm):
                 self.logger.info(f"Batch {i+1} completed ({len(batch_predictions)} predictions)")
             
-            # Write batch predictions to cache file
-            self._write_batch_to_cache(cache_file_path, batch_df, batch_predictions, text_column, i+1, total_batches)
+            # Write batch predictions to cache file (only if cache file was initialized)
+            if cache_file_path:
+                self._write_batch_to_cache(cache_file_path, batch_df, batch_predictions, text_column, i+1, total_batches)
         
         # Final cleanup: ensure no None remain (fallback defaults)
         final_predictions: List[List[int]] = []
