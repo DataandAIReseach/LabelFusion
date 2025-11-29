@@ -1,9 +1,0 @@
-config:
-  max_completion_tokens: 150
-  model: gpt-5-nano
-  temperature: 0.1
-  top_p: 1.0
-metadata:
-  experiment_id: 2025-11-25_16-03-28_reuters_fusion_100000ppm_20251125_160326_openai
-  model_name: openai_classifier
-  timestamp: '2025-11-25T16:03:33.194014'
