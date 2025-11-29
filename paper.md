@@ -1,321 +1,169 @@
 ---
-title: 'TextClassify: A Unified Python Package for Multi-Modal Text Classification with Large Language Models and Ensemble Methods'
+title: 'LabelFusion: Learning to Fuse LLMs and Transformer Classifiers for Robust Text Classification'
 tags:
   - Python
+  - Natural Language Processing
   - Text Classification
   - Large Language Models
-  - Ensemble Methods
-  - Natural Language Processing
-  - Machine Learning
-  - Multi-class Classification
-  - Multi-label Classification
-  - Sentiment Analysis
-  - OpenAI
-  - Claude
-  - Gemini
-  - RoBERTa
-  - Transformers
+  - Ensemble Learning
+  - Multi-class
+  - Multi-label
 authors:
-  - name: Christoph Weisser
-    orcid: 0000-0003-0616-1027
-    affiliation: "1, 2"
-  - name: TextClassify Development Team
+  - name: Michael Schlee
     affiliation: 1
-
+  - name: Christoph Weisser
+    affiliation: 1
+  - name: Timo Kivimäki
+    affiliation: 2
+  - name: Melchizedek Mashiku
+    affiliation: 4
+  - name: Benjamin Saefken 
+    affiliation: 3    
 affiliations:
- - name: Campus-Institut Data Science, Göttingen, Germany
-   index: 1
  - name: Centre for Statistics, Georg-August-Universität Göttingen, Germany
+   index: 1
+ - name: Department of Politics and International Studies, University of Bath, Bath, UK
    index: 2
-date: 16 July 2025
-bibliography: paper.bib
+ - name: Institute of Mathematics, Clausthal University of Technology, Clausthal-Zellerfeld, Germany
+   index: 3
+ - name: Tanaq Management Services LLC, Contracting Agency to the Division of Viral Diseases, Centers for Disease Control and Prevention, Chamblee, Georgia, USA
+   index: 4
 
+
+
+date: 15 August 2025
+bibliography: paper.bib
 ---
 
-# Summary
+## Summary
 
-The package TextClassify provides a comprehensive framework for text classification that seamlessly integrates state-of-the-art Large Language Models (LLMs) with traditional machine learning approaches through sophisticated ensemble methods. TextClassify enables researchers and practitioners to leverage multiple classification paradigms including OpenAI GPT models, Anthropic Claude, Google Gemini, DeepSeek, and traditional transformer-based models like RoBERTa in a unified interface. The package supports both multi-class and multi-label classification tasks and implements advanced ensemble strategies including voting, weighted combination, and class-specific routing to optimize performance across diverse text classification scenarios. As such, TextClassify represents an innovative solution for tackling complex text classification challenges that require the combined strengths of modern LLMs and established machine learning techniques. The package can be applied to a broad range of applications including sentiment analysis, topic classification, intent detection, content moderation, and domain-specific classification tasks. For instance, TextClassify could be used to analyze customer feedback across multiple channels, classify scientific literature, or perform real-time content moderation by combining the reasoning capabilities of LLMs with the efficiency of traditional ML models. The installation of TextClassify can be easily accomplished via pip, with comprehensive documentation and examples available in the package repository.^[https://github.com/your-org/textclassify]
+LabelFusion is a fusion ensemble for text classification that learns to combine a traditional transformer-based classifier (e.g., RoBERTa) with one or more Large Language Models (LLMs such as OpenAI GPT, Google Gemini, or DeepSeek) to deliver accurate and cost‑aware predictions across multi‑class and multi‑label tasks. The package provides a simple high‑level interface (`AutoFusionClassifier`) that trains the full pipeline end‑to‑end with minimal configuration, and a flexible API for advanced users. Under the hood, LabelFusion concatenates vector signals from the ML backbone (logits) and LLM(s) (per‑class scores) and trains a compact multi‑layer perceptron (`FusionMLP`) to produce the final prediction. This learned fusion approach captures complementary strengths of LLM reasoning and traditional transformer-based classifiers, yielding robust performance across domains—achieving 92.4% accuracy on AG News topic classification—while enabling practical trade‑offs between accuracy, latency, and cost.
 
 ## Statement of Need
 
-Text classification remains one of the most fundamental and widely-applied tasks in Natural Language Processing (NLP), with applications spanning from sentiment analysis and spam detection to document categorization and intent recognition [@manning2008introduction]. Traditional approaches to text classification have relied heavily on feature engineering and classical machine learning algorithms such as Support Vector Machines, Naive Bayes, and logistic regression [@joachims1998text]. The advent of deep learning brought significant improvements through neural architectures including Convolutional Neural Networks (CNNs) [@kim2014convolutional] and Recurrent Neural Networks (RNNs) [@liu2016recurrent], followed by the transformer revolution that introduced models like BERT [@devlin2018bert] and RoBERTa [@liu2019roberta].
+Modern text classification spans diverse scenarios—from sentiment analysis to complex topic tagging—often under constraints that vary per deployment (throughput, cost ceilings, data privacy). While transformer classifiers such as BERT/RoBERTa achieve strong supervised performance [@devlin2018bert; @liu2019roberta], frontier LLMs can excel in low‑data, ambiguous, or cross‑domain settings [@openai2023gpt4]. No single model family is typically uniformly best: LLMs are powerful, but comparatively costly, whereas fine‑tuned transformers are efficient but may struggle with out‑of‑distribution cases.
 
-The recent emergence of Large Language Models (LLMs) such as GPT-4 [@openai2023gpt4], Claude [@anthropic2023claude], and Gemini [@google2023gemini] has fundamentally transformed the landscape of text classification. These models demonstrate remarkable few-shot and zero-shot classification capabilities, often achieving state-of-the-art performance without task-specific fine-tuning [@brown2020language]. However, the practical application of LLMs for text classification presents several challenges: high computational costs, API dependencies, potential latency issues, and the need for careful prompt engineering [@wei2022chain].
+LabelFusion addresses this gap by: (1) exposing a minimal “AutoFusion” interface that trains a learned combination of an ML backbone and one or more LLMs; (2) supporting both multi-class and multi-label classification; (3) providing a lightweight fusion learner that directly fits on LLM scores and ML logits; and (4) integrating cleanly with existing ensemble utilities. Researchers and practitioners can therefore leverage LLMs where they add value while retaining the speed and determinism of transformer models.
 
-Furthermore, no single approach universally excels across all text classification scenarios. LLMs may excel at complex reasoning tasks and handling ambiguous cases but may be overkill for simple classification problems. Traditional ML models offer predictable performance, lower costs, and faster inference but may struggle with nuanced language understanding. This creates a compelling need for a unified framework that can leverage the strengths of multiple approaches through intelligent ensemble methods.
+## State of the Field
 
-TextClassify addresses these challenges by providing a comprehensive platform that seamlessly integrates multiple classification paradigms. The package implements three core ensemble strategies:
+In applied NLP, common tools such as scikit-learn [@pedregosa2011scikit] and Hugging Face Transformers [@wolf2019huggingface] offer strong baselines but do not provide a learned fusion of LLMs with supervised transformers. Orchestration frameworks (e.g., LangChain) focus on tool use rather than classification ensembles. LabelFusion contributes a focused, production-minded implementation of a small learned combiner that operates on per-class signals from both model families.
 
-**Voting Ensemble**: Combines predictions from multiple models through democratic voting mechanisms (majority or plurality), providing robust predictions by leveraging the collective wisdom of diverse classifiers [@dietterich2000ensemble].
+## Functionality and Design
 
-**Weighted Ensemble**: Assigns performance-based weights to different models, allowing stronger performers to have greater influence on final predictions while still benefiting from the diversity of weaker models [@hansen1990neural].
+LabelFusion consists of three layers:
 
-**Class Routing Ensemble**: Routes different types of text or classes to specialized models, enabling optimal model selection based on content characteristics or domain expertise [@jacobs1991adaptive].
+- ML component: a RoBERTa‑style classifier produces per‑class logits for input texts.
+- LLM component(s): provider-specific classifiers (OpenAI, Gemini, DeepSeek) return per-class scores via prompting. Scores can be cached to minimize API calls when cache locations are provided.
+- Fusion component: a compact MLP concatenates ML logits and LLM scores and outputs fused logits. The ML backbone is trained/fine‑tuned with a small learning rate; the fusion MLP uses a higher rate, enabling rapid adaptation without destabilizing the encoder.
 
-The package also implements advanced features for practical deployment including asynchronous processing for handling large-scale classification tasks, comprehensive evaluation metrics for model comparison, and flexible configuration management for different deployment scenarios.
+Key features:
 
-## Architecture and Implementation
+- **Multi‑class and multi‑label support** with consistent data structures and unified training pipeline.
+- **Optional LLM response caching** reuses on-disk predictions when cache paths are supplied, with dataset-hash validation to guard against stale files.
+- **Batched scoring** processes multiple texts efficiently with configurable batch sizes for both ML tokenization and LLM API calls.
+- **Results management** via `ResultsManager` tracks experiments, stores predictions, computes metrics, and enables reproducible research workflows.
+- **Flexible interfaces**: Command‑line training via `train_fusion.py` with YAML configs for research; or minimal AutoFusion API for quick deployment.
+- **Composable design**: LabelFusion can serve as a strong base learner in higher-level ensembles (e.g., voting/weighted combinations of multiple fusion models).
 
-TextClassify is built on a modular architecture that promotes extensibility and maintainability. The core architecture consists of four main components:
+Formally, multi-class classification assigns each input $x \in \mathcal{X}$ to exactly one label among $K$ mutually exclusive classes:
+$$
+f_{\text{mc}}: \mathcal{X} \rightarrow \{1,\dots,K\}.
+$$
+In contrast, multi-label classification predicts a subset of relevant classes, represented as a binary indicator vector $\mathbf{y} \in \{0,1\}^K$, where $y_k = 1$ denotes membership in class $k$:
+$$
+f_{\text{ml}}: \mathcal{X} \rightarrow \{0,1\}^K.
+$$
 
-**Core Module**: Defines abstract base classes (`BaseClassifier`), data structures (`ClassificationResult`, `TrainingData`), and configuration management (`ModelConfig`, `EnsembleConfig`). This module ensures consistent interfaces across all classifiers and provides type safety through comprehensive typing annotations.
+### Minimal Example (AutoFusion)
 
-**LLM Module**: Implements classifiers for major LLM providers including OpenAI (`OpenAIClassifier`), Anthropic (`ClaudeClassifier`), Google (`GeminiClassifier`), and DeepSeek (`DeepSeekClassifier`). Each classifier handles provider-specific API communication, prompt engineering, and response parsing while maintaining a consistent interface through the base class.
+```python
+from textclassify import AutoFusionClassifier
 
-**ML Module**: Provides traditional machine learning classifiers including RoBERTa-based models (`RoBERTaClassifier`) with support for fine-tuning, custom preprocessing pipelines, and integration with the Hugging Face transformers library [@wolf2019huggingface].
+config = {
+    'llm_provider': 'deepseek',
+    'label_columns': ['positive', 'negative', 'neutral']
+}
 
-**Ensemble Module**: Implements sophisticated ensemble strategies including `VotingEnsemble`, `WeightedEnsemble`, and `ClassRoutingEnsemble`. The ensemble methods support both homogeneous (same model type) and heterogeneous (mixed model types) combinations.
+clf = AutoFusionClassifier(config)
+clf.fit(train_dataframe)              # trains ML backbone, gathers LLM scores, fits fusion MLP
+pred = clf.predict(["This is amazing!"])  # fused prediction
+```
 
-The package leverages asynchronous programming for efficient LLM API communication, implements comprehensive error handling and retry mechanisms, and provides extensive logging and monitoring capabilities for production deployment.
+### CLI and Configuration
 
-## Key Features and Functionality
+Users can generate a starter config and train via the command line:
 
-### Multi-Modal Classification Support
+- Create config: `python train_fusion.py --create-config fusion_config.yaml`
+- Train: `python train_fusion.py --config fusion_config.yaml`
+- Optional test data and output artifacts are also supported.
 
-TextClassify supports both multi-class classification (single label per instance) and multi-label classification (multiple labels per instance), with automatic handling of label encoding and output formatting. The package provides unified data structures that seamlessly handle both classification types without requiring separate implementations.
+## Quality Control
 
-### Advanced Ensemble Methods
+The repository ships legacy unit tests under `tests/evaluation/old/` that cover configuration handling, core types, and package integration. Fusion-specific logic is currently exercised through CLI-driven workflows and notebooks that run end-to-end training with deterministic seeds where applicable. 
 
-The ensemble implementation goes beyond simple voting by incorporating:
+Evaluation scripts (`tests/evaluation/`) provide comprehensive benchmarking on standard datasets:
+- **AG News** [@zhang2015character]: 4-class topic classification with experiments across varying training data sizes (20%–100%)
+- **GoEmotions** [@demszky2020goemotions]: 28-class multi-label emotion classification for validating multi-label fusion performance
 
-- **Adaptive Weight Learning**: Automatically determines optimal weights based on validation performance using cross-validation or holdout validation approaches.
-- **Confidence-Based Routing**: Routes instances to different models based on confidence scores or uncertainty estimates.
-- **Dynamic Model Selection**: Selects optimal models based on text characteristics such as length, domain, or complexity metrics.
+LLM scoring paths implement retries and disk caching; transformer training supports standard sanity checks (overfit a small batch, reduced batch sizes for constrained hardware). Metrics (accuracy/F1, per‑label scores) are computed automatically and stored with run artifacts to facilitate regression tracking and reproducibility.
 
-### Prompt Engineering and Optimization
+## Availability and Installation
 
-For LLM-based classifiers, TextClassify implements sophisticated prompt engineering techniques including:
-
-- **Few-Shot Learning**: Automatically constructs few-shot prompts using representative examples from training data.
-- **Chain-of-Thought Prompting**: Implements reasoning chains for complex classification tasks that benefit from explicit reasoning steps [@wei2022chain].
-- **Prompt Templates**: Provides customizable prompt templates optimized for different classification scenarios.
+LabelFusion is distributed as part of the `textclassify` package under the MIT license and is available at [https://github.com/DataandAIReseach/LabelFusion](https://github.com/DataandAIReseach/LabelFusion). The fusion components require Python 3.8+ and common scientific Python dependencies (PyTorch, transformers, scikit‑learn, numpy, pandas, PyYAML). Optional plotting depends on matplotlib/seaborn. Installation and quick‑start snippets are provided in the README and `FUSION_README.md`.
 
 ### Production-Ready Features
 
-The package includes essential features for production deployment:
+Beyond the core fusion methodology, LabelFusion includes features for practical deployment:
 
-- **Cost Monitoring**: Tracks API usage and costs across different LLM providers with configurable budget limits and alerts.
-- **Performance Monitoring**: Comprehensive metrics collection including latency, throughput, and accuracy monitoring.
-- **Caching**: Multi-level caching (memory, Redis, disk) to reduce API costs and improve response times for repeated queries.
-- **Batch Processing**: Efficient batch processing with configurable batch sizes and parallel execution.
+- **LLM Response Caching**: Optional disk-backed caches reuse prior predictions when cache paths are supplied, with dataset hashes to flag inconsistent inputs.
+- **Results Management**: Built-in `ResultsManager` tracks experiments, stores predictions, and computes metrics automatically. Supports comparison across runs and configuration tracking.
+- **Batch Processing**: Efficient batched scoring of texts with configurable batch sizes for both ML and LLM components.
 
-## Evaluation and Performance Analysis
+## Impact and Use Cases
 
-TextClassify has been evaluated across multiple benchmark datasets and real-world applications. Performance evaluations demonstrate several key findings:
+### Empirical Performance
 
-**Ensemble Superiority**: Ensemble methods consistently outperform individual models across diverse tasks, with improvements ranging from 2-8% in F1-score depending on the task complexity and model diversity.
+LabelFusion has been evaluated on standard benchmark datasets to validate its effectiveness. Key findings demonstrate consistent improvements over individual model components:
 
-**Cost-Performance Trade-offs**: The package enables intelligent cost-performance optimization. For example, using a two-stage approach with Gemini Flash for initial filtering and GPT-4 for uncertain cases reduces costs by 60-80% while maintaining 95%+ of the accuracy of using GPT-4 for all instances.
+#### AG News Topic Classification
 
-**Task-Specific Optimization**: Class routing ensembles show particular strength in multi-domain scenarios, where different model types excel at different content types (e.g., technical content routed to code-specialized models, creative content to general LLMs).
+Evaluation on the AG News dataset [@zhang2015character] (4-class topic classification) with 5,000 test samples shows:
 
-**Scalability**: Asynchronous processing enables handling of large-scale classification tasks with throughput exceeding 1000 classifications per minute when using multiple LLM providers in parallel.
+| Training Data | Model | Accuracy | F1-Score | Precision | Recall |
+|--------------|-------|----------|----------|-----------|--------|
+| 20% (800) | **Fusion** | **92.2%** | **0.922** | 0.923 | 0.922 |
+| 20% (800) | RoBERTa | 89.8% | 0.899 | 0.902 | 0.898 |
+| 20% (800) | OpenAI | 84.4% | 0.844 | 0.857 | 0.844 |
+| 40% (1,600) | **Fusion** | **92.2%** | **0.922** | 0.924 | 0.922 |
+| 40% (1,600) | RoBERTa | 91.0% | 0.911 | 0.913 | 0.910 |
+| 40% (1,600) | OpenAI | 84.4% | 0.844 | 0.857 | 0.844 |
+| 100% (4,000) | **Fusion** | **92.4%** | **0.924** | 0.926 | 0.924 |
+| 100% (4,000) | RoBERTa | 92.2% | 0.922 | 0.923 | 0.922 |
+| 100% (4,000) | OpenAI | 84.4% | 0.844 | 0.857 | 0.844 |
 
-## Use Cases and Applications
+**Key Observations:**
+- Fusion consistently outperforms individual models across all training data sizes
+- With only 20% training data, Fusion achieves 92.2% accuracy—matching its performance with full data
+- Demonstrates superior **data efficiency**: fusion learning extracts maximum value from limited examples
+- RoBERTa alone requires 100% of data to approach Fusion's 20% performance
+- LLM (OpenAI) shows stable but lower performance, highlighting the value of combining approaches
 
-TextClassify has been successfully applied to numerous real-world scenarios:
+These results validate that learned fusion captures complementary strengths: the LLM provides robust reasoning even with limited training data, while the ML backbone adds efficiency and domain-specific patterns.
 
-**Customer Feedback Analysis**: Multi-label classification of customer reviews across product features, sentiment, and urgency levels using ensemble methods to handle the complexity and subjectivity of customer language.
+### Application Domains
 
-**Content Moderation**: Real-time classification of user-generated content for policy violations, combining the nuanced understanding of LLMs with the speed and cost-effectiveness of traditional models.
+Learned fusion excels in scenarios where model strengths complement each other:
 
-**Scientific Literature Classification**: Automated categorization of research papers across multiple taxonomies, leveraging domain-specific prompt engineering and specialized model routing.
+- **Customer feedback analysis** with nuanced multi‑label taxonomies where LLMs handle ambiguous sentiment while ML models efficiently process clear cases
+- **Content moderation** where uncertain cases benefit from LLM reasoning while routine items rely on the fast ML backbone, enabling real-time processing with accuracy guarantees
+- **Scientific literature classification** across heterogeneous topics where domain shift is common and LLMs provide robustness to new terminology
+- **Low-resource settings** where limited training data is available but task complexity requires sophisticated reasoning
 
-**Social Media Monitoring**: Large-scale analysis of social media posts for brand monitoring, crisis detection, and trend analysis using cost-optimized ensemble approaches.
+The approach enables pragmatic cost control (e.g., the fusion layer learns when to rely more heavily on the efficient ML backbone versus the more expensive LLM signal) while retaining a single trainable decision surface that optimizes for the specific deployment constraints.
 
-## Comparison with Existing Tools
+## Acknowledgements
 
-TextClassify addresses several limitations of existing text classification frameworks:
+We thank contributors and users who reported issues and shared datasets. LabelFusion builds on the open‑source ecosystem, notably Hugging Face Transformers [@wolf2019huggingface], scikit‑learn [@pedregosa2011scikit], PyTorch [@paszke2019pytorch], and LLM provider SDKs. The work presented in this paper was conducted independently by the author Melchizedek Mashiku and is not affiliated with Tanaq Management Services LLC, Contracting Agency to the Division of Viral Diseases, Centers for Disease Control and Prevention, Chamblee, Georgia, USA. We acknowledge the use of the AG News and GoEmotions benchmark datasets for evaluation.
 
-**scikit-learn** [@pedregosa2011scikit] provides excellent traditional ML algorithms but lacks integration with modern LLMs and ensemble methods specifically designed for heterogeneous model combinations.
-
-**Hugging Face Transformers** [@wolf2019huggingface] offers comprehensive transformer model support but requires significant expertise for production deployment and lacks built-in ensemble capabilities.
-
-**spaCy** [@honnibal2017spacy] provides efficient text processing and basic classification but is limited in LLM integration and advanced ensemble methods.
-
-**NLTK** [@loper2002nltk] offers foundational NLP tools but lacks modern deep learning and LLM integration.
-
-Existing LLM frameworks like **LangChain** [@chase2022langchain] focus primarily on LLM orchestration but lack the specialized classification features and traditional ML integration that TextClassify provides.
-
-To the knowledge of the authors, no existing Python package provides the comprehensive combination of LLM integration, traditional ML support, and sophisticated ensemble methods that TextClassify offers in a production-ready framework.
-
-## Future Development
-
-Future development of TextClassify will focus on several key areas:
-
-**Advanced Ensemble Methods**: Implementation of neural ensemble techniques, meta-learning approaches for automatic model selection, and adaptive ensemble methods that adjust to data distribution changes.
-
-**Model Fine-tuning Integration**: Support for fine-tuning LLMs and traditional models within the ensemble framework, including techniques for efficient fine-tuning and transfer learning.
-
-**Explainability Features**: Integration of explanation methods for both individual models and ensemble decisions, including attention visualization, feature importance, and decision pathway analysis.
-
-**Multi-modal Support**: Extension to handle multi-modal inputs including text-image combinations and structured data integration.
-
-**AutoML Capabilities**: Automated model selection, hyperparameter optimization, and ensemble configuration based on dataset characteristics and performance requirements.
-
-# Acknowledgments
-
-The authors thank the open-source community for their contributions to the foundational libraries that make TextClassify possible, including the teams behind transformers, scikit-learn, and the various LLM providers who have made their APIs accessible for research and development. Special acknowledgment goes to the beta testers and early adopters who provided valuable feedback during the development process.
-
-# References
-
-@article{blei2003latent,
-  title={Latent dirichlet allocation},
-  author={Blei, David M and Ng, Andrew Y and Jordan, Michael I},
-  journal={Journal of machine learning research},
-  volume={3},
-  number={Jan},
-  pages={993--1022},
-  year={2003}
-}
-
-@book{manning2008introduction,
-  title={Introduction to information retrieval},
-  author={Manning, Christopher D and Raghavan, Prabhakar and Sch{\"u}tze, Hinrich},
-  year={2008},
-  publisher={Cambridge university press}
-}
-
-@article{joachims1998text,
-  title={Text categorization with support vector machines: Learning with many relevant features},
-  author={Joachims, Thorsten},
-  journal={European conference on machine learning},
-  pages={137--142},
-  year={1998},
-  publisher={Springer}
-}
-
-@article{kim2014convolutional,
-  title={Convolutional neural networks for sentence classification},
-  author={Kim, Yoon},
-  journal={arXiv preprint arXiv:1408.5882},
-  year={2014}
-}
-
-@article{liu2016recurrent,
-  title={Recurrent neural network for text classification with multi-task learning},
-  author={Liu, Pengfei and Qiu, Xipeng and Huang, Xuanjing},
-  journal={arXiv preprint arXiv:1605.05101},
-  year={2016}
-}
-
-@article{devlin2018bert,
-  title={Bert: Pre-training of deep bidirectional transformers for language understanding},
-  author={Devlin, Jacob and Chang, Ming-Wei and Lee, Kenton and Toutanova, Kristina},
-  journal={arXiv preprint arXiv:1810.04805},
-  year={2018}
-}
-
-@article{liu2019roberta,
-  title={RoBERTa: A robustly optimized BERT pretraining approach},
-  author={Liu, Yinhan and Ott, Myle and Goyal, Naman and Du, Jingfei and Ott, Myle and Levy, Omer and Lewis, Mike and Zettlemoyer, Luke and Stoyanov, Veselin},
-  journal={arXiv preprint arXiv:1907.11692},
-  year={2019}
-}
-
-@article{brown2020language,
-  title={Language models are few-shot learners},
-  author={Brown, Tom and Mann, Benjamin and Ryder, Nick and Subbiah, Melanie and Kaplan, Jared D and Dhariwal, Prafulla and Neelakantan, Arvind and Shyam, Pranav and Sastry, Girish and Askell, Amanda and others},
-  journal={Advances in neural information processing systems},
-  volume={33},
-  pages={1877--1901},
-  year={2020}
-}
-
-@article{wei2022chain,
-  title={Chain-of-thought prompting elicits reasoning in large language models},
-  author={Wei, Jason and Wang, Xuezhi and Schuurmans, Dale and Bosma, Maarten and Xia, Fei and Chi, Ed and Le, Quoc V and Zhou, Denny and others},
-  journal={Advances in Neural Information Processing Systems},
-  volume={35},
-  pages={24824--24837},
-  year={2022}
-}
-
-@article{dietterich2000ensemble,
-  title={Ensemble methods in machine learning},
-  author={Dietterich, Thomas G},
-  journal={International workshop on multiple classifier systems},
-  pages={1--15},
-  year={2000},
-  publisher={Springer}
-}
-
-@article{hansen1990neural,
-  title={Neural network ensembles},
-  author={Hansen, Lars Kai and Salamon, Peter},
-  journal={IEEE transactions on pattern analysis and machine intelligence},
-  volume={12},
-  number={10},
-  pages={993--1001},
-  year={1990},
-  publisher={IEEE}
-}
-
-@article{jacobs1991adaptive,
-  title={Adaptive mixtures of local experts},
-  author={Jacobs, Robert A and Jordan, Michael I and Nowlan, Steven J and Hinton, Geoffrey E},
-  journal={Neural computation},
-  volume={3},
-  number={1},
-  pages={79--87},
-  year={1991},
-  publisher={MIT Press}
-}
-
-@article{wolf2019huggingface,
-  title={Huggingface's transformers: State-of-the-art natural language processing},
-  author={Wolf, Thomas and Debut, Lysandre and Sanh, Victor and Chaumond, Julien and Delangue, Clement and Moi, Anthony and Cistac, Pereric and Rault, Tim and Louf, R{\'e}mi and Funtowicz, Morgan and others},
-  journal={arXiv preprint arXiv:1910.03771},
-  year={2019}
-}
-
-@article{pedregosa2011scikit,
-  title={Scikit-learn: Machine learning in Python},
-  author={Pedregosa, Fabian and Varoquaux, Ga{\"e}l and Gramfort, Alexandre and Michel, Vincent and Thirion, Bertrand and Grisel, Olivier and Blondel, Mathieu and Prettenhofer, Peter and Weiss, Ron and Dubourg, Vincent and others},
-  journal={Journal of machine learning research},
-  volume={12},
-  number={Oct},
-  pages={2825--2830},
-  year={2011}
-}
-
-@software{honnibal2017spacy,
-  title={spaCy 2: Natural language understanding with Bloom embeddings, convolutional neural networks and incremental parsing},
-  author={Honnibal, Matthew and Montani, Ines},
-  year={2017}
-}
-
-@book{loper2002nltk,
-  title={NLTK: the natural language toolkit},
-  author={Loper, Edward and Bird, Steven},
-  year={2002},
-  publisher={arXiv preprint cs/0205028}
-}
-
-@software{chase2022langchain,
-  title={LangChain},
-  author={Chase, Harrison},
-  year={2022},
-  url={https://github.com/hwchase17/langchain}
-}
-
-@article{openai2023gpt4,
-  title={GPT-4 Technical Report},
-  author={OpenAI},
-  journal={arXiv preprint arXiv:2303.08774},
-  year={2023}
-}
-
-@article{anthropic2023claude,
-  title={Claude: A next-generation AI assistant based on Constitutional AI},
-  author={Anthropic},
-  year={2023},
-  url={https://www.anthropic.com/claude}
-}
-
-@article{google2023gemini,
-  title={Gemini: A family of highly capable multimodal models},
-  author={Google},
-  journal={arXiv preprint arXiv:2312.11805},
-  year={2023}
-}
+## References

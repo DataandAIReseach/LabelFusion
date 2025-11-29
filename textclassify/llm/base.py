@@ -588,7 +588,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             total_batches = (len(df_uncached) + self.batch_size - 1) // self.batch_size
             cache_file_path = None  # Don't initialize cache file when using existing cache
         else:
-            df_uncached = df
+            df_uncached = df  # Use the full DataFrame when there's no cache
             total_batches = (len(df) + self.batch_size - 1) // self.batch_size
             # Initialize batch-wise cache file only when there's no existing cache
             cache_file_path = self._initialize_batch_cache_file(df_uncached)
