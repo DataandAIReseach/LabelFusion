@@ -238,13 +238,49 @@ class FusionEnsemble(BaseEnsemble):
         print(f"Training data: {len(train_df)} samples")
         print(f"Validation data: {len(val_df)} samples")
         
-        # Step 1: Train ML model on training set
+        # Step 1: Train ML model on training set or load from cache
+        ml_model_loaded = False
         if not self.ml_model.is_trained:
-            print("Training ML model on training set...")
-            # Use DataFrame interface directly
-            self.ml_model.fit(train_df, val_df)
+            # Compute dataset hash to find cached model
+            import hashlib
+            from pathlib import Path
+            
+            text_column = self.ml_model.text_column or 'text'
+            text_series = train_df[text_column] if text_column in train_df.columns else train_df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+            
+            # Check cache directory for matching model
+            cache_dir = Path("cache")
+            cached_model_path = cache_dir / f"roberta_{dataset_hash}"
+            
+            # Also check auto_save_path if provided
+            potential_paths = [cached_model_path]
+            if hasattr(self.ml_model, 'auto_save_path') and self.ml_model.auto_save_path:
+                potential_paths.append(Path(self.ml_model.auto_save_path))
+            
+            for model_path in potential_paths:
+                # Check if model directory exists and contains model files
+                if model_path.exists():
+                    # Check for either pytorch_model.bin or model.safetensors
+                    has_model = (model_path / "pytorch_model.bin").exists() or (model_path / "model.safetensors").exists()
+                    if has_model:
+                        try:
+                            print(f"📦 Loading cached ML model from: {model_path}")
+                            self.ml_model.load_model(str(model_path))
+                            ml_model_loaded = True
+                            print(f"✅ ML model loaded from cache (hash: {dataset_hash})")
+                            break
+                        except Exception as e:
+                            print(f"⚠️  Failed to load model from {model_path}: {e}")
+                            continue
+            
+            if not ml_model_loaded:
+                print(f"🔧 Training ML model on training set (hash: {dataset_hash})...")
+                # Use DataFrame interface directly
+                self.ml_model.fit(train_df, val_df)
         else:
-            print("ML model already trained")
+            print("✅ ML model already trained")
         
         # Set up classes from ML model
         self.classes_ = self.ml_model.classes_

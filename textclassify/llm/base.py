@@ -504,7 +504,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
     def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
         """Return True if a test cache file matching the given DataFrame exists, else False.
 
-        Computes an 8-char dataset hash from the provided DataFrame and checks
+        Computes an 8-char dataset hash from the text column only and checks
         cached test JSON filenames and their metadata for a match. Uses self.cache_dir.
         """
         from pathlib import Path
@@ -516,12 +516,17 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if not p.exists():
             return False
 
-        # Compute stable 8-char hash for DataFrame
+        # Compute stable 8-char hash based on text column only
+        text_column = getattr(self, 'text_column', 'text')
         try:
-            hashed = pd.util.hash_pandas_object(df, index=True).values
+            # Hash only the text column, not LLM predictions
+            text_series = df[text_column] if text_column in df.columns else df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
             dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
         except Exception:
-            csv_bytes = df.to_csv(index=True).encode('utf-8')
+            # Fallback: hash text column as CSV
+            text_series = df[text_column] if text_column in df.columns else df.iloc[:, 0]
+            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
 
         discovered = self.discover_cached_predictions(cache_dir)
@@ -551,13 +556,24 @@ class BaseLLMClassifier(AsyncBaseClassifier):
     async def _generate_predictions(
         self,
         df: pd.DataFrame,
-        text_column: str
+        text_column: str,
+        mode: str = None
     ) -> List[List[int]]:
         """Generate predictions in batches with progress tracking.
+        
+        Args:
+            df: DataFrame to process
+            text_column: Name of the text column
+            mode: Dataset mode ('test', 'val', 'train') for cache naming.
+                  If None, uses self.mode or defaults to 'test'
         
         Returns:
             List[List[int]]: List of binary vectors representing predictions
         """
+        # Determine mode from parameter, self.mode, or default
+        if mode is None:
+            mode = getattr(self, 'mode', 'test') or 'test'
+        
         # If an incremental prediction cache is available, skip already-predicted rows
         predictions: List[Optional[List[int]]] = [None] * len(df)
         
@@ -591,7 +607,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             df_uncached = df  # Use the full DataFrame when there's no cache
             total_batches = (len(df) + self.batch_size - 1) // self.batch_size
             # Initialize batch-wise cache file only when there's no existing cache
-            cache_file_path = self._initialize_batch_cache_file(df_uncached)
+            cache_file_path = self._initialize_batch_cache_file(df_uncached, mode=mode)
         
         if self.verbose:
             self.logger.info(f"Processing {len(df)} samples in {total_batches} batches of size {self.batch_size}")
@@ -665,11 +681,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
 
         return final_predictions
     
-    def _initialize_batch_cache_file(self, df: pd.DataFrame) -> str:
+    def _initialize_batch_cache_file(self, df: pd.DataFrame, mode: str = "test") -> str:
         """Initialize a JSON cache file for batch-wise prediction storage.
         
         Args:
             df: DataFrame being processed
+            mode: Dataset mode ('test', 'val', 'train') for file naming
             
         Returns:
             str: Path to the cache file
@@ -682,18 +699,20 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         cache_dir = Path(self.cache_dir)
         cache_dir.mkdir(parents=True, exist_ok=True)
         
-        # Compute dataset hash
+        # Compute dataset hash based on text column only (deterministic)
         try:
-            hashed = pd.util.hash_pandas_object(df, index=True).values
+            # Hash only the text column, not LLM predictions
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
             dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
         except Exception:
-            csv_bytes = df.to_csv(index=True).encode('utf-8')
+            # Fallback: hash text column as CSV
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
         
-        # Create cache filename with timestamp and dataset hash in the format
-        # expected by other parts of the code (e.g. test_YYYY-MM-DD-HH-MM-SS_hash.json)
-        timestamp = dt.now().strftime('%Y-%m-%d-%H-%M-%S')
-        cache_filename = f"test_{timestamp}_{dataset_hash}.json"
+        # Create cache filename: mode_hash.json (e.g. val_b6e3cb0f.json)
+        cache_filename = f"{mode}_{dataset_hash}.json"
         cache_file_path = cache_dir / cache_filename
         
         # Initialize cache file with metadata
@@ -704,7 +723,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 'model': self.config.parameters.get('model', 'unknown'),
                 'dataset_hash': dataset_hash,
                 'dataset_size': len(df),
-                'timestamp': timestamp,
+                'mode': mode,
                 'multi_label': self.multi_label,
                 'label_columns': self.label_columns,
                 'text_column': self.text_column,

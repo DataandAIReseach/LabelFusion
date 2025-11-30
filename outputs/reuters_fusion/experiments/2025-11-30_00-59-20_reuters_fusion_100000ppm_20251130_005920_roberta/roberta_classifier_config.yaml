@@ -1,0 +1,25 @@
+config:
+  batch_size: 8
+  classes: &id001
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  label_columns: *id001
+  learning_rate: 2.0e-05
+  max_length: 256
+  model_name: roberta-base
+  multi_label: true
+  num_epochs: 2
+  num_labels: 10
+  text_column: text
+metadata:
+  experiment_id: 2025-11-30_00-59-20_reuters_fusion_100000ppm_20251130_005920_roberta
+  model_name: roberta_classifier
+  timestamp: '2025-11-30T01:03:53.987035'
