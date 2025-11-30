@@ -389,9 +389,25 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.is_trained = True
         print("✅ Model training completed!")
         
-        # Auto-save model if path is provided
+        # Auto-save model in cache directory with dataset hash
         if self.auto_save_path:
-            self.save_model(self.auto_save_path)
+            save_path = self.auto_save_path
+        else:
+            # Generate cache path based on training data hash
+            import hashlib
+            from pathlib import Path
+            
+            # Compute dataset hash from text column
+            text_series = train_df[self.text_column] if self.text_column in train_df.columns else train_df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+            
+            # Create cache path: cache/roberta_{hash}
+            cache_dir = Path("cache")
+            save_path = str(cache_dir / f"roberta_{dataset_hash}")
+        
+        self.save_model(save_path)
+        print(f"💾 Model cached at: {save_path}")
         
         # Generate and save validation predictions if validation data is provided
         val_predictions_saved = None
@@ -1004,6 +1020,88 @@ class RoBERTaClassifier(BaseMLClassifier):
             if 'out of memory' in str(e).lower():
                 self._handle_cuda_oom(e, context=f"moving {name} to device")
             raise
+    
+    def save_model(self, path: str) -> None:
+        """Save the trained RoBERTa model to disk.
+        
+        Args:
+            path: Directory path to save the model
+        """
+        if not self.is_trained:
+            raise ValueError("Model must be trained before saving")
+        
+        from pathlib import Path
+        import json
+        
+        save_dir = Path(path)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save model and tokenizer using HuggingFace methods
+        self.model.save_pretrained(save_dir)
+        self.tokenizer.save_pretrained(save_dir)
+        
+        # Save additional metadata
+        metadata = {
+            'model_name': self.model_name,
+            'max_length': self.max_length,
+            'batch_size': self.batch_size,
+            'learning_rate': self.learning_rate,
+            'num_epochs': self.num_epochs,
+            'multi_label': self.multi_label,
+            'num_labels': self.num_labels,
+            'classes_': self.classes_,
+            'text_column': self.text_column,
+            'label_columns': self.label_columns,
+            'classification_type': str(self.classification_type) if self.classification_type else None,
+            'device': str(self.device)
+        }
+        
+        with open(save_dir / 'model_metadata.json', 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        print(f"✅ Model saved to: {save_dir}")
+    
+    def load_model(self, path: str) -> None:
+        """Load a trained RoBERTa model from disk.
+        
+        Args:
+            path: Directory path containing the saved model
+        """
+        from pathlib import Path
+        import json
+        
+        load_dir = Path(path)
+        if not load_dir.exists():
+            raise FileNotFoundError(f"Model directory not found: {load_dir}")
+        
+        # Load metadata
+        metadata_path = load_dir / 'model_metadata.json'
+        if metadata_path.exists():
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            
+            self.model_name = metadata.get('model_name', self.model_name)
+            self.max_length = metadata.get('max_length', self.max_length)
+            self.multi_label = metadata.get('multi_label', self.multi_label)
+            self.num_labels = metadata.get('num_labels', self.num_labels)
+            self.classes_ = metadata.get('classes_', self.classes_)
+            self.text_column = metadata.get('text_column', self.text_column)
+            self.label_columns = metadata.get('label_columns', self.label_columns)
+            
+            # Restore classification type
+            if metadata.get('classification_type'):
+                if 'MULTI_LABEL' in metadata['classification_type']:
+                    self.classification_type = ClassificationType.MULTI_LABEL
+                else:
+                    self.classification_type = ClassificationType.MULTI_CLASS
+        
+        # Load tokenizer and model
+        self.tokenizer = AutoTokenizer.from_pretrained(load_dir)
+        self.model = AutoModelForSequenceClassification.from_pretrained(load_dir)
+        self.model.to(self.device)
+        self.is_trained = True
+        
+        print(f"✅ Model loaded from: {load_dir}")
     
     @property
     def model_info(self) -> Dict[str, Any]:
