@@ -1021,11 +1021,13 @@ class RoBERTaClassifier(BaseMLClassifier):
                 self._handle_cuda_oom(e, context=f"moving {name} to device")
             raise
     
-    def save_model(self, path: str) -> None:
+    def save_model(self, path: str, safe_serialization: bool = True) -> None:
         """Save the trained RoBERTa model to disk.
         
         Args:
             path: Directory path to save the model
+            safe_serialization: If True, saves as .safetensors (default). 
+                              If False, saves as pytorch_model.bin (legacy format).
         """
         if not self.is_trained:
             raise ValueError("Model must be trained before saving")
@@ -1037,7 +1039,9 @@ class RoBERTaClassifier(BaseMLClassifier):
         save_dir.mkdir(parents=True, exist_ok=True)
         
         # Save model and tokenizer using HuggingFace methods
-        self.model.save_pretrained(save_dir)
+        # safe_serialization=True → model.safetensors (recommended, secure)
+        # safe_serialization=False → pytorch_model.bin (legacy, larger file)
+        self.model.save_pretrained(save_dir, safe_serialization=safe_serialization)
         self.tokenizer.save_pretrained(save_dir)
         
         # Save additional metadata

@@ -49,7 +49,7 @@ def detect_label_columns(df: pd.DataFrame, text_column: str = 'text'):
 
 
 def create_ml_model(text_column: str, label_columns: list, output_dir: str, experiment_name: str, auto_save_path: str = None):
-    ml_config = ModelConfig(model_name='roberta-base', model_type=ModelType.TRADITIONAL_ML, parameters={'model_name': 'roberta-base', 'max_length': 256, 'learning_rate': 2e-5, 'num_epochs': 2, 'batch_size': 8})
+    ml_config = ModelConfig(model_name='roberta-base', model_type=ModelType.TRADITIONAL_ML, parameters={'model_name': 'roberta-base', 'max_length': 256, 'learning_rate': 2e-5, 'num_epochs': 2, 'batch_size': 32})
     return RoBERTaClassifier(config=ml_config, text_column=text_column, label_columns=label_columns, multi_label=True, auto_save_path=auto_save_path, auto_save_results=True, output_dir=output_dir, experiment_name=f"{experiment_name}_roberta")
 
 
