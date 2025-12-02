@@ -683,6 +683,9 @@ class FusionEnsemble(BaseEnsemble):
     def _create_dataset_hash(self, df: pd.DataFrame) -> str:
         """Create a hash of the DataFrame for cache validation.
         
+        Hashes only the text column to ensure deterministic caching
+        regardless of label changes.
+        
         Args:
             df: DataFrame to hash
             
@@ -691,10 +694,19 @@ class FusionEnsemble(BaseEnsemble):
         """
         import hashlib
         
-        # Create hash based on DataFrame content
-        df_hash = hashlib.md5(
-            pd.util.hash_pandas_object(df, index=True).values
-        ).hexdigest()[:8]  # Only first 8 characters
+        # Get text column name from ML model, default to 'text'
+        text_column = self.ml_model.text_column if self.ml_model else 'text'
+        
+        # Create hash based on text column only (deterministic)
+        try:
+            text_series = df[text_column] if text_column in df.columns else df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            df_hash = hashlib.md5(hashed).hexdigest()[:8]
+        except Exception:
+            # Fallback: hash text column as CSV
+            text_series = df[text_column] if text_column in df.columns else df.iloc[:, 0]
+            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
+            df_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
         
         return df_hash
     
