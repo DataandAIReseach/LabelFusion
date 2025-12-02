@@ -169,7 +169,6 @@ class RoBERTaClassifier(BaseMLClassifier):
                 self.results_manager,
                 f"roberta_{self.config.model_name}"
             )
-        
         # Set up classes
         self.classes_ = label_columns if label_columns else []
         
