@@ -104,6 +104,8 @@ def run_once(data_dir: str, output_dir: str, percentage: float = 1.0, few_shot: 
     fusion = create_fusion_ensemble(ml_model, llm_model, output_dir, experiment_name)
 
     print(f"Training fusion on {len(fusion_train_df)} samples (labels: {label_columns})")
+
+
     fusion.fit(fusion_train_df, df_val)
 
     print("Predicting on test set...")
