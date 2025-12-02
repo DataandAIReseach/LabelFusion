@@ -504,7 +504,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
     def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
         """Return True if a test cache file matching the given DataFrame exists, else False.
 
-        Computes an 8-char dataset hash from the text column only and checks
+        Computes an 8-char dataset hash from the provided DataFrame and checks
         cached test JSON filenames and their metadata for a match. Uses self.cache_dir.
         """
         from pathlib import Path
@@ -516,17 +516,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if not p.exists():
             return False
 
-        # Compute stable 8-char hash based on text column only
-        text_column = getattr(self, 'text_column', 'text')
+        # Compute stable 8-char hash for DataFrame
         try:
-            # Hash only the text column, not LLM predictions
-            text_series = df[text_column] if text_column in df.columns else df.iloc[:, 0]
-            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            hashed = pd.util.hash_pandas_object(df, index=True).values
             dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
         except Exception:
-            # Fallback: hash text column as CSV
-            text_series = df[text_column] if text_column in df.columns else df.iloc[:, 0]
-            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
+            csv_bytes = df.to_csv(index=True).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
 
         discovered = self.discover_cached_predictions(cache_dir)
@@ -556,117 +551,58 @@ class BaseLLMClassifier(AsyncBaseClassifier):
     async def _generate_predictions(
         self,
         df: pd.DataFrame,
-        text_column: str,
-        mode: str = None
+        text_column: str
     ) -> List[List[int]]:
         """Generate predictions in batches with progress tracking.
-        
-        Uses hash-based matching to identify cached vs uncached texts:
-        1. Load full dataset and compute hash for each text
-        2. Load cached predictions and compute hash for each cached text
-        3. Compare hash sets to identify uncached texts
-        4. Process only uncached texts while preserving original order
-        
-        Args:
-            df: DataFrame to process
-            text_column: Name of the text column
-            mode: Dataset mode ('test', 'val', 'train') for cache naming.
-                  If None, uses self.mode or defaults to 'test'
         
         Returns:
             List[List[int]]: List of binary vectors representing predictions
         """
-        import hashlib
-        
-        # Determine mode from parameter, self.mode, or default
-        if mode is None:
-            mode = getattr(self, 'mode', 'test') or 'test'
-        
-        # Step 1: Compute hash values for all texts in the dataset
-        def compute_text_hash(text: str) -> str:
-            """Compute MD5 hash of text for matching."""
-            return hashlib.md5(str(text).encode('utf-8')).hexdigest()
-        
-        # Create hash -> (position, text) mapping for the full dataset
-        dataset_hash_map = {}
-        for pos, (_, row) in enumerate(df.iterrows()):
-            text = row.get(text_column, "")
-            text_hash = compute_text_hash(text)
-            dataset_hash_map[text_hash] = (pos, text)
-        
-        if self.verbose:
-            print(f"\n📊 Dataset: {len(df)} texts with {len(dataset_hash_map)} unique hashes")
-        
-        # Step 2: Try to load cached predictions and match by hash
+        # If an incremental prediction cache is available, skip already-predicted rows
         predictions: List[Optional[List[int]]] = [None] * len(df)
-        cache_file_path = self._get_cache_file_path(df, mode)
-        cached_hashes = set()
         
-        if cache_file_path and Path(cache_file_path).exists():
-            try:
-                with open(cache_file_path, 'r') as f:
-                    cache_data = json.load(f)
-                
-                cached_predictions = cache_data.get('predictions', [])
-                
-                # Step 3: Match cached predictions by hash
-                for cache_entry in cached_predictions:
-                    cached_text = cache_entry.get('text', '')
-                    cached_pred = cache_entry.get('prediction', None)
-                    
-                    if cached_pred and isinstance(cached_pred, list):
-                        cached_hash = compute_text_hash(cached_text)
-                        cached_hashes.add(cached_hash)
-                        
-                        # If this hash exists in our dataset, store the prediction
-                        if cached_hash in dataset_hash_map:
-                            pos, _ = dataset_hash_map[cached_hash]
-                            predictions[pos] = cached_pred
-                
-                num_cached = sum(1 for p in predictions if p is not None)
-                if self.verbose:
-                    print(f"✅ Loaded {num_cached} cached predictions from {Path(cache_file_path).name}")
-                    print(f"   Cache has {len(cached_predictions)} entries, matched {num_cached} to current dataset")
-                
-            except Exception as e:
-                if self.verbose:
-                    print(f"⚠️  Could not load cache file: {e}")
-                cached_hashes = set()
-        
-        # Step 4: Identify uncached texts by comparing hash sets
-        uncached_positions = []
-        for text_hash, (pos, text) in dataset_hash_map.items():
-            if text_hash not in cached_hashes:
+        # Initialize batch-wise cache file with proper mode
+        mode = self.mode if self.mode else "test"
+        cache_file_path = self._initialize_batch_cache_file(df, mode=mode)
+
+        # Build list of indices for which we need to run inference
+        if self.has_test_cache_for_dataset(df):
+            uncached_positions: List[int] = []
+            for pos, (_, row) in enumerate(df.iterrows()):
+                text = row.get(text_column, "")
+                try:
+                    if self._prediction_cache.has_prediction(text):
+                        cached = self._prediction_cache.get_prediction(text)
+                        pred = cached.get('prediction') if isinstance(cached, dict) else None
+                        if isinstance(pred, list):
+                            predictions[pos] = pred
+                            continue
+                except Exception:
+                    # On any cache error, treat as uncached and continue
+                    pass
                 uncached_positions.append(pos)
-        
-        # If all texts are cached, return immediately
-        if len(uncached_positions) == 0:
-            if self.verbose:
-                print("✨ All texts found in cache, no inference needed!")
-            final_preds = [p for p in predictions if p is not None]
-            return final_preds
-        
-        # Step 5: Create DataFrame with only uncached texts (preserving original indices)
-        df_uncached = df.iloc[uncached_positions].copy()
-        total_batches = (len(df_uncached) + self.batch_size - 1) // self.batch_size
-        
-        # Ensure cache file is initialized before writing
-        if cache_file_path is None:
-            cache_file_path = self._initialize_batch_cache_file(df, mode=mode)
-        elif not Path(cache_file_path).exists():
-            cache_file_path = self._initialize_batch_cache_file(df, mode=mode)
+
+            if len(uncached_positions) == 0:
+                # All samples cached — return formatted cached predictions
+                final_preds = [p for p in predictions if p is not None]
+                return final_preds
+
+            # Create a DataFrame with only uncached rows (preserve order)
+            df_uncached = df.iloc[uncached_positions]
+            total_batches = (len(df_uncached) + self.batch_size - 1) // self.batch_size
+        else:
+            df_uncached = df
+            total_batches = (len(df) + self.batch_size - 1) // self.batch_size
         
         if self.verbose:
-            print(f"🔄 Need to process {len(uncached_positions)} uncached texts ({len(uncached_positions)/len(df)*100:.1f}%)")
-            print(f"   Will save to: {cache_file_path}")
-            print(f"   Processing in {total_batches} batches of size {self.batch_size}")
+            self.logger.info(f"Processing {len(df)} samples in {total_batches} batches of size {self.batch_size}")
+            print(f"Processing in {total_batches} batches...")
         
         # Use tqdm for progress bar if verbose mode is enabled
         batch_iterator = range(0, len(df_uncached), self.batch_size)
         if self.verbose:
             batch_iterator = tqdm(batch_iterator, desc="Processing batches", total=total_batches)
         
-        # Step 6: Process uncached texts in batches
         for i, batch_start in enumerate(batch_iterator):
             batch_df = df_uncached.iloc[batch_start:batch_start + self.batch_size]
             
@@ -676,20 +612,46 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             
             batch_predictions = await self._process_batch(batch_df, text_column)
 
-            # Map batch predictions back to original positions
-            batch_positions = uncached_positions[batch_start: batch_start + self.batch_size]
-            for rel_idx, orig_pos in enumerate(batch_positions):
-                if rel_idx < len(batch_predictions):
-                    predictions[orig_pos] = batch_predictions[rel_idx]
+            # If using an incremental cache, write batch predictions back into the
+            # main predictions list at their original positions
+            if hasattr(self, '_prediction_cache') and self._prediction_cache and df_uncached is not df:
+                # Map batch_df positions back to original positional indices in `predictions`.
+                # `df_uncached.index` contains DataFrame index labels which may not be
+                # 0..N-1 contiguous positions; using them directly as list indices
+                # causes IndexError when labels are large or non-sequential. Use the
+                # previously-built `uncached_positions` (positional offsets) instead.
+                try:
+                    batch_positions = uncached_positions[batch_start: batch_start + self.batch_size]
+                except Exception:
+                    # Fallback: compute positional indices from labels (slower)
+                    batch_positions = [df.index.get_loc(lbl) for lbl in df_uncached.index[batch_start: batch_start + self.batch_size]]
+
+                for rel_idx, orig_pos in enumerate(batch_positions):
+                    if rel_idx < len(batch_predictions):
+                        predictions[orig_pos] = batch_predictions[rel_idx]
+            else:
+                # No cache in use or full run — append sequentially
+                # When not using cache, predictions list may be all None placeholders,
+                # so we append to build the final list
+                if all(p is None for p in predictions):
+                    # fresh append mode
+                    predictions = []
+                    predictions.extend(batch_predictions)
+                else:
+                    # mix-mode: fill next available None slots
+                    fill_idx = 0
+                    for j in range(len(predictions)):
+                        if predictions[j] is None and fill_idx < len(batch_predictions):
+                            predictions[j] = batch_predictions[fill_idx]
+                            fill_idx += 1
             
             if self.verbose and not isinstance(batch_iterator, tqdm):
                 self.logger.info(f"Batch {i+1} completed ({len(batch_predictions)} predictions)")
             
             # Write batch predictions to cache file
-            if cache_file_path:
-                self._write_batch_to_cache(cache_file_path, batch_df, batch_predictions, text_column, i+1, total_batches)
+            self._write_batch_to_cache(cache_file_path, batch_df, batch_predictions, text_column, i+1, total_batches)
         
-        # Step 7: Ensure no None remain in predictions (fallback defaults)
+        # Final cleanup: ensure no None remain (fallback defaults)
         final_predictions: List[List[int]] = []
         for p in predictions:
             if p is None:
@@ -701,43 +663,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             else:
                 final_predictions.append(p)
 
-        if self.verbose:
-            print(f"✅ Generated {len(final_predictions)} total predictions ({len(uncached_positions)} new, {len(final_predictions)-len(uncached_positions)} cached)")
-
         return final_predictions
-    
-    def _get_cache_file_path(self, df: pd.DataFrame, mode: str = "test") -> Optional[str]:
-        """Get the cache file path for a dataset without initializing it.
-        
-        Args:
-            df: DataFrame to compute hash for
-            mode: Dataset mode ('test', 'val', 'train')
-            
-        Returns:
-            Path to cache file, or None if cache directory doesn't exist
-        """
-        import hashlib
-        from pathlib import Path
-        
-        cache_dir = Path(self.cache_dir)
-        if not cache_dir.exists():
-            return None
-        
-        # Compute dataset hash based on text column only (deterministic)
-        try:
-            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
-            hashed = pd.util.hash_pandas_object(text_series, index=False).values
-            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
-        except Exception:
-            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
-            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
-            dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
-        
-        # Create cache filename: mode_hash.json (e.g. val_b6e3cb0f.json)
-        cache_filename = f"{mode}_{dataset_hash}.json"
-        cache_file_path = cache_dir / cache_filename
-        
-        return str(cache_file_path)
     
     def _initialize_batch_cache_file(self, df: pd.DataFrame, mode: str = "test") -> str:
         """Initialize or load existing JSON cache file for batch-wise prediction storage.
@@ -789,6 +715,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 'model': self.config.parameters.get('model', 'unknown'),
                 'dataset_hash': dataset_hash,
                 'dataset_size': len(df),
+                'num_samples': len(df),
                 'mode': mode,
                 'multi_label': self.multi_label,
                 'label_columns': self.label_columns,
