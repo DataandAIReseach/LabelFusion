@@ -286,9 +286,14 @@ class FusionEnsemble(BaseEnsemble):
         self.classes_ = self.ml_model.classes_
         self.num_labels = len(self.classes_)
         
-        # Step 2: Get ML predictions on validation set
+        # Step 2: Get ML predictions on validation set with hashes
         print("Getting ML predictions on validation set...")
         ml_val_result = self.ml_model.predict_without_saving(val_df)
+        text_column = self.ml_model.text_column or 'text'
+        ml_val_predictions_hashed = self._attach_hashes_to_predictions(
+            ml_val_result.predictions, 
+            val_df[text_column].tolist()
+        )
         
         # Step 3: Get LLM predictions on validation set
         llm_val_predictions = self._get_or_generate_llm_predictions(
@@ -297,6 +302,12 @@ class FusionEnsemble(BaseEnsemble):
             cache_path=self.val_llm_cache_path,
             mode="val",
             provided_predictions=val_llm_predictions
+        )
+        
+        # Attach hashes to LLM predictions
+        llm_val_predictions_hashed = self._attach_hashes_to_predictions(
+            llm_val_predictions,
+            val_df[text_column].tolist()
         )
         
         # Create ClassificationResult for validation predictions
@@ -360,14 +371,22 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 5: Train fusion MLP on validation set predictions
         print("Training fusion MLP on validation predictions...")
-        self._train_fusion_mlp_on_val(val_df, ml_val_result, llm_val_result, text_column, label_columns)
+        self._train_fusion_mlp_on_val(
+            val_df, 
+            ml_val_predictions_hashed, 
+            llm_val_predictions_hashed, 
+            text_column, 
+            label_columns
+        )
         
         # Step 6: Generate and save fusion predictions on full validation set
         print("Generating fusion predictions on validation set...")
         val_true_labels = val_df[label_columns].values.tolist() if all(col in val_df.columns for col in label_columns) else None
+        
+        # For _predict_with_fusion, we pass the hashed predictions as lists
         fusion_val_result = self._predict_with_fusion(
-            ml_val_result, 
-            llm_val_result, 
+            ml_val_predictions_hashed, 
+            llm_val_predictions_hashed, 
             val_df[text_column].tolist(), 
             val_true_labels
         )
@@ -718,6 +737,43 @@ class FusionEnsemble(BaseEnsemble):
             test_df=df
         )
         return llm_result.predictions
+    
+    def _compute_text_hash(self, text: str) -> str:
+        """Compute hash for a single text string.
+        
+        Args:
+            text: Text to hash
+            
+        Returns:
+            8-character hash string
+        """
+        import hashlib
+        return hashlib.md5(text.encode('utf-8')).hexdigest()[:8]
+    
+    def _attach_hashes_to_predictions(self, predictions: List, texts: List[str]) -> List[Dict[str, Any]]:
+        """Attach text hashes to predictions for robust matching.
+        
+        Args:
+            predictions: List of predictions (any format)
+            texts: List of text strings corresponding to predictions
+            
+        Returns:
+            List of dictionaries with 'text_hash' and 'prediction' keys
+        """
+        if len(predictions) != len(texts):
+            raise EnsembleError(
+                f"Predictions length ({len(predictions)}) must match texts length ({len(texts)})",
+                "FusionEnsemble"
+            )
+        
+        hashed_predictions = []
+        for pred, text in zip(predictions, texts):
+            hashed_predictions.append({
+                'text_hash': self._compute_text_hash(text),
+                'prediction': pred
+            })
+        
+        return hashed_predictions
     
     def _create_dataset_hash(self, df: pd.DataFrame) -> str:
         """Create a hash of the DataFrame for cache validation.
@@ -1160,31 +1216,67 @@ class FusionEnsemble(BaseEnsemble):
         print("   • Set force_load_from_cache=True to ensure cached predictions are used")
         print("="*60)
     
-    def train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, llm_val_result, 
+    def train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_predictions, llm_val_predictions, 
                                 text_column: str, label_columns: List[str]):
-        """Public method to train the fusion MLP using validation set predictions from both ML and LLM models."""
-        return self._train_fusion_mlp_on_val(val_df, ml_val_result, llm_val_result, text_column, label_columns)
+        """Public method to train the fusion MLP using validation set predictions from both ML and LLM models.
+        
+        Args:
+            val_df: Validation DataFrame
+            ml_val_predictions: ML predictions (list of dicts with hashes or raw predictions)
+            llm_val_predictions: LLM predictions (list of dicts with hashes or raw predictions)
+            text_column: Name of text column
+            label_columns: List of label column names
+        """
+        return self._train_fusion_mlp_on_val(val_df, ml_val_predictions, llm_val_predictions, text_column, label_columns)
 
-    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_result, llm_val_result, 
+    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_predictions, llm_val_predictions, 
                                 text_column: str, label_columns: List[str]):
-        """Train the fusion MLP using validation set predictions from both ML and LLM models."""
+        """Train the fusion MLP using validation set predictions from both ML and LLM models.
+        
+        Args:
+            val_df: Validation DataFrame
+            ml_val_predictions: ML predictions (list of dicts with hashes or raw predictions)
+            llm_val_predictions: LLM predictions (list of dicts with hashes or raw predictions)
+            text_column: Name of text column
+            label_columns: List of label column names
+        """
+        
+        # Handle backward compatibility: extract predictions from ClassificationResult if needed
+        from ..core.types import ClassificationResult
+        
+        if isinstance(ml_val_predictions, ClassificationResult):
+            ml_preds = ml_val_predictions.predictions
+        else:
+            ml_preds = ml_val_predictions
+        
+        if isinstance(llm_val_predictions, ClassificationResult):
+            llm_preds = llm_val_predictions.predictions
+        else:
+            llm_preds = llm_val_predictions
         
         # Split validation DataFrame into train/val for fusion MLP training
+        # IMPORTANT: Keep track of original indices to match predictions correctly
+        val_df_with_idx = val_df.copy()
+        val_df_with_idx['_original_idx'] = range(len(val_df))
+        
         fusion_train_df, fusion_val_df = train_test_split(
-            val_df,
+            val_df_with_idx,
             test_size=0.1, random_state=42, stratify=None
         )
         
-        # Split both ML and LLM results accordingly
-        split_idx = len(fusion_train_df)
+        # Get original indices for matching predictions
+        train_indices = fusion_train_df['_original_idx'].tolist()
+        val_indices = fusion_val_df['_original_idx'].tolist()
         
-        # Split ML predictions
-        fusion_train_ml_predictions = ml_val_result.predictions[:split_idx]
-        fusion_val_ml_predictions = ml_val_result.predictions[split_idx:]
+        # Remove temporary column
+        fusion_train_df = fusion_train_df.drop(columns=['_original_idx'])
+        fusion_val_df = fusion_val_df.drop(columns=['_original_idx'])
         
-        # Split LLM predictions
-        fusion_train_llm_predictions = llm_val_result.predictions[:split_idx]
-        fusion_val_llm_predictions = llm_val_result.predictions[split_idx:]
+        # Split predictions by matching original indices (not by position!)
+        fusion_train_ml_predictions = [ml_preds[i] for i in train_indices]
+        fusion_val_ml_predictions = [ml_preds[i] for i in val_indices]
+        fusion_train_llm_predictions = [llm_preds[i] for i in train_indices]
+        fusion_val_llm_predictions = [llm_preds[i] for i in val_indices]
         
         print(f"   🔧 Fusion training: {len(fusion_train_df)} samples")
         print(f"   🔧 Fusion validation: {len(fusion_val_df)} samples")
@@ -1280,42 +1372,141 @@ class FusionEnsemble(BaseEnsemble):
     
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
                               ml_predictions: List, llm_predictions: List):
-        """Create dataset for fusion training using pre-computed ML and LLM predictions."""
+        """Create dataset for fusion training using hash-based prediction matching.
         
-        # Convert ML predictions to tensor format (binary vectors)
-        ml_tensor = torch.zeros(len(ml_predictions), self.num_labels)
-        for i, prediction in enumerate(ml_predictions):
-            if isinstance(prediction, list) and len(prediction) == self.num_labels:
-                # Already in binary vector format
-                ml_tensor[i] = torch.tensor(prediction, dtype=torch.float)
-            elif isinstance(prediction, str):
-                # Convert class name to binary vector
-                if prediction in self.classes_:
-                    class_idx = self.classes_.index(prediction)
-                    ml_tensor[i, class_idx] = 1.0
+        This method uses text hashes to match predictions with texts, making it
+        robust against DataFrame reordering.
         
-        # Convert LLM predictions to tensor format (binary vectors)
-        llm_tensor = torch.zeros(len(llm_predictions), self.num_labels)
-        for i, prediction in enumerate(llm_predictions):
-            if isinstance(prediction, list) and len(prediction) == self.num_labels:
-                # Already in binary vector format
-                llm_tensor[i] = torch.tensor(prediction, dtype=torch.float)
-            elif isinstance(prediction, str):
-                # Convert class name to binary vector
-                if prediction in self.classes_:
-                    class_idx = self.classes_.index(prediction)
-                    llm_tensor[i, class_idx] = 1.0
-            elif isinstance(prediction, list):
-                # List of class names (multi-label)
-                for pred_class in prediction:
-                    if pred_class in self.classes_:
-                        class_idx = self.classes_.index(pred_class)
-                        llm_tensor[i, class_idx] = 1.0
+        Args:
+            texts: List of text strings
+            labels: List of label vectors
+            ml_predictions: List of ML predictions (can be dict with 'text_hash' or raw predictions)
+            llm_predictions: List of LLM predictions (can be dict with 'text_hash' or raw predictions)
+            
+        Returns:
+            TensorDataset with matched predictions
+        """
         
-        # Create tensor dataset with predictions only (no tokenization needed)
+        # Check if predictions have hash information (new format)
+        # or are plain predictions (old format - backward compatible)
+        ml_has_hashes = (len(ml_predictions) > 0 and 
+                        isinstance(ml_predictions[0], dict) and 
+                        'text_hash' in ml_predictions[0])
+        llm_has_hashes = (len(llm_predictions) > 0 and 
+                         isinstance(llm_predictions[0], dict) and 
+                         'text_hash' in llm_predictions[0])
+        
+        # Initialize tensors
+        ml_tensor = torch.zeros(len(texts), self.num_labels)
+        llm_tensor = torch.zeros(len(texts), self.num_labels)
+        
+        if ml_has_hashes or llm_has_hashes:
+            # NEW FORMAT: Use hash-based matching
+            print("🔐 Using hash-based prediction matching (robust against reordering)")
+            
+            # Compute hashes for current texts
+            text_hashes = [self._compute_text_hash(text) for text in texts]
+            
+            # Build hash-to-prediction mappings
+            ml_hash_map = {}
+            if ml_has_hashes:
+                for pred_dict in ml_predictions:
+                    ml_hash_map[pred_dict['text_hash']] = pred_dict['prediction']
+            else:
+                # Old format ML predictions - create mapping by position
+                for i, pred in enumerate(ml_predictions):
+                    if i < len(text_hashes):
+                        ml_hash_map[text_hashes[i]] = pred
+            
+            llm_hash_map = {}
+            if llm_has_hashes:
+                for pred_dict in llm_predictions:
+                    llm_hash_map[pred_dict['text_hash']] = pred_dict['prediction']
+            else:
+                # Old format LLM predictions - create mapping by position
+                for i, pred in enumerate(llm_predictions):
+                    if i < len(text_hashes):
+                        llm_hash_map[text_hashes[i]] = pred
+            
+            # Match predictions to texts by hash
+            mismatches = 0
+            for i, text_hash in enumerate(text_hashes):
+                # Match ML prediction
+                ml_pred = ml_hash_map.get(text_hash)
+                if ml_pred is None:
+                    mismatches += 1
+                    print(f"⚠️ Warning: No ML prediction found for text hash {text_hash} at index {i}")
+                else:
+                    ml_tensor[i] = self._prediction_to_tensor(ml_pred)
+                
+                # Match LLM prediction
+                llm_pred = llm_hash_map.get(text_hash)
+                if llm_pred is None:
+                    mismatches += 1
+                    print(f"⚠️ Warning: No LLM prediction found for text hash {text_hash} at index {i}")
+                else:
+                    llm_tensor[i] = self._prediction_to_tensor(llm_pred)
+            
+            if mismatches > 0:
+                raise EnsembleError(
+                    f"Found {mismatches} prediction mismatches. This indicates DataFrame reordering or missing predictions.",
+                    "FusionEnsemble"
+                )
+            
+            print(f"✅ Successfully matched {len(texts)} predictions by hash")
+            
+        else:
+            # OLD FORMAT: Position-based matching (backward compatible)
+            print("⚠️ Using position-based prediction matching (assumes DataFrame order unchanged)")
+            
+            # Validate lengths match
+            if len(ml_predictions) != len(texts):
+                raise EnsembleError(
+                    f"ML predictions length ({len(ml_predictions)}) doesn't match texts length ({len(texts)})",
+                    "FusionEnsemble"
+                )
+            if len(llm_predictions) != len(texts):
+                raise EnsembleError(
+                    f"LLM predictions length ({len(llm_predictions)}) doesn't match texts length ({len(texts)})",
+                    "FusionEnsemble"
+                )
+            
+            # Convert predictions by position
+            for i in range(len(texts)):
+                ml_tensor[i] = self._prediction_to_tensor(ml_predictions[i])
+                llm_tensor[i] = self._prediction_to_tensor(llm_predictions[i])
+        
+        # Create tensor dataset
         labels_tensor = torch.FloatTensor(labels)
-        
         return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
+    
+    def _prediction_to_tensor(self, prediction) -> torch.Tensor:
+        """Convert a single prediction to a binary tensor vector.
+        
+        Args:
+            prediction: Can be binary vector list, class name string, or list of class names
+            
+        Returns:
+            Binary tensor of shape (num_labels,)
+        """
+        tensor = torch.zeros(self.num_labels)
+        
+        if isinstance(prediction, list) and len(prediction) == self.num_labels:
+            # Already in binary vector format
+            tensor = torch.tensor(prediction, dtype=torch.float)
+        elif isinstance(prediction, str):
+            # Convert class name to binary vector
+            if prediction in self.classes_:
+                class_idx = self.classes_.index(prediction)
+                tensor[class_idx] = 1.0
+        elif isinstance(prediction, list):
+            # List of class names (multi-label)
+            for pred_class in prediction:
+                if pred_class in self.classes_:
+                    class_idx = self.classes_.index(pred_class)
+                    tensor[class_idx] = 1.0
+        
+        return tensor
     
     def predict(self, 
                 test_df: pd.DataFrame, true_labels: Optional[List[List[int]]] = None,
@@ -1348,17 +1539,32 @@ class FusionEnsemble(BaseEnsemble):
         elif true_labels is not None:
             extracted_labels = true_labels
         
-        # Step 1: Get ML predictions on test data
+        # Step 1: Get ML predictions on test data with hashes
         print("Getting ML predictions on test data...")
         ml_test_result = self.ml_model.predict(test_df)
+        ml_test_predictions_hashed = self._attach_hashes_to_predictions(
+            ml_test_result.predictions,
+            texts
+        )
         
         # Step 2: Get LLM predictions on test data
+        # Use provided train_df, or fall back to cached training data
+        llm_train_df = train_df if train_df is not None else getattr(self, 'train_df_cache', None)
+        if llm_train_df is None:
+            print("⚠️ Warning: No training data available for LLM few-shot examples")
+        
         llm_test_predictions = self._get_or_generate_llm_predictions(
             df=test_df,
-            train_df=getattr(self, 'test_df_cache', test_df),
+            train_df=llm_train_df if llm_train_df is not None else test_df,
             cache_path=self.test_llm_cache_path,
             mode="test",
             provided_predictions=test_llm_predictions
+        )
+        
+        # Attach hashes to LLM predictions
+        llm_test_predictions_hashed = self._attach_hashes_to_predictions(
+            llm_test_predictions,
+            texts
         )
         
         # Create ClassificationResult for test predictions
@@ -1407,7 +1613,12 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 3: Use fusion MLP to combine predictions
         print("Generating fusion predictions...")
-        result = self._predict_with_fusion(ml_test_result, llm_test_result, texts, extracted_labels)
+        result = self._predict_with_fusion(
+            ml_test_predictions_hashed, 
+            llm_test_predictions_hashed, 
+            texts, 
+            extracted_labels
+        )
         
         # Save test results using ResultsManager
         if self.results_manager:
@@ -1435,11 +1646,36 @@ class FusionEnsemble(BaseEnsemble):
         
         return result
     
-    def _predict_with_fusion(self, ml_result, llm_result, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
-        """Generate fusion predictions using trained MLP."""
-        # Create dataset using both ML and LLM predictions
+    def _predict_with_fusion(self, ml_predictions, llm_predictions, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+        """Generate fusion predictions using trained MLP.
+        
+        Args:
+            ml_predictions: Either ClassificationResult (old format) or list of dicts with hashes (new format)
+            llm_predictions: Either ClassificationResult (old format) or list of dicts with hashes (new format)
+            texts: List of text strings
+            true_labels: Optional true labels for metrics
+            
+        Returns:
+            ClassificationResult with fusion predictions
+        """
+        # Handle backward compatibility: extract predictions from ClassificationResult if needed
+        from ..core.types import ClassificationResult
+        
+        if isinstance(ml_predictions, ClassificationResult):
+            ml_preds = ml_predictions.predictions
+        else:
+            # New format: list of dicts with hashes
+            ml_preds = ml_predictions
+        
+        if isinstance(llm_predictions, ClassificationResult):
+            llm_preds = llm_predictions.predictions
+        else:
+            # New format: list of dicts with hashes
+            llm_preds = llm_predictions
+        
+        # Create dataset using both ML and LLM predictions (hash-based matching happens here)
         dummy_labels = [[0] * self.num_labels] * len(texts)
-        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_result.predictions, llm_result.predictions)
+        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_preds, llm_preds)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
         
         # Generate predictions

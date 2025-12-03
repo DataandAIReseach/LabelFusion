@@ -66,7 +66,7 @@ def create_fusion_ensemble(ml_model, llm_model, output_dir: str, experiment_name
     return fusion
 
 
-def run_once(data_dir: str, output_dir: str, percentage: float = 1.0, few_shot: int = 10, ml_train_on_full: bool = False):
+def run_once(data_dir: str, output_dir: str, percentage: float = 1.0, few_shot: int = 20, ml_train_on_full: bool = False):
     df_train, df_val, df_test = load_datasets(data_dir)
     text_column = 'text'
     label_columns = detect_label_columns(df_train, text_column)
@@ -109,8 +109,7 @@ def run_once(data_dir: str, output_dir: str, percentage: float = 1.0, few_shot: 
     fusion.fit(fusion_train_df, df_val)
 
     print("Predicting on test set...")
-    result = fusion.predict(df_test,
-                            df_train)
+    result = fusion.predict(df_test, train_df=df_train)
     metrics = result.metadata.get('metrics', {}) if result.metadata else {}
     print(f"Test metrics: {metrics}")
 
@@ -123,9 +122,9 @@ if __name__ == '__main__':
     except Exception:
         percentage = 0.001
     try:
-        few_shot = int(os.getenv('FEW_SHOT', '10'))
+        few_shot = int(os.getenv('FEW_SHOT', '20'))
     except Exception:
-        few_shot = 10
+        few_shot = 20
     ml_train_on_full = os.getenv('ML_TRAIN_ON_FULL', '').lower() in ('1', 'true', 'yes')
 
     run_once(data_dir=data_dir, output_dir=output_dir, percentage=percentage, few_shot=few_shot, ml_train_on_full=ml_train_on_full)
