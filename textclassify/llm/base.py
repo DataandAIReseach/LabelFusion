@@ -675,11 +675,19 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             mode: Dataset mode ('test', 'val', 'train') for file naming
             
         Returns:
-            str: Path to the cache file
+            str: Path to the cache file, or None if caching is disabled
         """
         import hashlib
         from datetime import datetime as dt
         from pathlib import Path
+        
+        # Skip cache initialization if flag is set (e.g., when filling missing predictions)
+        if getattr(self, '_skip_batch_cache_write', False):
+            print(f"🔍 DEBUG: Skipping batch cache initialization (_skip_batch_cache_write=True)")
+            return None
+        
+        # DEBUG: Log DataFrame size used for hash calculation
+        print(f"🔍 DEBUG: _initialize_batch_cache_file called with df size: {len(df)} rows, mode: {mode}")
         
         # Create cache directory if it doesn't exist
         cache_dir = Path(self.cache_dir)
@@ -696,6 +704,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
             csv_bytes = text_series.to_csv(index=False).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+        
+        print(f"🔍 DEBUG: Computed dataset_hash: {dataset_hash} for {len(df)} rows")
         
         # Create cache filename: mode_hash.json (e.g. val_b6e3cb0f.json)
         cache_filename = f"{mode}_{dataset_hash}.json"
@@ -746,6 +756,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             batch_num: Current batch number
             total_batches: Total number of batches
         """
+        # Skip if cache file path is None or if skip flag is set
+        if cache_file_path is None or getattr(self, '_skip_batch_cache_write', False):
+            return
+            
         try:
             # Read existing cache data
             with open(cache_file_path, 'r') as f:
