@@ -1,0 +1,44 @@
+created_at: '2025-12-05T14:04:32.343787'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq004
+    platform: Linux-4.18.0-553.81.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2025-12-05_14-02-20_reuters_fusion_100000ppm_20251205_140219_openai
+  git_commit: d71a60cace81678d4ac24e8e268446510d6b7b1c
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-12-05T14:02:20.179740'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/openai_classifier_val_metrics.yaml
+  - metrics/openai_classifier_test_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/test_predictions_7a1383356171.json
+  - predictions/val_predictions_aa685a6f1bc6.csv
+  - predictions/val_predictions_aa685a6f1bc6.json
+  - predictions/test_predictions_7a1383356171.csv
+test_results: null
+training_results:
+  metrics:
+    f1: 0.0
+    hamming_loss: 0.10950884086444009
+    micro_f1: 0.8904911591355599
+    micro_precision: 0.8904911591355599
+    micro_recall: 0.8904911591355599
+    precision: 0.0
+    recall: 0.0
+    subset_accuracy: 0.0
+  mode: test
+  model_name: gpt-5-nano
+  predictions_source: cached
+  timestamp: '2025-12-05T14:04:32.339885'
+  total_samples: 2545
