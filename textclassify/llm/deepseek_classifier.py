@@ -74,6 +74,10 @@ class DeepSeekClassifier(BaseLLMClassifier):
         self.top_p = self.config.parameters.get('top_p', 1.0)
         self.frequency_penalty = self.config.parameters.get('frequency_penalty', 0.0)
         self.presence_penalty = self.config.parameters.get('presence_penalty', 0.0)
+        
+        # Mode tracking (train/val/test) - inherited from base but can be set here too
+        if not hasattr(self, 'mode'):
+            self.mode = None
     
     def predict(
         self,
@@ -84,6 +88,9 @@ class DeepSeekClassifier(BaseLLMClassifier):
         label_definitions: Optional[Dict[str, str]] = None
     ) -> ClassificationResult:
         """Predict using DeepSeek classifier with explicit results saving."""
+        # Set mode to 'test' when predicting
+        self.mode = 'test'
+        
         # Store test_df reference for results saving
         if test_df is not None:
             self._current_test_df = test_df
@@ -98,68 +105,67 @@ class DeepSeekClassifier(BaseLLMClassifier):
         )
         
         # 🚀 EXPLICIT RESULTS SAVING (like RoBERTa)
-        if self.results_manager and hasattr(self, '_current_test_df'):
-            try:
-                saved_files = self.results_manager.save_predictions(
-                    result, "test", self._current_test_df
-                )
-                
-                # Save metrics YAML
-                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
-                    metrics_file = self.results_manager.save_metrics(
-                        result.metadata['metrics'], "test", "deepseek_classifier"
+        if self.results_manager:
+            dataset_type = getattr(self, '_current_dataset_type', 'test')
+            current_df = getattr(self, '_current_test_df', None)
+            
+            if current_df is not None:
+                try:
+                    saved_files = self.results_manager.save_predictions(
+                        result, dataset_type, current_df
                     )
-                    saved_files["metrics"] = metrics_file
-                
-                # Save model configuration
-                model_config_dict = {
-                    'provider': 'deepseek',
-                    'model_name': self.model,
-                    'temperature': self.temperature,
-                    'max_completion_tokens': self.max_completion_tokens,
-                    'top_p': self.top_p,
-                    'frequency_penalty': self.frequency_penalty,
-                    'presence_penalty': self.presence_penalty,
-                    'multi_label': self.multi_label,
-                    'text_column': self.text_column,
-                    'label_columns': self.label_columns,
-                    'classes': self.classes_,
-                    'classification_type': 'multi_label' if self.multi_label else 'single_label'
-                }
-                
-                config_file = self.results_manager.save_model_config(
-                    model_config_dict, "deepseek_classifier"
-                )
-                saved_files["config"] = config_file
-                
-                # Save experiment summary
-                experiment_summary = {
-                    'model_type': 'llm',
-                    'provider': 'deepseek',
-                    'model_name': self.model,
-                    'test_samples': len(self._current_test_df),
-                    'train_samples': len(train_df) if train_df is not None else 0,
-                    'classification_type': 'multi_label' if self.multi_label else 'single_label',
-                    'metrics': result.metadata.get('metrics', {}) if result.metadata else {},
-                    'completed': True
-                }
-                
-                self.results_manager.save_experiment_summary(experiment_summary)
-                
-                print(f"📁 DeepSeek prediction results saved: {saved_files}")
-                
-                # Add file paths to result metadata
-                if not result.metadata:
-                    result.metadata = {}
-                result.metadata['saved_files'] = saved_files
-                
-                # Clean up temporary reference
-                delattr(self, '_current_test_df')
-                
-            except Exception as e:
-                print(f"Warning: Could not save DeepSeek prediction results: {e}")
-                if hasattr(self, '_current_test_df'):
-                    delattr(self, '_current_test_df')
+                    
+                    # Save metrics YAML
+                    if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                        metrics_file = self.results_manager.save_metrics(
+                            result.metadata['metrics'], "test", "deepseek_classifier"
+                        )
+                        saved_files["metrics"] = metrics_file
+                    
+                    # Save model configuration
+                    model_config_dict = {
+                        'provider': 'deepseek',
+                        'model_name': self.model,
+                        'temperature': self.temperature,
+                        'max_completion_tokens': self.max_completion_tokens,
+                        'top_p': self.top_p,
+                        'frequency_penalty': self.frequency_penalty,
+                        'presence_penalty': self.presence_penalty,
+                        'multi_label': self.multi_label,
+                        'text_column': self.text_column,
+                        'label_columns': self.label_columns,
+                        'classes': self.classes_,
+                        'classification_type': 'multi_label' if self.multi_label else 'single_label'
+                    }
+                    
+                    config_file = self.results_manager.save_model_config(
+                        model_config_dict, "deepseek_classifier"
+                    )
+                    saved_files["config"] = config_file
+                    
+                    # Save experiment summary
+                    experiment_summary = {
+                        'model_type': 'llm',
+                        'provider': 'deepseek',
+                        'model_name': self.model,
+                        'test_samples': len(self._current_test_df),
+                        'train_samples': len(train_df) if train_df is not None else 0,
+                        'classification_type': 'multi_label' if self.multi_label else 'single_label',
+                        'metrics': result.metadata.get('metrics', {}) if result.metadata else {},
+                        'completed': True
+                    }
+                    
+                    self.results_manager.save_experiment_summary(experiment_summary)
+                    
+                    print(f"📁 DeepSeek prediction results saved: {saved_files}")
+                    
+                    # Add file paths to result metadata
+                    if not result.metadata:
+                        result.metadata = {}
+                    result.metadata['saved_files'] = saved_files
+                    
+                except Exception as e:
+                    print(f"Warning: Could not save DeepSeek prediction results: {e}")
         
         return result
     

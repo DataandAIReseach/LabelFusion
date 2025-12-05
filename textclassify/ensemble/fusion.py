@@ -634,24 +634,73 @@ class FusionEnsemble(BaseEnsemble):
                         print(f"✅ All {len(final_predictions)} predictions found in cache (hash-matched)")
                         predictions_source = "cached"
                     else:
-                        # Generate missing predictions
+                        # Generate missing predictions with incremental batch-wise caching
                         print(f"🔍 Found {len(missing_indices)} missing predictions (hash-matched); generating them...")
                         
                         # Create DataFrame with only missing rows
                         df_uncached = df.iloc[missing_indices].copy()
                         
-                        # Disable auto-caching AND batch cache writing to prevent creating 
-                        # new cache file with hash based on subset DataFrame
-                        original_auto_use_cache = getattr(self.llm_model, 'auto_use_cache', False)
+                        # Compute the CORRECT hash from full dataset (not subset)
+                        dataset_hash = self._create_dataset_hash(df)
+                        
+                        # Enable batch cache writing with FIXED hash from full dataset
+                        # We'll manually set the cache file path so LLM writes to correct file
                         original_skip_batch_cache = getattr(self.llm_model, '_skip_batch_cache_write', False)
-                        self.llm_model.auto_use_cache = False
-                        self.llm_model._skip_batch_cache_write = True
+                        self.llm_model._skip_batch_cache_write = False  # Enable batch writing
+                        
+                        # Manually initialize the cache file with FULL dataset hash
+                        from pathlib import Path
+                        cache_dir = Path("cache")
+                        cache_dir.mkdir(parents=True, exist_ok=True)
+                        cache_file_path = cache_dir / f"{mode}_{dataset_hash}.json"
+                        
+                        # Initialize cache if it doesn't exist
+                        if not cache_file_path.exists():
+                            print(f"📝 Initializing cache file: {cache_file_path}")
+                            import json
+                            import datetime
+                            cache_data = {
+                                'metadata': {
+                                    'provider': getattr(self.llm_model, 'provider', 'openai'),
+                                    'model': self.llm_model.config.parameters.get('model', 'unknown'),
+                                    'dataset_hash': dataset_hash,
+                                    'dataset_size': len(df),
+                                    'num_samples': len(df),
+                                    'mode': mode,
+                                    'multi_label': self.llm_model.multi_label,
+                                    'label_columns': self.llm_model.label_columns,
+                                    'text_column': self.llm_model.text_column,
+                                    'batch_size': self.llm_model.batch_size
+                                },
+                                'predictions': []
+                            }
+                            # Load existing predictions if file exists
+                            if cache_file_path.exists():
+                                with open(cache_file_path, 'r') as f:
+                                    existing_cache = json.load(f)
+                                    if 'predictions' in existing_cache:
+                                        cache_data['predictions'] = existing_cache['predictions']
+                            
+                            with open(cache_file_path, 'w') as f:
+                                json.dump(cache_data, f, indent=2)
+                        
+                        # Inject a custom method that returns our pre-determined cache file path
+                        original_init_batch_cache = self.llm_model._initialize_batch_cache_file
+                        
+                        def fixed_init_batch_cache(df_arg=None, mode=None, **kwargs):
+                            """Return the correct cache file path with full dataset hash."""
+                            return str(cache_file_path)
+                        
+                        self.llm_model._initialize_batch_cache_file = fixed_init_batch_cache
                         
                         try:
+                            # Now generate predictions - LLM will write to correct cache after each batch
+                            print(f"🔄 Generating {len(df_uncached)} predictions with incremental caching...")
                             generated = self._generate_llm_predictions(df_uncached, train_df, mode)
+                            print(f"✅ Generated {len(generated)} predictions (saved incrementally to {cache_file_path})")
                         finally:
-                            # Restore original settings
-                            self.llm_model.auto_use_cache = original_auto_use_cache
+                            # Restore original method
+                            self.llm_model._initialize_batch_cache_file = original_init_batch_cache
                             self.llm_model._skip_batch_cache_write = original_skip_batch_cache
                         
                         # Merge generated predictions back using indices
@@ -660,15 +709,6 @@ class FusionEnsemble(BaseEnsemble):
                                 final_predictions[idx] = generated[i]
                         
                         predictions_source = "merged_cached"
-                        
-                        # Save merged predictions using FULL DataFrame for correct hash
-                        try:
-                            self._save_cached_llm_predictions(final_predictions, cache_path, df)
-                            print(f"✅ Saved {len(final_predictions)} predictions to cache with correct hash")
-                        except Exception as e:
-                            print(f"⚠️  ERROR: Could not save merged cache: {e}")
-                            import traceback
-                            traceback.print_exc()
             else:
                 # Generate new predictions and save to cache
                 print(f"Generating new LLM predictions for {mode} set...")
