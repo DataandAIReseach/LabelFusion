@@ -1,0 +1,282 @@
+id,text,earn,acq,money-fx,grain,crude,trade,interest,ship,wheat,corn,predicted,probabilities
+training/9770,"U.K. VISIBLE TRADE DEFICIT NARROWS IN FEBRUARY
+  Britain's visible trade deficit narrowed
+  to a seasonally adjusted provisional 224 mln stg in February
+  from 527 mln in January, The Trade and Industry Department
+  said.
+      The current account balance of payments in February showed
+  a seasonally adjusted provisional surplus of 376 mln stg
+  compared with a surplus of 73 mln in January.
+      Invisibles in February were put provisionally at a 600 mln
+  surplus, the same as in January.
+      Seasonally adjusted, imports rose in February to 7.16
+  billion stg from 6.73 billion in January. Exports rose to a
+  record 6.93 billion last month from 6.20 billion in January.
+      Trade Department officials said the improvement in
+  Britain's current account contrasted with most private
+  forecasts and they attributed much of the strength to imports
+  rising less quickly in February than might otherwise have been
+  expected.
+      The Department said exceptionally cold weather in January
+  reduced exports that month and that there had been an element
+  of catching up in the February figures.
+      The seasonally adjusted volume index, base 1980, a guide to
+  underlying non-oil trade, showed exports rising to 131.0 from
+  114.6 in January and imports rising to 142.2 from 136.5.
+      The value of British oil exports in February rose to 751
+  mln stg from 723 mln in Jnauary while oil imports rose to 425
+  mln from 352 mln.
+      The Department said the upward trend in non-oil export
+  volume continues and the underlying level of non-oil import
+  volume seems to have stablised.
+      The Departnment said exports to the U.S. May be benefiting
+  from fluctuations in the mark and yen exchange rates.
+  
+
+",0,0,0,0,0,1,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5105207562446594, ""acq"": 0.5229584574699402, ""money-fx"": 0.4511467516422272, ""grain"": 0.4237263798713684, ""crude"": 0.4235873222351074, ""trade"": 0.41377365589141846, ""interest"": 0.5043511986732483, ""ship"": 0.47680261731147766, ""wheat"": 0.46531161665916443, ""corn"": 0.4494098126888275}"
+training/2298,"HOOPER HOLMES SHERLOCK INC &lt;HOOP> 4TH QTR NET
+  Shr 22 cts vs 25 cts
+      Net 472,000 vs 454,000
+      Revs 16.2 mln vs 15.2 mln
+      Avg shrs 2,135,315 vs 1,835,325
+      12 mths
+      Shr 71 cts vs 70 cts
+      Net 1,393,000 vs 1,285,000
+      Rwevs 61,805,000 vs 55,367,000
+      Avg shares 1,960,319 vs 1,835,325
+  
+
+",1,0,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5190306305885315, ""acq"": 0.5259109139442444, ""money-fx"": 0.45096930861473083, ""grain"": 0.4183502197265625, ""crude"": 0.40917253494262695, ""trade"": 0.40337735414505005, ""interest"": 0.5082162618637085, ""ship"": 0.4618052840232849, ""wheat"": 0.46434900164604187, ""corn"": 0.446869432926178}"
+training/6003,"IRVING TRUST &lt;V> BUYS GULF/WESTERN &lt;GW> UNIT
+  Irving Bank Corp said it bought the
+  factoring division of Associates Commercial Corp, a unit of
+  Gulf and Western Co Inc's Associates Corp of North America.
+      The terms of the previously announced deal were not
+  disclosed.
+      It said the assets were transferred to Irving Commercial
+  Corp.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5104432106018066, ""acq"": 0.5255162119865417, ""money-fx"": 0.4563383162021637, ""grain"": 0.4097098708152771, ""crude"": 0.41852691769599915, ""trade"": 0.4096111059188843, ""interest"": 0.5099674463272095, ""ship"": 0.4733133912086487, ""wheat"": 0.45994895696640015, ""corn"": 0.4401131570339203}"
+training/6070,"STEINHARDT GROUP HAS 6.6 PCT OF HOLIDAY &lt;HIA>
+  A group led by New York investor
+  Michael Steinhardt told the Securities and Exchange Commission
+  it bought a 6.6 pct stake in Holiday Corp common stock as an
+  investment.
+      The group said it paid 114 mln dlrs for its 1.6 mln Holiday
+  shares, 530,000 of which were bought since Feb. 6.
+      At the same time, group members said they held short
+  positions in the stock totaling 830,000 shares.
+      In addition to Steinhardt himself, the group includes
+  Steinhardt Partners and Institutional Partners, two investment
+  firms of which Steinhardt is one of the general partners.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5148484706878662, ""acq"": 0.5247988104820251, ""money-fx"": 0.45997166633605957, ""grain"": 0.4125497341156006, ""crude"": 0.4163089990615845, ""trade"": 0.4134446382522583, ""interest"": 0.5093746185302734, ""ship"": 0.4740573465824127, ""wheat"": 0.46417510509490967, ""corn"": 0.4422643780708313}"
+training/11431,"MAY &lt;MA> TO SELL SYCAMORE DIVISION
+  The May Department Stores Co said it
+  has signed an agreement to sell its Sycamore Specialty Store
+  Division to an investment group that includes Syacmore senior
+  management.
+      May said it expects to close the deal, which includes the
+  entire division and its 1,000 employees, in April.
+      Sycamore has 111 women's apparel stores in Indiana, Ohio,
+  Illinois, Kentucky and Michigan, May said.
+      May added that the Indiana National Bank of Indianapolis
+  provided a portion of the deal's financing.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5124231576919556, ""acq"": 0.5280690789222717, ""money-fx"": 0.4565446972846985, ""grain"": 0.40704676508903503, ""crude"": 0.42039820551872253, ""trade"": 0.4051155745983124, ""interest"": 0.5102982521057129, ""ship"": 0.4719216823577881, ""wheat"": 0.46133264899253845, ""corn"": 0.4425068795681}"
+training/6311,"&lt;SCEPTRE INVESTMENT COUNSEL LTD> 1ST QTR NET
+  Period ended January 31
+      Shr 22 cts vs 16 cts
+      Net 518,564 vs 374,198
+      Revs 2,090,724 vs 1,614,079
+  
+
+",1,0,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5231301188468933, ""acq"": 0.526727557182312, ""money-fx"": 0.45392635464668274, ""grain"": 0.41701099276542664, ""crude"": 0.41211041808128357, ""trade"": 0.4023161232471466, ""interest"": 0.5087407231330872, ""ship"": 0.46554166078567505, ""wheat"": 0.46891629695892334, ""corn"": 0.44515129923820496}"
+training/14701," 7-APR-1987 17:17:34.97
+   7-APR-1987 17:17:34.97
+
+",0,0,0,1,0,0,0,1,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5244559049606323, ""acq"": 0.5339954495429993, ""money-fx"": 0.4569009244441986, ""grain"": 0.42410463094711304, ""crude"": 0.41933557391166687, ""trade"": 0.4205281138420105, ""interest"": 0.5199689865112305, ""ship"": 0.4788265824317932, ""wheat"": 0.47606760263442993, ""corn"": 0.4511090815067291}"
+training/12463,"HOOGOVENS EXPECTS CLEAR LOSS IN 1987
+  &lt;Koninklijke
+  Nederlandsche Hoogovens en Staalfabrieken NV> said it expected
+  a ""clear loss"" for 1987.
+       The company reported its 1986 profits were 44 pct lower at
+  154.6 mln guilders than in the year before.
+       Turnover was 18 pct lower than in 1985.
+       The main reason fo the fall in turnover was the lower rate
+  of the dollar, the company said. The lower costs for raw
+  materials and energy, resulting from the lower dollar, could
+  not compensate the fall in revenues.
+       Costs 5.61 billion guilders vs 6.66 billion
+       Depreciation 457 mln vs 493 mln
+       Operating profit 375 mln vs 598 mln
+       Financial charges 155.1 mln vs 169.4 mln
+       Extraordinary loss 12 rpt 12 mln vs 138 mln
+       Crude steel production five mln tonnes vs 5.3 mln
+       Aluminium production 96,000 tonnes vs same.
+  
+
+",1,0,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5159704089164734, ""acq"": 0.5246370434761047, ""money-fx"": 0.4510020315647125, ""grain"": 0.41868162155151367, ""crude"": 0.41535255312919617, ""trade"": 0.41221916675567627, ""interest"": 0.5070427656173706, ""ship"": 0.47341179847717285, ""wheat"": 0.46667852997779846, ""corn"": 0.44630393385887146}"
+training/2520,"SANTA FE SOUTHERN PACIFIC APPEALS MERGER RULING
+  Santa Fe Southern Pacific Corp will
+  later today formally ask the U.S. Interstate Commerce
+  Commission (ICC) to reconsider its earlier rejection of the
+  merger of the holding company's railroad assets, a company
+  spokesman said.
+      ""We expect to file papers late tonight"" asking the ICC to
+  reopen the rail merger case, spokesman Rich Hall said in a
+  telephone interview from the company's Chicago headquarters.
+      The ICC had rejected in July, on grounds it would reduce
+  competition, the merger of the Santa Fe and Southern Pacific
+  Railroads.
+      The deadline for seeking ICC reconsideration of the merger
+  plan is midnight tonight.
+      Santa Fe Southern Pacific owns the Santa Fe railroad and
+  holds the Southern Pacific railroad assets in trust while
+  awaiting federal approval of the merger plan.
+      The ICC had ordered the holding company to divest one or
+  the other railroad but stayed its ruling pending a decision on
+  the request for reconsideration.
+      If the ICC ultimately decides not to reopen the case, it is
+  expected to reinstate the divestiture order.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5100580453872681, ""acq"": 0.5254557132720947, ""money-fx"": 0.45473018288612366, ""grain"": 0.41504618525505066, ""crude"": 0.4212743043899536, ""trade"": 0.4145961403846741, ""interest"": 0.5073032379150391, ""ship"": 0.476043164730072, ""wheat"": 0.46148791909217834, ""corn"": 0.4420067369937897}"
+training/3223,"INVESTORS HAVE 5.5 PCT OF DATAREX SYSTEMS &lt;DRX>
+  A small investor group led by Melvyn
+  Gelch, a Providence, R.I., surgeon, told the Securities and
+  Exchange Commission it has acquired 60,840 shares of Datarex
+  Systems Inc, or 5.5 pct of the total outstanding common stock.
+      The Gelch group said it bought the stake for about 935,000
+  dlrs for investment purposes only.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5169392824172974, ""acq"": 0.5271134376525879, ""money-fx"": 0.4605041444301605, ""grain"": 0.4139642119407654, ""crude"": 0.4142970144748688, ""trade"": 0.41210275888442993, ""interest"": 0.5110592842102051, ""ship"": 0.473302960395813, ""wheat"": 0.46793514490127563, ""corn"": 0.4440322816371918}"
+training/9118,"Bank of Japan bought 200 to 300 mln dlrs this morning, dealers said.
+
+  Bank of Japan bought 200 to 300 mln dlrs this morning, dealers said.
+  
+
+",0,0,1,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5173100829124451, ""acq"": 0.5224475860595703, ""money-fx"": 0.4544491469860077, ""grain"": 0.41386204957962036, ""crude"": 0.4201679527759552, ""trade"": 0.40968161821365356, ""interest"": 0.5178143382072449, ""ship"": 0.4705868661403656, ""wheat"": 0.4710274636745453, ""corn"": 0.4434071481227875}"
+training/3333,"BUSINESS EDITOR THEODORE CROSS OFFERS 34 DLRS SHARE FOR HARPER AND ROW
+
+  BUSINESS EDITOR THEODORE CROSS OFFERS 34 DLRS SHARE FOR HARPER AND ROW
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5185151696205139, ""acq"": 0.5338213443756104, ""money-fx"": 0.45372822880744934, ""grain"": 0.4222272038459778, ""crude"": 0.4213047921657562, ""trade"": 0.414634644985199, ""interest"": 0.5141029953956604, ""ship"": 0.473138689994812, ""wheat"": 0.4714384078979492, ""corn"": 0.44488832354545593}"
+training/2848,"U.S. FEEDGRAINS GROUP ATTACKS CANADA CORN RULING
+  The U.S. Feedgrains Council is
+  surprised and disappointed by the Canadian Import Tribunal's
+  decision that imports of corn from the U.S. are materially
+  injuring Canadian corn producers, a council spokesman said.
+      ""At a time when the world is attempting to liberalize trade
+  in the new rounnd of multilateral negotiations, it is
+  incomprehensible that a country that stands to gain so much
+  from the reduction in agricultural trade barriers would
+  threaten that process by caving in to pressures for
+  protectionism,"" council president Darwin E. Stolte said.
+      Canada's finding will strain the U.S./Canadian trading
+  relationship, could damage the future of U.S. feedgrains 
+  support for the free trade negotiations, and also negatively
+  impact farm trade reform with other nations, the council said.
+  
+
+",0,0,0,1,0,0,0,0,0,1,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5134775042533875, ""acq"": 0.5326324701309204, ""money-fx"": 0.45446670055389404, ""grain"": 0.4232177734375, ""crude"": 0.42266470193862915, ""trade"": 0.4160866439342499, ""interest"": 0.5074695944786072, ""ship"": 0.4776593744754791, ""wheat"": 0.4688255190849304, ""corn"": 0.4495822787284851}"
+training/11543,"GRUNTAL FINANCIAL &lt;GRU> 2ND QTR FEB 27 NET
+  Shr primary 33 cts vs 33 cts
+      Shr diluted 27 cts vs 32 cts
+      Net 3,669,000 vs 3,556,000
+      Revs 58.2 mln vs 56.6 mln
+      Avg shrs primary 11.2 mln vs 11.1 mln
+      Avg shrs diluted 15.1 mln vs 11.1 mln
+      Six mths
+      Shr primary 43 cts vs 46 cts
+      Shr diluted 37 cts vs 45 cts
+      Net 4,711,000 vs 4,879,000
+      Revs 101.9 mln vs 95.7 mln
+      Avg shrs primary 11.2 mln vs 10.9 mln
+      Avg shrs diluted 15.1 mln vs 10.9 mln
+  
+
+",1,0,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5207998156547546, ""acq"": 0.5248173475265503, ""money-fx"": 0.4512243866920471, ""grain"": 0.41966456174850464, ""crude"": 0.4116387367248535, ""trade"": 0.40205979347229004, ""interest"": 0.508685290813446, ""ship"": 0.4598460793495178, ""wheat"": 0.4663316607475281, ""corn"": 0.4444938600063324}"
+training/8424,"PIONEER SYSTEMS INC &lt;PAE> YEAR NOV 29 LOSS
+  Oper shr loss five cts vs loss 1.28 dlrs
+      Oper net loss 155,000 vs loss 3,982,000
+      Sales 37.1 mln vs 34.2 mln
+      NOTE: Net excludes losses from discontinued fabric
+  finishing operations of 3,431,000 dlrs vs 5,910,000 dlrs.
+  
+
+",1,0,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.521219789981842, ""acq"": 0.5267743468284607, ""money-fx"": 0.44840264320373535, ""grain"": 0.41842225193977356, ""crude"": 0.41144564747810364, ""trade"": 0.40643200278282166, ""interest"": 0.5068234205245972, ""ship"": 0.46723446249961853, ""wheat"": 0.4661824405193329, ""corn"": 0.4462054371833801}"
+training/2749,"CANADA CORN DECISION UNJUSTIFIED - YEUTTER
+  U.S. trade representative Clayton
+  Yeutter said Canada's finding announced today that U.S. corn
+  imports injure Canadian farmers is ""totally unjustified.""
+      ""U.S. corn exports to Canada are so small that it is
+  inconceivable that they injure Canadian corn farmers by any
+  reasonable measure,"" Yeutter said in a statement.
+      He said if other countries follow Canada's lead it could
+  result in ""a rash of protectionist actions throughout the
+  world."" French corn growers have recently indicated they will
+  challenge U.S. corn gluten feed shipments to Europe.
+      Yeutter said the U.S. will examine the Canadian decision
+  closely and if the U.S. believes the decision was not based on
+  facts, ""will carefully evaluate appropriate responses."" Yeutter
+  did not say what steps the U.S. may take in response.
+  
+
+",0,0,0,1,0,0,0,0,0,1,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5112819671630859, ""acq"": 0.5272266864776611, ""money-fx"": 0.4548304080963135, ""grain"": 0.41864213347435, ""crude"": 0.42369917035102844, ""trade"": 0.4211175739765167, ""interest"": 0.5096549391746521, ""ship"": 0.47735440731048584, ""wheat"": 0.4671765863895416, ""corn"": 0.45006051659584045}"
+training/4493,"SAFEGUARD SCIENTIFIC &lt;SFE> IN EQUITY DEAL
+  Safeguard Scientifics Inc
+  said it made a 2.5 mln dlr equity investment in &lt;Sanchez
+  Computer Associates Inc>, a private computer software firm
+  based in Malvern, Pa.
+     Safeguard said the investment gives it a ""major ownership
+  position"" in Sanchez, which specializes in software products
+  for financial institutions.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5160383582115173, ""acq"": 0.5263711810112, ""money-fx"": 0.45768019556999207, ""grain"": 0.41329798102378845, ""crude"": 0.4110505282878876, ""trade"": 0.41190019249916077, ""interest"": 0.5086824893951416, ""ship"": 0.47232329845428467, ""wheat"": 0.4653502404689789, ""corn"": 0.4431246221065521}"
+training/8572,"QUAKER OATS &lt;OAT> SELLS UNIT TO KEYSTONE
+  The Quaker Oats Co said it sold
+  its Vernell's Fine Candies Inc unit to privately-held Keystone
+  Partners Inc for an undisclosed price.
+      The company said Vernells had sales of around 30 mln dlrs
+  in the year ended in August, 1986.
+      Quaker Oats acquired Vernells in August, 1986 when it
+  purchased Golden Grain Macaroni Co.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5154886245727539, ""acq"": 0.5271334052085876, ""money-fx"": 0.45431655645370483, ""grain"": 0.4147532284259796, ""crude"": 0.418852299451828, ""trade"": 0.41513630747795105, ""interest"": 0.5121287107467651, ""ship"": 0.47781750559806824, ""wheat"": 0.4648675322532654, ""corn"": 0.44427984952926636}"
+training/11378,"BROUGHER &lt;BIGI> TO SELL 40 PCT OF SUBSIDIARY
+  Brougher Insurance Group Inc
+  said it plans to sell 40 pct of the stock of its subsidiary,
+  Intercontinental Corp, for one mln dlrs to three European
+  insurance companies.
+      The parent company said it signed a letter of intent to
+  sell the stock to &lt;WASA Europeiska Forsakrings AB> of Sweden,
+  &lt;Europeiske Reiseforsikring A/S> of Norway, and &lt;Europeiska
+  Rejseforsikrings A/S> of Denmark.
+      Brougher said it expects to realize a net after-tax gain of
+  approximately 330,000 dlrs, or 12 cts per share, from issuing
+  stock of Intercontinental.
+  
+
+",0,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5153712034225464, ""acq"": 0.5221158862113953, ""money-fx"": 0.4552099406719208, ""grain"": 0.41354426741600037, ""crude"": 0.41414791345596313, ""trade"": 0.41298747062683105, ""interest"": 0.5087853074073792, ""ship"": 0.4690502882003784, ""wheat"": 0.4655125141143799, ""corn"": 0.44575366377830505}"
+training/10218,"HONEYWELL &lt;HON> DEBT RISES ON SPERRY BUYOUT
+  Honeywell Inc said its total debt
+  rose by more than 85 pct in 1986, mainly due to its 1.02
+  billion dlr acquisition of the Sperry Aerospace Group.
+      At yearend, according to the company's 1986 annual report,
+  Honeywell's total debt stood at 1.44 billion dlrs, compared
+  with 776.6 mln dlrs in 1985.
+      Honeywell said that if it had acquired the Sperry unit at
+  the beginning of 1986, its loss for the full year would have
+  been 9.88 dlrs a share.
+      Honeywell's actual loss in 1986 was 8.33 dlrs a share.
+  
+
+",1,1,0,0,0,0,0,0,0,0,"['earn', 'acq', 'money-fx', 'grain', 'crude', 'trade', 'interest', 'ship', 'wheat', 'corn']","{""earn"": 0.5169957280158997, ""acq"": 0.5270795226097107, ""money-fx"": 0.4556930959224701, ""grain"": 0.4141791760921478, ""crude"": 0.4138029217720032, ""trade"": 0.4123711884021759, ""interest"": 0.5064480304718018, ""ship"": 0.4763023257255554, ""wheat"": 0.46638205647468567, ""corn"": 0.4468691349029541}"

@@ -1,0 +1,58 @@
+created_at: '2025-12-05T16:20:21.177028'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq004
+    platform: Linux-4.18.0-553.81.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2025-12-05_16-19-11_smoke_openai
+  git_commit: 6f7ef1a97693e915b8c5676d8f8eff83c044281f
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-12-05T16:19:11.591940'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/openai_classifier_test_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/test_predictions_81cee4433749.csv
+  - predictions/test_predictions_81cee4433749.json
+test_results: null
+training_results:
+  batch_size: 32
+  classes:
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  classification_type: multi_label
+  completed: true
+  max_completion_tokens: 150
+  metrics:
+    f1: 0.8033333333333333
+    hamming_loss: 0.09
+    micro_f1: 0.91
+    micro_precision: 0.91
+    micro_recall: 0.91
+    precision: 0.8041666666666666
+    recall: 0.825
+    subset_accuracy: 0.7
+  model_name: gpt-4o-mini
+  model_type: llm
+  num_labels: 10
+  provider: openai
+  temperature: 0.1
+  test_samples: 20
+  train_samples: 58
