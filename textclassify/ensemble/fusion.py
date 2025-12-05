@@ -220,9 +220,6 @@ class FusionEnsemble(BaseEnsemble):
         if self.ml_model is None or self.llm_model is None:
             raise EnsembleError("Both ML and LLM models must be added before training")
         
-        # DEBUG: Log validation DataFrame size at entry
-        print(f"🔍 DEBUG: val_df size at FusionEnsemble.fit() entry: {len(val_df)} rows")
-        
         # Determine classification type if not already set
         if self.classification_type is None:
             if hasattr(self.ml_model, 'multi_label'):
@@ -299,7 +296,6 @@ class FusionEnsemble(BaseEnsemble):
         )
         
         # Step 3: Get LLM predictions on validation set
-        print(f"🔍 DEBUG: val_df size before _get_or_generate_llm_predictions: {len(val_df)} rows")
         llm_val_predictions = self._get_or_generate_llm_predictions(
             df=val_df,
             train_df=train_df,
@@ -320,38 +316,101 @@ class FusionEnsemble(BaseEnsemble):
         if all(col in val_df.columns for col in label_columns):
             val_true_labels = val_df[label_columns].values.tolist()
         
-        # If we have true labels, call the LLM classifier's predict_texts method to get proper metrics
+        # Calculate LLM validation metrics directly from cached predictions
         if val_true_labels is not None and self.llm_model is not None:
             try:
-                # Temporarily disable LLM results saving if intermediate saving is disabled
-                original_llm_results_manager = None
-                if not self.save_intermediate_llm_predictions and hasattr(self.llm_model, 'results_manager'):
-                    original_llm_results_manager = self.llm_model.results_manager
-                    self.llm_model.results_manager = None
+                # Calculate metrics directly from cached predictions and true labels
+                from sklearn.metrics import accuracy_score, hamming_loss, precision_recall_fscore_support
+                import numpy as np
                 
-                try:
-                    # Call the LLM classifier's predict_texts method with cached predictions
-                    # This ensures metrics are calculated and individual results are saved
-                    llm_val_result = self.llm_model.predict_texts(
-                        texts=val_df[text_column].tolist(), 
-                        true_labels=val_true_labels
+                # Check if predictions are already in binary format or need conversion
+                if llm_val_predictions and isinstance(llm_val_predictions[0], list) and all(isinstance(x, (int, float)) for x in llm_val_predictions[0]):
+                    # Already in binary format
+                    predicted_labels_array = np.array(llm_val_predictions)
+                else:
+                    # Convert predictions from class names to binary format
+                    predicted_labels = []
+                    for pred in llm_val_predictions:
+                        binary_pred = [0] * len(self.llm_model.classes_)
+                        if isinstance(pred, list):
+                            for class_name in pred:
+                                if class_name in self.llm_model.classes_:
+                                    binary_pred[self.llm_model.classes_.index(class_name)] = 1
+                        elif pred in self.llm_model.classes_:
+                            binary_pred[self.llm_model.classes_.index(pred)] = 1
+                        predicted_labels.append(binary_pred)
+                    predicted_labels_array = np.array(predicted_labels)
+                
+                true_labels_array = np.array(val_true_labels)
+                
+                # Calculate metrics
+                metrics = {}
+                if self.llm_model.multi_label:
+                    # Multi-label metrics
+                    exact_match = accuracy_score(true_labels_array, predicted_labels_array)
+                    hamming = hamming_loss(true_labels_array, predicted_labels_array)
+                    precision, recall, f1, _ = precision_recall_fscore_support(
+                        true_labels_array, predicted_labels_array, 
+                        average='weighted', zero_division=0
                     )
-                    # Override predictions with cached ones if they were used
-                    if val_llm_predictions is not None or self.val_llm_cache_path:
-                        llm_val_result.predictions = llm_val_predictions
-                        # Update model name to indicate cached predictions were used
-                        llm_val_result.model_name = "llm_model_cached"
-                finally:
-                    # Restore the original results manager
-                    if original_llm_results_manager is not None:
-                        self.llm_model.results_manager = original_llm_results_manager
+                    micro_precision, micro_recall, micro_f1, _ = precision_recall_fscore_support(
+                        true_labels_array, predicted_labels_array, 
+                        average='micro', zero_division=0
+                    )
+                    
+                    metrics = {
+                        'subset_accuracy': float(exact_match),
+                        'hamming_loss': float(hamming),
+                        'precision': float(precision),
+                        'recall': float(recall),
+                        'f1': float(f1),
+                        'micro_precision': float(micro_precision),
+                        'micro_recall': float(micro_recall),
+                        'micro_f1': float(micro_f1)
+                    }
+                else:
+                    # Single-label metrics
+                    true_indices = np.argmax(true_labels_array, axis=1)
+                    pred_indices = np.argmax(predicted_labels_array, axis=1)
+                    accuracy = accuracy_score(true_indices, pred_indices)
+                    precision, recall, f1, _ = precision_recall_fscore_support(
+                        true_indices, pred_indices, 
+                        average='weighted', zero_division=0
+                    )
+                    
+                    metrics = {
+                        'accuracy': float(accuracy),
+                        'precision': float(precision),
+                        'recall': float(recall),
+                        'f1': float(f1)
+                    }
+                
+                # Save LLM validation metrics if saving is enabled
+                if self.save_intermediate_llm_predictions and self.llm_model.results_manager:
+                    try:
+                        metrics_file = self.llm_model.results_manager.save_metrics(
+                            metrics, 
+                            "val", 
+                            "openai_classifier"
+                        )
+                        print(f"📊 LLM validation metrics saved: {metrics_file}")
+                    except Exception as e:
+                        print(f"Warning: Could not save LLM validation metrics: {e}")
+                
+                # Create result with metrics
+                from ..core.types import ClassificationResult
+                llm_val_result = ClassificationResult(
+                    predictions=llm_val_predictions,
+                    model_name="llm_model_cached",
+                    metadata={'metrics': metrics}
+                )
             except Exception as e:
-                print(f"Warning: Could not call LLM classifier predict_texts for metrics: {e}")
+                print(f"Warning: Could not calculate LLM validation metrics: {e}")
                 # Fallback to simple ClassificationResult
                 from ..core.types import ClassificationResult
                 llm_val_result = ClassificationResult(
                     predictions=llm_val_predictions,
-                    model_name="llm_model" if val_llm_predictions is None else "llm_model_cached",
+                    model_name="llm_model_cached",
                     classification_type=self.classification_type
                 )
         else:
@@ -737,31 +796,36 @@ class FusionEnsemble(BaseEnsemble):
                         # For cached/provided predictions: create metrics and save directly WITHOUT calling LLM API
                         print(f"📝 Creating metrics and saving results for {predictions_source} predictions (no API calls)...")
                         
-                        # Convert predictions to binary format for metrics calculation
-                        binary_predictions = []
-                        for pred in final_predictions:
-                            if self.llm_model.multi_label:
-                                # Multi-label: convert list of class names to binary vector
-                                binary_pred = [0] * len(self.llm_model.classes_)
-                                if isinstance(pred, list):
-                                    for class_name in pred:
-                                        if class_name in self.llm_model.classes_:
-                                            binary_pred[self.llm_model.classes_.index(class_name)] = 1
-                                binary_predictions.append(binary_pred)
-                            else:
-                                # Single-label: convert class name to binary vector or parse string response
-                                if isinstance(pred, str):
-                                    # Parse string prediction using LLM model's method
-                                    binary_pred = self.llm_model._parse_prediction_response(pred)
-                                else:
-                                    # Assume it's already a class name
+                        # Check if predictions are already in binary format or need conversion
+                        if final_predictions and isinstance(final_predictions[0], list) and all(isinstance(x, (int, float)) for x in final_predictions[0]):
+                            # Already in binary format
+                            binary_predictions = final_predictions
+                        else:
+                            # Convert predictions to binary format for metrics calculation
+                            binary_predictions = []
+                            for pred in final_predictions:
+                                if self.llm_model.multi_label:
+                                    # Multi-label: convert list of class names to binary vector
                                     binary_pred = [0] * len(self.llm_model.classes_)
-                                    if pred in self.llm_model.classes_:
-                                        binary_pred[self.llm_model.classes_.index(pred)] = 1
+                                    if isinstance(pred, list):
+                                        for class_name in pred:
+                                            if class_name in self.llm_model.classes_:
+                                                binary_pred[self.llm_model.classes_.index(class_name)] = 1
+                                    binary_predictions.append(binary_pred)
+                                else:
+                                    # Single-label: convert class name to binary vector or parse string response
+                                    if isinstance(pred, str):
+                                        # Parse string prediction using LLM model's method
+                                        binary_pred = self.llm_model._parse_prediction_response(pred)
                                     else:
-                                        # Default to first class if prediction not in classes
-                                        binary_pred[0] = 1
-                                binary_predictions.append(binary_pred)
+                                        # Assume it's already a class name
+                                        binary_pred = [0] * len(self.llm_model.classes_)
+                                        if pred in self.llm_model.classes_:
+                                            binary_pred[self.llm_model.classes_.index(pred)] = 1
+                                        else:
+                                            # Default to first class if prediction not in classes
+                                            binary_pred[0] = 1
+                                    binary_predictions.append(binary_pred)
                         
                         # Calculate metrics
                         metrics = self.llm_model._calculate_metrics(binary_predictions, true_labels)
@@ -1107,8 +1171,6 @@ class FusionEnsemble(BaseEnsemble):
             base_cache_path: Base path for the cache file (e.g., 'cache/val')
             df: DataFrame for hash calculation and metadata (MUST be the FULL dataset)
         """
-        print(f"🔍 DEBUG: _save_cached_llm_predictions called with {len(predictions)} predictions")
-        
         if not base_cache_path or not base_cache_path.strip():
             print("⚠️  No cache path provided, skipping save")
             return
@@ -2021,25 +2083,83 @@ class FusionEnsemble(BaseEnsemble):
             # Generate LLM test metrics if we have true labels
             if extracted_labels is not None and self.llm_model is not None:
                 try:
-                    llm_test_result = self.llm_model.predict_texts(
-                        texts=texts, 
-                        true_labels=extracted_labels
-                    )
-                    llm_test_result.predictions = llm_test_predictions
-                    llm_test_result.model_name = "llm_model_cached"
+                    # Calculate metrics directly from cached predictions and true labels
+                    from sklearn.metrics import accuracy_score, hamming_loss, precision_recall_fscore_support
+                    import numpy as np
+                    
+                    # Check if predictions are already in binary format or need conversion
+                    if llm_test_predictions and isinstance(llm_test_predictions[0], list) and all(isinstance(x, (int, float)) for x in llm_test_predictions[0]):
+                        # Already in binary format
+                        predicted_labels_array = np.array(llm_test_predictions)
+                    else:
+                        # Convert predictions from class names to binary format
+                        predicted_labels = []
+                        for pred in llm_test_predictions:
+                            binary_pred = [0] * len(self.llm_model.classes_)
+                            if isinstance(pred, list):
+                                for class_name in pred:
+                                    if class_name in self.llm_model.classes_:
+                                        binary_pred[self.llm_model.classes_.index(class_name)] = 1
+                            elif pred in self.llm_model.classes_:
+                                binary_pred[self.llm_model.classes_.index(pred)] = 1
+                            predicted_labels.append(binary_pred)
+                        predicted_labels_array = np.array(predicted_labels)
+                    
+                    true_labels_array = np.array(extracted_labels)
+                    
+                    # Calculate metrics
+                    metrics = {}
+                    if self.llm_model.multi_label:
+                        # Multi-label metrics
+                        exact_match = accuracy_score(true_labels_array, predicted_labels_array)
+                        hamming = hamming_loss(true_labels_array, predicted_labels_array)
+                        precision, recall, f1, _ = precision_recall_fscore_support(
+                            true_labels_array, predicted_labels_array, 
+                            average='weighted', zero_division=0
+                        )
+                        micro_precision, micro_recall, micro_f1, _ = precision_recall_fscore_support(
+                            true_labels_array, predicted_labels_array, 
+                            average='micro', zero_division=0
+                        )
+                        
+                        metrics = {
+                            'subset_accuracy': float(exact_match),
+                            'hamming_loss': float(hamming),
+                            'precision': float(precision),
+                            'recall': float(recall),
+                            'f1': float(f1),
+                            'micro_precision': float(micro_precision),
+                            'micro_recall': float(micro_recall),
+                            'micro_f1': float(micro_f1)
+                        }
+                    else:
+                        # Single-label metrics
+                        true_indices = np.argmax(true_labels_array, axis=1)
+                        pred_indices = np.argmax(predicted_labels_array, axis=1)
+                        accuracy = accuracy_score(true_indices, pred_indices)
+                        precision, recall, f1, _ = precision_recall_fscore_support(
+                            true_indices, pred_indices, 
+                            average='weighted', zero_division=0
+                        )
+                        
+                        metrics = {
+                            'accuracy': float(accuracy),
+                            'precision': float(precision),
+                            'recall': float(recall),
+                            'f1': float(f1)
+                        }
                     
                     # Save LLM test metrics
-                    if self.llm_model.results_manager and hasattr(llm_test_result, 'metadata') and llm_test_result.metadata:
-                        if 'metrics' in llm_test_result.metadata:
-                            try:
-                                metrics_file = self.llm_model.results_manager.save_metrics(
-                                    llm_test_result.metadata['metrics'], 
-                                    "test", 
-                                    self.llm_model.model_name or "openai_classifier"
-                                )
-                                print(f"📊 LLM test metrics saved: {metrics_file}")
-                            except Exception as e:
-                                print(f"Warning: Could not save LLM test metrics: {e}")
+                    if self.llm_model.results_manager:
+                        try:
+                            metrics_file = self.llm_model.results_manager.save_metrics(
+                                metrics, 
+                                "test", 
+                                "openai_classifier"
+                            )
+                            print(f"📊 LLM test metrics saved: {metrics_file}")
+                        except Exception as e:
+                            print(f"Warning: Could not save LLM test metrics: {e}")
                 except Exception as e:
                     print(f"Warning: Could not generate LLM test metrics: {e}")
             

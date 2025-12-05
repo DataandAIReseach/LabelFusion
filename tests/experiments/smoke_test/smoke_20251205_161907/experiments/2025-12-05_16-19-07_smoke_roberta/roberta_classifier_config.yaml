@@ -1,0 +1,25 @@
+config:
+  batch_size: 8
+  classes: &id001
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  label_columns: *id001
+  learning_rate: 2.0e-05
+  max_length: 256
+  model_name: distilroberta-base
+  multi_label: true
+  num_epochs: 1
+  num_labels: 10
+  text_column: text
+metadata:
+  experiment_id: 2025-12-05_16-19-07_smoke_roberta
+  model_name: roberta_classifier
+  timestamp: '2025-12-05T16:19:11.435187'
