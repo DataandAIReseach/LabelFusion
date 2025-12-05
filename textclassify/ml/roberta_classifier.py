@@ -196,7 +196,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         # Mode tracking (train/val/test)
         self.mode = None
-        self._current_test_df = None  # DataFrame reference for results saving
+        self._current_data_df = None  # DataFrame reference for results saving
     
     def set_mode(self, mode: str) -> None:
         """Set the current prediction mode.
@@ -426,14 +426,17 @@ class RoBERTaClassifier(BaseMLClassifier):
             print("📝 Generating validation predictions...")
             try:
                 val_result = self._predict_on_dataset(val_df, mode="validation")
-                # Extract all validation metrics
+                # Extract all validation metrics and saved file paths
                 val_metrics = val_result.metadata.get('metrics', {}) if val_result.metadata else {}
+                saved_files = val_result.metadata.get('saved_files', {}) if val_result.metadata else {}
+                
                 val_predictions_saved = {
                     'num_samples': len(val_df),
-                    'metrics': val_metrics
+                    'metrics': val_metrics,
+                    'saved_files': saved_files  # Include paths to saved files
                 }
                 
-                # Print key metrics
+                # Print key metrics and file locations
                 if val_metrics:
                     if 'accuracy' in val_metrics:
                         print(f"✅ Validation accuracy: {val_metrics['accuracy']:.4f}")
@@ -443,6 +446,10 @@ class RoBERTaClassifier(BaseMLClassifier):
                         print(f"   Precision (weighted): {val_metrics['precision_weighted']:.4f}")
                     if 'recall_weighted' in val_metrics:
                         print(f"   Recall (weighted): {val_metrics['recall_weighted']:.4f}")
+                    
+                    # Print metrics file location
+                    if 'metrics' in saved_files:
+                        print(f"   Metrics saved to: {saved_files['metrics']}")
                 else:
                     print(f"✅ Validation predictions saved for {len(val_df)} samples")
             except Exception as e:
@@ -531,9 +538,8 @@ class RoBERTaClassifier(BaseMLClassifier):
         # Set mode
         self.mode = mode
         
-        # Store DataFrame reference for results saving
-        if self.results_manager:
-            self._current_test_df = data_df
+        # Store DataFrame reference for results saving (always store it)
+        self._current_data_df = data_df
         
         # Make predictions using the internal text method
         result = self._predict_texts_internal(texts, true_labels)
@@ -558,12 +564,14 @@ class RoBERTaClassifier(BaseMLClassifier):
 
     def predict_without_saving(
         self,
-        data_df: pd.DataFrame
+        data_df: pd.DataFrame,
+        mode: str = "test"
     ) -> ClassificationResult:
         """Predict on data without saving results (for internal use by ensembles).
         
         Args:
             data_df: DataFrame for prediction with text and optionally label columns
+            mode: Prediction mode ("test", "validation", "train") for proper file naming
             
         Returns:
             ClassificationResult with predictions and metrics
@@ -585,8 +593,11 @@ class RoBERTaClassifier(BaseMLClassifier):
         if all(col in data_df.columns for col in self.label_columns):
             true_labels = data_df[self.label_columns].values.tolist()
         
-        # Store DataFrame reference (even though we won't save results here)
-        self._current_test_df = data_df
+        # Set mode for proper file naming
+        self.mode = mode
+        
+        # Store DataFrame reference
+        self._current_data_df = data_df
         
         # Make predictions using the internal text method (no saving)
         return self._predict_texts_internal(texts, true_labels)
@@ -711,7 +722,7 @@ class RoBERTaClassifier(BaseMLClassifier):
             try:
                 # Use mode if available, otherwise default to "test"
                 mode = self.mode if self.mode else 'test'
-                current_df = getattr(self, '_current_test_df', None)
+                current_df = getattr(self, '_current_data_df', None)
                 
                 if current_df is not None:
                     saved_files = self.results_manager.save_predictions(
