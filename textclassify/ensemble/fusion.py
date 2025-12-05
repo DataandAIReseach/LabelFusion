@@ -291,7 +291,7 @@ class FusionEnsemble(BaseEnsemble):
         
         # Step 2: Get ML predictions on validation set with hashes
         print("Getting ML predictions on validation set...")
-        ml_val_result = self.ml_model.predict_without_saving(val_df)
+        ml_val_result = self.ml_model.predict_without_saving(val_df, mode="validation")
         text_column = self.ml_model.text_column or 'text'
         ml_val_predictions_hashed = self._attach_hashes_to_predictions(
             ml_val_result.predictions, 
@@ -1995,6 +1995,15 @@ class FusionEnsemble(BaseEnsemble):
         if cached_fusion_predictions is not None:
             # Use cached predictions
             print(f"🎯 Using cached fusion predictions (count: {len(cached_fusion_predictions)})")
+            
+            # Generate ML test metrics if we have true labels
+            if extracted_labels is not None and self.ml_model is not None:
+                try:
+                    print("📊 Generating ML test metrics from cached predictions...")
+                    ml_test_result = self.ml_model.predict(test_df)
+                    print(f"📊 ML test metrics generated and saved")
+                except Exception as e:
+                    print(f"Warning: Could not generate ML test metrics: {e}")
             
             # Still need to get LLM predictions for metrics calculation
             llm_train_df = train_df if train_df is not None else getattr(self, 'train_df_cache', None)
