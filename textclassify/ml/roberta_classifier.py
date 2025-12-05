@@ -193,6 +193,18 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.model = None
         self.label_encoder = None
         self.num_labels = None
+        
+        # Mode tracking (train/val/test)
+        self.mode = None
+        self._current_test_df = None  # DataFrame reference for results saving
+    
+    def set_mode(self, mode: str) -> None:
+        """Set the current prediction mode.
+        
+        Args:
+            mode: The mode to set ('train', 'val', or 'test')
+        """
+        self.mode = mode
     
     def fit(
         self,
@@ -413,12 +425,26 @@ class RoBERTaClassifier(BaseMLClassifier):
         if val_df is not None and self.enable_validation:
             print("📝 Generating validation predictions...")
             try:
-                val_result = self._predict_on_dataset(val_df, dataset_type="validation")
+                val_result = self._predict_on_dataset(val_df, mode="validation")
+                # Extract all validation metrics
+                val_metrics = val_result.metadata.get('metrics', {}) if val_result.metadata else {}
                 val_predictions_saved = {
-                    'accuracy': val_result.metadata.get('metrics', {}).get('accuracy', 0.0) if val_result.metadata else 0.0,
-                    'num_samples': len(val_df)
+                    'num_samples': len(val_df),
+                    'metrics': val_metrics
                 }
-                print(f"✅ Validation predictions saved with accuracy: {val_predictions_saved['accuracy']:.4f}")
+                
+                # Print key metrics
+                if val_metrics:
+                    if 'accuracy' in val_metrics:
+                        print(f"✅ Validation accuracy: {val_metrics['accuracy']:.4f}")
+                    if 'f1_weighted' in val_metrics:
+                        print(f"   F1 (weighted): {val_metrics['f1_weighted']:.4f}")
+                    if 'precision_weighted' in val_metrics:
+                        print(f"   Precision (weighted): {val_metrics['precision_weighted']:.4f}")
+                    if 'recall_weighted' in val_metrics:
+                        print(f"   Recall (weighted): {val_metrics['recall_weighted']:.4f}")
+                else:
+                    print(f"✅ Validation predictions saved for {len(val_df)} samples")
             except Exception as e:
                 print(f"⚠️ Warning: Could not save validation predictions: {e}")
                 val_predictions_saved = None
@@ -474,13 +500,13 @@ class RoBERTaClassifier(BaseMLClassifier):
     def _predict_on_dataset(
         self, 
         data_df: pd.DataFrame, 
-        dataset_type: str = "test"
+        mode: str = "test"
     ) -> ClassificationResult:
-        """Predict on a dataset with specified dataset type for proper file naming.
+        """Predict on a dataset with specified mode for proper file naming.
         
         Args:
             data_df: DataFrame for prediction with text and optionally label columns
-            dataset_type: Type of dataset ("test", "validation", etc.) for file naming
+            mode: Prediction mode ("test", "validation", "train") for file naming
             
         Returns:
             ClassificationResult with predictions and metrics
@@ -502,19 +528,15 @@ class RoBERTaClassifier(BaseMLClassifier):
         if all(col in data_df.columns for col in self.label_columns):
             true_labels = data_df[self.label_columns].values.tolist()
         
-        # Store DataFrame reference for results saving with specified dataset type
+        # Set mode
+        self.mode = mode
+        
+        # Store DataFrame reference for results saving
         if self.results_manager:
             self._current_test_df = data_df
-            self._current_dataset_type = dataset_type
         
         # Make predictions using the internal text method
         result = self._predict_texts_internal(texts, true_labels)
-        
-        # Clean up temporary references
-        if hasattr(self, '_current_test_df'):
-            delattr(self, '_current_test_df')
-        if hasattr(self, '_current_dataset_type'):
-            delattr(self, '_current_dataset_type')
             
         return result
 
@@ -532,7 +554,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         Returns:
             ClassificationResult with predictions and metrics
         """
-        return self._predict_on_dataset(test_df, dataset_type="test")
+        return self._predict_on_dataset(test_df, mode="test")
 
     def predict_without_saving(
         self,
@@ -562,6 +584,9 @@ class RoBERTaClassifier(BaseMLClassifier):
         true_labels = None
         if all(col in data_df.columns for col in self.label_columns):
             true_labels = data_df[self.label_columns].values.tolist()
+        
+        # Store DataFrame reference (even though we won't save results here)
+        self._current_test_df = data_df
         
         # Make predictions using the internal text method (no saving)
         return self._predict_texts_internal(texts, true_labels)
@@ -681,35 +706,31 @@ class RoBERTaClassifier(BaseMLClassifier):
             embeddings=all_embeddings if all_embeddings else None  # Add embeddings to result
         )
         
-        # Save prediction results using ResultsManager (if it's the main predict call)
-        if self.results_manager and hasattr(self, '_current_test_df'):
+        # Save prediction results using ResultsManager (always save when available)
+        if self.results_manager:
             try:
-                # Use dataset type if available, otherwise default to "test"
-                dataset_type = getattr(self, '_current_dataset_type', 'test')
+                # Use mode if available, otherwise default to "test"
+                mode = self.mode if self.mode else 'test'
+                current_df = getattr(self, '_current_test_df', None)
                 
-                saved_files = self.results_manager.save_predictions(
-                    result, dataset_type, self._current_test_df
-                )
-                
-                # Save metrics if available
-                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
-                    metrics_file = self.results_manager.save_metrics(
-                        result.metadata['metrics'], dataset_type, "roberta_classifier"
+                if current_df is not None:
+                    saved_files = self.results_manager.save_predictions(
+                        result, mode, current_df
                     )
-                    saved_files["metrics"] = metrics_file
-                
-                print(f"📁 Prediction results saved: {saved_files}")
-                
-                # Add file paths to result metadata
-                if not result.metadata:
-                    result.metadata = {}
-                result.metadata['saved_files'] = saved_files
-                
-                # Clean up temporary references
-                if hasattr(self, '_current_test_df'):
-                    delattr(self, '_current_test_df')
-                if hasattr(self, '_current_dataset_type'):
-                    delattr(self, '_current_dataset_type')
+                    
+                    # Save metrics if available
+                    if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                        metrics_file = self.results_manager.save_metrics(
+                            result.metadata['metrics'], mode, "roberta_classifier"
+                        )
+                        saved_files["metrics"] = metrics_file
+                    
+                    print(f"📁 Prediction results saved: {saved_files}")
+                    
+                    # Add file paths to result metadata
+                    if not result.metadata:
+                        result.metadata = {}
+                    result.metadata['saved_files'] = saved_files
                 
             except Exception as e:
                 print(f"Warning: Could not save prediction results: {e}")
