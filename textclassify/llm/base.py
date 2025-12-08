@@ -516,12 +516,15 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if not p.exists():
             return False
 
-        # Compute stable 8-char hash for DataFrame
+        # Compute stable 8-char hash for DataFrame using ONLY text column (consistent with _initialize_batch_cache_file)
         try:
-            hashed = pd.util.hash_pandas_object(df, index=True).values
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
             dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
         except Exception:
-            csv_bytes = df.to_csv(index=True).encode('utf-8')
+            # Fallback: hash text column as CSV
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
 
         discovered = self.discover_cached_predictions(cache_dir)
@@ -711,10 +714,42 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         cache_filename = f"{mode}_{dataset_hash}.json"
         cache_file_path = cache_dir / cache_filename
         
-        # If cache file exists, load it; otherwise create new one
+        # If cache file exists, load it into _prediction_cache; otherwise create new one
         if cache_file_path.exists():
             if self.verbose:
                 self.logger.info(f"Loading existing batch cache file: {cache_file_path}")
+            
+            # Load predictions from JSON cache file into _prediction_cache
+            try:
+                with open(cache_file_path, 'r') as f:
+                    cache_data = json.load(f)
+                    predictions_list = cache_data.get('predictions', [])
+                    
+                    # Populate _prediction_cache with predictions from the file
+                    if self._prediction_cache and predictions_list:
+                        for pred_entry in predictions_list:
+                            text = pred_entry.get('text', '')
+                            if text:
+                                # Add prediction using add_prediction_direct (no auto-save)
+                                prediction = pred_entry.get('prediction', [])
+                                response_text = pred_entry.get('response_text', '')
+                                prompt = pred_entry.get('prompt', '')
+                                
+                                # Use add_prediction_direct to avoid triggering auto-save
+                                self._prediction_cache.add_prediction_direct(
+                                    text=text,
+                                    prediction=prediction,
+                                    response_text=response_text,
+                                    prompt=prompt,
+                                    metadata=pred_entry
+                                )
+                        
+                        if self.verbose:
+                            self.logger.info(f"✓ Loaded {len(predictions_list)} predictions into memory cache")
+            except Exception as e:
+                if self.verbose:
+                    self.logger.warning(f"Failed to load predictions into cache: {e}")
+            
             return str(cache_file_path)
         
         # Initialize new cache file with metadata
@@ -1614,10 +1649,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Patterns to match different cache file types
         # Supports both formats: YYYY-MM-DD-HH-MM-SS and YYYY_MM_DD_HH_MM_SS
         patterns = {
-            'train_predictions': r'train[_-](?:predictions[_-])?\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+\.json',
-            'validation_predictions': r'val(?:idation)?[_-](?:predictions[_-])?\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+\.json',
-            'test_predictions': r'test[_-](?:predictions[_-])?\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+\.json'
+        'train_predictions': r'train[_-](?:predictions[_-])?(?:\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-])?[a-f0-9]+\.json',
+        'validation_predictions': r'val(?:idation)?[_-](?:predictions[_-])?(?:\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-])?[a-f0-9]+\.json',
+        'test_predictions': r'test[_-](?:predictions[_-])?(?:\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-])?[a-f0-9]+\.json'
         }
+
         
         for dataset_type, pattern in patterns.items():
             matching_files = []

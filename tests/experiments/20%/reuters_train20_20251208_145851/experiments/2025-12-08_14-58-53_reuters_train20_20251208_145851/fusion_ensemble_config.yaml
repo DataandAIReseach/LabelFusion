@@ -1,0 +1,26 @@
+config:
+  batch_size: 8
+  classes:
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  classification_type: ClassificationType.MULTI_LABEL
+  ensemble_method: fusion
+  fusion_hidden_dims:
+  - 64
+  - 32
+  fusion_lr: 0.0005
+  ml_lr: 1.0e-05
+  num_epochs: 10
+  num_labels: 10
+metadata:
+  experiment_id: 2025-12-08_14-58-53_reuters_train20_20251208_145851
+  model_name: fusion_ensemble
+  timestamp: '2025-12-08T14:58:59.606423'

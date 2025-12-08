@@ -2000,9 +2000,20 @@ class FusionEnsemble(BaseEnsemble):
         """
         tensor = torch.zeros(self.num_labels)
         
+        # Debug: Check prediction type and format
+        if not isinstance(prediction, (str, list)):
+            raise ValueError(f"Unexpected prediction type: {type(prediction)}. Value: {prediction}")
+        
         if isinstance(prediction, list) and len(prediction) == self.num_labels:
-            # Already in binary vector format
-            tensor = torch.tensor(prediction, dtype=torch.float)
+            # Already in binary vector format - check if all elements are numeric
+            if all(isinstance(x, (int, float)) for x in prediction):
+                tensor = torch.tensor(prediction, dtype=torch.float)
+            else:
+                # List of class names (multi-label)
+                for pred_class in prediction:
+                    if isinstance(pred_class, str) and pred_class in self.classes_:
+                        class_idx = self.classes_.index(pred_class)
+                        tensor[class_idx] = 1.0
         elif isinstance(prediction, str):
             # Convert class name to binary vector
             if prediction in self.classes_:
@@ -2011,7 +2022,7 @@ class FusionEnsemble(BaseEnsemble):
         elif isinstance(prediction, list):
             # List of class names (multi-label)
             for pred_class in prediction:
-                if pred_class in self.classes_:
+                if isinstance(pred_class, str) and pred_class in self.classes_:
                     class_idx = self.classes_.index(pred_class)
                     tensor[class_idx] = 1.0
         
@@ -2420,6 +2431,14 @@ class FusionEnsemble(BaseEnsemble):
         # Calculate metrics if true labels are provided
         metrics = None
         if true_labels is not None:
+            # Debug: Check dimensions before calculating metrics
+            print(f"DEBUG: binary_predictions length: {len(binary_predictions)}")
+            print(f"DEBUG: true_labels length: {len(true_labels)}")
+            if len(binary_predictions) > 0:
+                print(f"DEBUG: binary_predictions[0] length: {len(binary_predictions[0])}")
+            if len(true_labels) > 0:
+                print(f"DEBUG: true_labels[0] length: {len(true_labels[0]) if isinstance(true_labels[0], list) else 'not a list'}")
+            
             metrics = self._calculate_metrics(binary_predictions, true_labels)
         
         # Create base result using inherited method
