@@ -1,0 +1,126 @@
+created_at: '2025-12-08T15:31:43.473336'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq003
+    platform: Linux-4.18.0-553.81.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2025-12-08_15-29-14_reuters_train60_20251208_152914_roberta
+  git_commit: 0992952b046b0446db66b45ab63699067f89635d
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-12-08T15:29:14.066512'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/roberta_classifier_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/validation_predictions_aa685a6f1bc6.csv
+  - predictions/validation_predictions_aa685a6f1bc6.json
+test_results: null
+training_results:
+  classes:
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  device: cuda
+  model_name: roberta-base
+  num_labels: 10
+  training_samples: 3505
+  validation_predictions:
+    metrics:
+      classification_report:
+        acq:
+          f1-score: 0.9667673716012085
+          precision: 0.963855421686747
+          recall: 0.9696969696969697
+          support: 165.0
+        corn:
+          f1-score: 0.5306122448979592
+          precision: 0.41935483870967744
+          recall: 0.7222222222222222
+          support: 18.0
+        crude:
+          f1-score: 0.9090909090909091
+          precision: 0.9210526315789473
+          recall: 0.8974358974358975
+          support: 39.0
+        earn:
+          f1-score: 0.9913644214162349
+          precision: 0.9862542955326461
+          recall: 0.9965277777777778
+          support: 288.0
+        grain:
+          f1-score: 0.9523809523809523
+          precision: 0.975609756097561
+          recall: 0.9302325581395349
+          support: 43.0
+        interest:
+          f1-score: 0.6888888888888889
+          precision: 0.5636363636363636
+          recall: 0.8857142857142857
+          support: 35.0
+        macro avg:
+          f1-score: 0.7523616720902978
+          precision: 0.7860522022211184
+          recall: 0.8242927952084929
+          support: 720.0
+        micro avg:
+          f1-score: 0.8964595858383434
+          precision: 0.8635778635778636
+          recall: 0.9319444444444445
+          support: 720.0
+        money-fx:
+          f1-score: 0.7786259541984732
+          precision: 0.6623376623376623
+          recall: 0.9444444444444444
+          support: 54.0
+        samples avg:
+          f1-score: 0.917671303451829
+          precision: 0.9093250901597115
+          recall: 0.9471921689850593
+          support: 720.0
+        ship:
+          f1-score: 0.18181818181818182
+          precision: 1.0
+          recall: 0.1
+          support: 20.0
+        trade:
+          f1-score: 0.88
+          precision: 0.868421052631579
+          recall: 0.8918918918918919
+          support: 37.0
+        weighted avg:
+          f1-score: 0.8984253006946814
+          precision: 0.898087675518248
+          recall: 0.9319444444444445
+          support: 720.0
+        wheat:
+          f1-score: 0.6440677966101694
+          precision: 0.5
+          recall: 0.9047619047619048
+          support: 21.0
+      exact_match_accuracy: 0.8191653786707882
+      f1_weighted: 0.8984253006946814
+      hamming_loss: 0.023956723338485315
+      precision_weighted: 0.898087675518248
+      recall_weighted: 0.9319444444444445
+    num_samples: 647
+    saved_files:
+      csv: tests/experiments/60%/reuters_train60_20251208_152914/experiments/2025-12-08_15-29-14_reuters_train60_20251208_152914_roberta/predictions/validation_predictions_aa685a6f1bc6.csv
+      json: tests/experiments/60%/reuters_train60_20251208_152914/experiments/2025-12-08_15-29-14_reuters_train60_20251208_152914_roberta/predictions/validation_predictions_aa685a6f1bc6.json
+      metrics: tests/experiments/60%/reuters_train60_20251208_152914/experiments/2025-12-08_15-29-14_reuters_train60_20251208_152914_roberta/metrics/roberta_classifier_validation_metrics.yaml
+  validation_samples: 647

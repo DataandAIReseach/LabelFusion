@@ -5,6 +5,7 @@ import json
 import re
 import logging
 import time
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Tuple, Iterator
 import pandas as pd
@@ -205,29 +206,61 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if self.verbose:
                 print("\n🔍 Auto-cache enabled, checking for cached predictions...")
             
+            # Compute dataset hash for test_df to find exact match
+            try:
+                text_series = test_df[self.text_column] if self.text_column in test_df.columns else test_df.iloc[:, 0]
+                hashed = pd.util.hash_pandas_object(text_series, index=False).values
+                test_dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+            except Exception:
+                text_series = test_df[self.text_column] if self.text_column in test_df.columns else test_df.iloc[:, 0]
+                csv_bytes = text_series.to_csv(index=False).encode('utf-8')
+                test_dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+            
+            if self.verbose:
+                print(f"🔑 Test dataset hash: {test_dataset_hash}")
+            
             discovered = self.discover_cached_predictions(self.cache_dir)
             
-            # Try to find a matching cache file for test predictions
+            # Try to find a matching cache file for test predictions with matching hash
             if 'test_predictions' in discovered and discovered['test_predictions']:
-                cache_file = discovered['test_predictions'][0]  # Use most recent
+                matching_cache = None
+                for cache_file in discovered['test_predictions']:
+                    # Check if filename contains the hash
+                    if test_dataset_hash in Path(cache_file).name:
+                        matching_cache = cache_file
+                        break
+                    
+                    # Also check metadata inside the file
+                    try:
+                        with open(cache_file, 'r') as f:
+                            cache_data = json.load(f)
+                        if cache_data.get('metadata', {}).get('dataset_hash') == test_dataset_hash:
+                            matching_cache = cache_file
+                            break
+                    except Exception:
+                        continue
                 
-                if self.verbose:
-                    print(f"✅ Found cached predictions: {Path(cache_file).name}")
-                    print("📥 Loading from cache (1000-5000x faster than inference)...")
-                
-                try:
-                    # Load and return cached predictions
-                    result = self.predict_with_cached_predictions(test_df, cache_file, train_df)
-                    
+                if matching_cache:
                     if self.verbose:
-                        print(f"⚡ Cache load completed in {time.time() - start_time:.2f} seconds")
+                        print(f"✅ Found matching cached predictions: {Path(matching_cache).name}")
+                        print("📥 Loading from cache (1000-5000x faster than inference)...")
                     
-                    return result
-                    
-                except Exception as e:
-                    if self.verbose:
-                        print(f"⚠️  Cache load failed: {e}")
-                        print("🔄 Falling back to normal inference...")
+                    try:
+                        # Load and return cached predictions
+                        result = self.predict_with_cached_predictions(test_df, matching_cache, train_df)
+                        
+                        if self.verbose:
+                            print(f"⚡ Cache load completed in {time.time() - start_time:.2f} seconds")
+                        
+                        return result
+                        
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"⚠️  Cache load failed: {e}")
+                            print("🔄 Falling back to normal inference...")
+                elif self.verbose:
+                    print(f"ℹ️  Found {len(discovered['test_predictions'])} test cache file(s), but none match current dataset (hash: {test_dataset_hash})")
+                    print("🔄 Running inference...")
             elif self.verbose:
                 print("ℹ️  No cached predictions found, running inference...")
 
@@ -1647,11 +1680,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         discovered = {}
         
         # Patterns to match different cache file types
-        # Supports both formats: YYYY-MM-DD-HH-MM-SS and YYYY_MM_DD_HH_MM_SS
+        # Supports: test_hash.json, test-hash.json, test_predictions_hash.json, test_YYYY-MM-DD_hash.json
         patterns = {
-        'train_predictions': r'train[_-](?:predictions[_-])?(?:\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-])?[a-f0-9]+\.json',
-        'validation_predictions': r'val(?:idation)?[_-](?:predictions[_-])?(?:\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-])?[a-f0-9]+\.json',
-        'test_predictions': r'test[_-](?:predictions[_-])?(?:\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-])?[a-f0-9]+\.json'
+        'train_predictions': r'train[_-](?:[a-f0-9]{8,}|predictions[_-][a-f0-9]{8,}|\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+)\.json',
+        'validation_predictions': r'val(?:idation)?[_-](?:[a-f0-9]{8,}|predictions[_-][a-f0-9]{8,}|\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+)\.json',
+        'test_predictions': r'test[_-](?:[a-f0-9]{8,}|predictions[_-][a-f0-9]{8,}|\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+)\.json'
         }
 
         
