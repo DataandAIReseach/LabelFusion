@@ -1882,23 +1882,39 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 )
         
         # Convert cached predictions to the expected format
-        # Predictions might be stored as binary vectors or class names
+        # Predictions might be stored as:
+        # 1. List of dicts with 'prediction' key: [{"text": "...", "prediction": [0,1,0]}, ...]
+        # 2. Direct binary vectors: [[0,1,0], [1,0,0], ...]
+        # 3. Class names: ["class1", "class2", ...]
         formatted_predictions = []
         for pred in predictions:
-            if isinstance(pred, list) and all(isinstance(x, int) for x in pred):
-                # Already in binary format
+            # Handle dict format (from _write_batch_to_cache)
+            if isinstance(pred, dict) and 'prediction' in pred:
+                prediction_array = pred['prediction']
+                if isinstance(prediction_array, list) and all(isinstance(x, int) for x in prediction_array):
+                    formatted_predictions.append(prediction_array)
+                else:
+                    # Fallback for unexpected format
+                    formatted_predictions.append([0] * len(self.label_columns))
+            # Handle direct binary vector
+            elif isinstance(pred, list) and all(isinstance(x, int) for x in pred):
                 formatted_predictions.append(pred)
-            else:
-                # Convert to binary format
+            # Handle class name strings
+            elif isinstance(pred, str):
                 binary_pred = [0] * len(self.label_columns)
-                if isinstance(pred, str):
-                    if pred in self.label_columns:
-                        binary_pred[self.label_columns.index(pred)] = 1
-                elif isinstance(pred, list):
-                    for label in pred:
-                        if label in self.label_columns:
-                            binary_pred[self.label_columns.index(label)] = 1
+                if pred in self.label_columns:
+                    binary_pred[self.label_columns.index(pred)] = 1
                 formatted_predictions.append(binary_pred)
+            # Handle list of class names (multi-label)
+            elif isinstance(pred, list) and pred and isinstance(pred[0], str):
+                binary_pred = [0] * len(self.label_columns)
+                for label in pred:
+                    if label in self.label_columns:
+                        binary_pred[self.label_columns.index(label)] = 1
+                formatted_predictions.append(binary_pred)
+            else:
+                # Unknown format - use default
+                formatted_predictions.append([0] * len(self.label_columns))
         
         # Calculate metrics if test_df has labels
         metrics = None
