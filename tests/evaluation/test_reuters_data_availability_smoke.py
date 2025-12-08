@@ -58,7 +58,14 @@ def main():
     # Configuration
     data_dir = '/scratch/users/u19147/LabelFusion/data/reuters'
     output_dir = 'tests/experiments/smoke_test'
-    cache_dir = 'cache'
+    cache_dir = 'cache/smoke_test'  # Use separate cache dir for smoke test
+    
+    # Clean cache directory to avoid stale data
+    import shutil
+    if os.path.exists(cache_dir):
+        print(f"\n🧹 Cleaning cache directory: {cache_dir}")
+        shutil.rmtree(cache_dir)
+    os.makedirs(cache_dir, exist_ok=True)
     
     # Use very small sample for smoke test
     train_pct = 0.01  # 1% of training data (~70 samples)
@@ -83,7 +90,12 @@ def main():
     sampled_test = df_test.sample(n=test_samples, random_state=42).reset_index(drop=True)
     
     print(f"   Train: {len(sampled_train)}, Val: {len(sampled_val)}, Test: {len(sampled_test)}")
-    print(f"   Labels: {label_columns[:3]}...")
+    print(f"   Labels: {label_columns[:3]}... ({len(label_columns)} total)")
+    
+    # Verify test data has labels
+    print(f"   Sampled test shape: {sampled_test.shape}")
+    print(f"   Sampled test columns: {list(sampled_test.columns[:5])}...")
+    assert all(col in sampled_test.columns for col in label_columns), "Test data missing label columns!"
     
     # Create experiment directory
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -91,7 +103,7 @@ def main():
     os.makedirs(experiment_dir, exist_ok=True)
     
     # 1. Train ML Model
-    print("\n🤖 Training ML Model (RoBERTa)...")
+    print("\n🤖 Creating ML Model (RoBERTa)...")
     ml_config = ModelConfig(
         model_name='distilroberta-base',
         model_type=ModelType.TRADITIONAL_ML,
@@ -114,8 +126,16 @@ def main():
         experiment_name='smoke_roberta'
     )
     
-    ml_model.fit(sampled_train, sampled_val)
-    print("   ✅ ML model trained")
+    # Try to load from cache if exists, otherwise fusion will train it
+    ml_cache_path = os.path.join(cache_dir, 'smoke_test_roberta.pt')
+    if os.path.exists(ml_cache_path):
+        try:
+            ml_model.load_model(ml_cache_path)
+            print(f"   ✅ ML model loaded from cache: {ml_cache_path}")
+        except Exception as e:
+            print(f"   ⚠️ Failed to load cache, will train from scratch: {e}")
+    else:
+        print(f"   ℹ️  No cache found at {ml_cache_path}, model will be trained by fusion")
     
     # 2. Create LLM Model
     print("\n🧠 Creating LLM Model (OpenAI)...")
@@ -174,23 +194,24 @@ def main():
     fusion_model.add_ml_model(ml_model)
     fusion_model.add_llm_model(llm_model)
     
+    print(f"\n🔧 Training fusion on {len(sampled_train)} train and {len(sampled_val)} val samples...")
     fusion_model.fit(sampled_train, sampled_val)
     print("   ✅ Fusion ensemble trained")
     
     # 4. Evaluate all models on test set
     print("\n📊 Evaluating on test set...")
     
-    # Fusion
-    fusion_result = fusion_model.predict(sampled_test)
-    fusion_metrics = fusion_result['metrics']
+    # Fusion (pass full df_train for proper operation, not sampled)
+    fusion_result = fusion_model.predict(sampled_test, train_df=df_train)
+    fusion_metrics = fusion_result.metadata.get('metrics', {}) if fusion_result.metadata else {}
     
-    # ML
+    # ML (just needs test DataFrame)
     ml_result = ml_model.predict(sampled_test)
-    ml_metrics = ml_result['metrics']
+    ml_metrics = ml_result.metadata.get('metrics', {}) if ml_result.metadata else {}
     
-    # LLM
-    llm_result = llm_model.predict(sampled_test)
-    llm_metrics = llm_result['metrics']
+    # LLM (needs full df_train for few-shot, not sampled)
+    llm_result = llm_model.predict(train_df=df_train, test_df=sampled_test)
+    llm_metrics = llm_result.metadata.get('metrics', {}) if llm_result.metadata else {}
     
     # Print results
     print("\n" + "="*80)
