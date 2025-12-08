@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: validation
+  experiment_id: 2025-12-08_15-23-38_reuters_train20_20251208_152336
+  git_commit: 0992952b046b0446db66b45ab63699067f89635d
+  model_name: fusion_ensemble
+  timestamp: '2025-12-08T15:23:45.031760'
+metrics:
+  f1: 0.6635754765584749
+  hamming_loss: 0.0482225656877898
+  micro_f1: 0.9517774343122102
+  micro_precision: 0.9517774343122102
+  micro_recall: 0.9517774343122102
+  precision: 0.6661514683153014
+  recall: 0.6622874806800618
+  subset_accuracy: 0.6584234930448223
