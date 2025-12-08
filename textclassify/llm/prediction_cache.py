@@ -351,6 +351,37 @@ class LLMPredictionCache:
         if self.verbose:
             self.logger.info("Cache cleared")
     
+    def add_prediction_direct(self, text: str, prediction: List[int], 
+                             response_text: str = "", prompt: str = "",
+                             metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Add prediction to cache directly without auto-save trigger.
+        
+        This is useful for bulk loading predictions from existing cache files.
+        
+        Args:
+            text: Original input text
+            prediction: Binary vector prediction
+            response_text: Raw LLM response
+            prompt: The prompt sent to LLM
+            metadata: Additional metadata
+        """
+        text_hash = self._get_text_hash(text)
+        
+        prediction_data = {
+            "text_hash": text_hash,
+            "text": text,
+            "prediction": prediction,
+            "response_text": response_text,
+            "prompt": prompt,
+            "success": True,
+            "error_message": None,
+            "timestamp": datetime.now().isoformat(),
+            "metadata": metadata or {}
+        }
+        
+        # Store in cache without triggering auto-save
+        self.predictions_cache[text_hash] = prediction_data
+    
     def get_failed_predictions(self) -> List[Dict[str, Any]]:
         """Get all failed predictions for retry."""
         return [pred for pred in self.predictions_cache.values() if not pred["success"]]

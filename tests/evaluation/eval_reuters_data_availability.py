@@ -157,34 +157,42 @@ def train_fusion_model(ml_model: RoBERTaClassifier, llm_model: OpenAIClassifier,
     fusion.add_llm_model(llm_model)
     
     print(f"🔧 Training fusion on {len(train_df)} train samples and {len(val_df)} val samples...")
+
     fusion.fit(train_df, val_df)
     
     return fusion
 
 
-def run_single_experiment(train_pct: float, val_pct: float, df_train: pd.DataFrame, 
+def run_single_experiment(train_pct: float, df_train: pd.DataFrame, 
                          df_val: pd.DataFrame, df_test: pd.DataFrame, 
                          text_column: str, label_columns: list, 
                          base_output_dir: str, cache_dir: str) -> Dict:
-    """Run a single experiment with specified train and val percentages."""
+    """Run a single experiment with specified train percentage.
+    
+    Note: val_df and test_df are kept constant (full datasets) across all experiments.
+    Only the training data is sampled according to train_pct.
+    This ensures consistent evaluation while testing different training data amounts.
+    """
     
     # Sample training data for ML model
     n_train = max(100, int(len(df_train) * train_pct))
     sampled_train = df_train.sample(n=n_train, random_state=42).reset_index(drop=True)
     
-    # Sample validation data for fusion training
-    n_val = max(50, int(len(df_val) * val_pct))
-    sampled_val = df_val.sample(n=n_val, random_state=42).reset_index(drop=True)
+    # Use FULL validation and test sets (not sampled)
+    # This ensures consistent evaluation across all experiments
+    # LLM predictions on these sets will be cached and reused
     
     # Create experiment directory organized by percentage
     pct_dir = os.path.join(base_output_dir, f"{int(train_pct*100)}%")
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    experiment_name = f"reuters_train{int(train_pct*100)}_val{int(val_pct*100)}_{timestamp}"
+    experiment_name = f"reuters_train{int(train_pct*100)}_{timestamp}"
     output_dir = os.path.join(pct_dir, experiment_name)
     os.makedirs(output_dir, exist_ok=True)
     
     print(f"\n{'='*80}")
-    print(f"🧪 Experiment: {int(train_pct*100)}% train ({n_train} samples), {int(val_pct*100)}% val ({n_val} samples)")
+    print(f"🧪 Experiment: {int(train_pct*100)}% train ({n_train} samples)")
+    print(f"   Validation: {len(df_val)} samples (full set, constant)")
+    print(f"   Test: {len(df_test)} samples (full set, constant)")
     print(f"{'='*80}")
     
     # Check for cached ML model
@@ -201,9 +209,9 @@ def run_single_experiment(train_pct: float, val_pct: float, df_train: pd.DataFra
         text_column, label_columns, output_dir, experiment_name, cache_dir
     )
     
-    # Train fusion model
+    # Train fusion model (uses full validation set for meta-learner training)
     fusion = train_fusion_model(
-        ml_model, llm_model, sampled_train, sampled_val, 
+        ml_model, llm_model, sampled_train, df_val,  # Note: df_val is full set, not sampled
         output_dir, experiment_name, cache_dir
     )
     
@@ -224,8 +232,8 @@ def run_single_experiment(train_pct: float, val_pct: float, df_train: pd.DataFra
     return {
         'train_pct': train_pct,
         'train_samples': n_train,
-        'val_pct': val_pct,
-        'val_samples': n_val,
+        'val_samples': len(df_val),  # Always full validation set
+        'test_samples': len(df_test),  # Always full test set
         'fusion_metrics': fusion_metrics,
         'ml_metrics': ml_metrics,
         'llm_metrics': llm_metrics
@@ -284,8 +292,9 @@ def main():
     # Training data percentages to test (for ML model)
     train_percentages = [0.2, 0.4, 0.6, 0.8, 1.0]  # 20%, 40%, 60%, 80%, 100%
     
-    # For fusion training, we use the same percentage of val data as train data
-    # This matches the table structure in the image
+    # Note: Validation and test sets are kept constant (100% of data)
+    # Only training data is sampled to test impact of training data size
+    # LLM predictions on val/test will be cached once and reused across experiments
     
     # Load datasets
     print("📂 Loading datasets...")
@@ -299,12 +308,10 @@ def main():
     # Run experiments
     results = []
     for train_pct in train_percentages:
-        # Use same percentage for validation data in fusion training
-        val_pct = train_pct
         
         try:
             result = run_single_experiment(
-                train_pct, val_pct, df_train, df_val, df_test,
+                train_pct, df_train, df_val, df_test,
                 text_column, label_columns, base_output_dir, cache_dir
             )
             results.append(result)
