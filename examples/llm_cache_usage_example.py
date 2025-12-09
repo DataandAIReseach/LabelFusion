@@ -60,7 +60,7 @@ def example_3_load_and_inspect():
     discovered = OpenAIClassifier.discover_cached_predictions("cache")
     
     if not discovered:
-        print("\n❌ No cache files found. Run predictions first to create cache files.")
+        print("\nNo cache files found. Run predictions first to create cache files.")
         return
     
     # Get first available cache file
@@ -95,8 +95,8 @@ def example_4_reuse_cached_predictions():
     discovered = OpenAIClassifier.discover_cached_predictions("cache")
     
     if not discovered:
-        print("\n❌ No cache files found.")
-        print("💡 Run predictions with caching enabled first:")
+        print("\nNo cache files found.")
+        print("Run predictions with caching enabled first:")
         print("   result = classifier.predict(train_df, test_df)")
         return
     
@@ -120,14 +120,14 @@ def example_4_reuse_cached_predictions():
     cached_data = classifier.load_cached_predictions_for_dataset(cache_file)
     
     if not cached_data:
-        print("\n❌ Could not load cache file")
+        print("\nCould not load cache file")
         return
     
     num_predictions = len(cached_data.get('predictions', []))
-    print(f"\n✅ Loaded {num_predictions} cached predictions")
+    print(f"\nLoaded {num_predictions} cached predictions")
     
     # Note: To actually use the predictions, you need a test_df with matching structure
-    print("\n💡 To use cached predictions:")
+    print("\nTo use cached predictions:")
     print("   result = classifier.predict_with_cached_predictions(test_df, cache_file)")
     print("   This is 1000-5000x faster than running inference!")
 
@@ -167,8 +167,8 @@ def example_5_compare_providers():
                 results[provider_name] = summary
     
     if not results:
-        print("\n❌ No provider cache directories found")
-        print("💡 Expected directories: cache/fusion_<provider>_cache/")
+        print("\nNo provider cache directories found")
+        print("Expected directories: cache/fusion_<provider>_cache/")
         return
     
     print(f"\nFound caches for {len(results)} provider(s)\n")
@@ -190,39 +190,39 @@ def example_5_compare_providers():
 
 def main():
     """Run all examples."""
-    print("\n🚀 LLM Cache Management Examples")
+    print("\nLLM Cache Management Examples")
     print("="*60)
     
     # Run examples
     try:
         example_1_discover_caches()
     except Exception as e:
-        print(f"\n⚠️  Example 1 error: {e}")
+        print(f"\nExample 1 error: {e}")
     
     try:
         example_2_cache_status()
     except Exception as e:
-        print(f"\n⚠️  Example 2 error: {e}")
+        print(f"\nExample 2 error: {e}")
     
     try:
         example_3_load_and_inspect()
     except Exception as e:
-        print(f"\n⚠️  Example 3 error: {e}")
+        print(f"\nExample 3 error: {e}")
     
     try:
         example_4_reuse_cached_predictions()
     except Exception as e:
-        print(f"\n⚠️  Example 4 error: {e}")
+        print(f"\nExample 4 error: {e}")
     
     try:
         example_5_compare_providers()
     except Exception as e:
-        print(f"\n⚠️  Example 5 error: {e}")
+        print(f"\nExample 5 error: {e}")
     
     print("\n" + "="*60)
-    print("✅ All examples completed!")
+    print("All examples completed!")
     print("="*60)
-    print("\n📖 See docs/LLM_CACHE_MANAGEMENT.md for detailed documentation")
+    print("\nSee docs/LLM_CACHE_MANAGEMENT.md for detailed documentation")
 
 
 if __name__ == "__main__":
