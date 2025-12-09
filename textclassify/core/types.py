@@ -49,6 +49,7 @@ class ClassificationResult:
     predictions: List[Union[str, List[str]]]  # Single label or list of labels per text
     probabilities: Optional[List[Dict[str, float]]] = None  # Class probabilities per text
     confidence_scores: Optional[List[float]] = None  # Overall confidence per text
+    embeddings: Optional[List] = None  # Embeddings (e.g., [CLS] token embeddings for fusion)
     
     # Metadata
     model_name: Optional[str] = None

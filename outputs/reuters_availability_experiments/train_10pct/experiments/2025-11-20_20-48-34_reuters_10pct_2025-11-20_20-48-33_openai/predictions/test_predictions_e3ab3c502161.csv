@@ -1,0 +1,86 @@
+id,text,earn,acq,money-fx,grain,crude,trade,interest,ship,wheat,corn,predicted
+test/17773,"BRITISH LAND OF AMERICA INC &lt;BLA> YEAR MARCH 31
+  Shr loss 36 cts vs loss 57 cts
+      Net loss 4,589,000 vs loss 7,339,000
+      Revs 19.9 mln vs 19.6 mln
+      Avg shrs 14.7 mln vs 13.3 mln
+      NOTE: Company is a subsidiary of &lt;British Land Co PLC>
+  
+
+",1,0,0,0,0,0,0,0,0,0,['earn']
+test/15274,"CATERPILLAR &lt;CAT> REAFFIRMS FIRST QUARTER OUTLOOK
+  Caterpillar Inc, in remarks
+  delivered at its annual meeting in San Francisco, reiterated
+  its expectation of a loss in the first quarter.
+      It said results would be hurt by a 25 mln dlr one-time
+  charge by Caterpillar Mitsubishi, a 50-pct owned affiliate. The
+  company said it expected profit from operations for the full
+  year to improve over 1986.
+      In remarks prepared for delivery to shareholders, President
+  Peter Donis said Caterpillar's targeted five pct cost reduction
+  in 1987 ""will be difficult to achieve because the weaker dollar
+  has limited opportunities to obtain lower material costs.""
+  
+
+",1,0,0,0,0,0,0,0,0,0,['earn']
+test/18642,"INDONESIA REJECTS WORLD BANK FARM REFORM IDEAS
+  Indonesia rejected World Bank
+  recommendations for sweeping reforms to its farm economy, as
+  the country's foreign aid donors met to consider giving it 2.5
+  billion dlrs in grants and soft loans.
+      Agriculture Minister Achmad Affandi, in written remarks
+  distributed today as Indonesia's 14 foreign donor nations met
+  at The Hague, said, ""The general argument presented by the Bank
+  for this free trade, open economy view is weak.""
+      The Bank called for overhauls in how Indonesia manages the
+  largest farm area in South-east Asia, and said agricultural
+  growth was stagnating under subsidies for rice farming.
+      The Bank report said Indonesia's rice production had peaked
+  and the subsidies are a waste of money.
+      Affandi replied that rice is the main staple and provides
+  an income for 17 pct of the workforce. The subsidies were
+  needed to support the fertilizer industry, including importers,
+  exporters, producers and distributors, he said, as well as
+  assisting in small part the majority of Indonesian farmers.
+      Affandi agreed with a bank recommendation that farmers
+  should be free to choose their own crops, but he said the
+  government would continue to maintain production targets for
+  ""strategic commodities"" such as rice and sugar.
+      The Bank report was especially critical of Indonesia's
+  drive to plant sugar, saying domestic sugar prices are double
+  the world average because of inefficiencies, and the country
+  would save money by importing the commodity.
+      However, Affandi said volatile world sugar prices, the need
+  to save foreign exchange and an already up-and-running sugar
+  industry were good arguments for continuing the sugar drive.
+      He also said import barriers and trade monopolies in the
+  agricultural sector were needed to help domestic industry
+  develop and because of ""over-production and price intervention
+  in the developed nations.""
+  
+
+",0,0,0,1,0,0,0,0,0,0,['grain']
+test/20913,"CADE INDUSTRIES INC &lt;CADE.O> 3RD QTR NET
+  Shr three cts vs two cts
+      Net 456,000 vs 272,000
+      Sales 15 mln vs 14.4 mln
+      Nine mths
+      Shr six cts vs 23 cts
+      Net 992,000 vs 3,812,000
+      Sales 41.1 mln vs 45.4 mln
+      Order backlog 46 mln vs 24.3 mln
+      Note: 1986 figures include a gain of 2.9 mln dlr or 17 cts
+  a share from life insurance proceeds.
+  
+
+",1,0,0,0,0,0,0,0,0,0,['earn']
+test/19763,"CYCARE &lt;CYCR.O> BUYS CONTROL DATA &lt;CAD> UNIT
+  Cycare Systems Inc, an
+  information processing systems company, said it purchased the
+  assets of Control Data Corp's MedTec unit for undisclosed
+  terms.
+      MedTec is a provider of patient accounting and scheduling
+  systems for large scale group medical practices.
+  
+
+",0,1,0,0,0,0,0,0,0,0,['acq']

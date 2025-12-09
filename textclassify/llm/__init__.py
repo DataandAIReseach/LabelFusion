@@ -15,7 +15,7 @@ Enable automatic cache checking and reuse in the constructor:
     # Auto-cache: automatically loads from cache if available
     classifier = OpenAIClassifier(
         config, 
-        auto_use_cache=True,  # ✨ NEW!
+        auto_use_cache=True,  #  NEW!
         cache_dir="cache"
     )
     

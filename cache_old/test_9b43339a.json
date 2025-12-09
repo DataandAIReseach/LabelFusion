@@ -1,0 +1,535 @@
+{
+  "metadata": {
+    "provider": "openai",
+    "model": "gpt-5-nano",
+    "dataset_hash": "9b43339a",
+    "dataset_size": 18,
+    "num_samples": 18,
+    "mode": "test",
+    "multi_label": true,
+    "label_columns": [
+      "earn",
+      "acq",
+      "money-fx",
+      "grain",
+      "crude",
+      "trade",
+      "interest",
+      "ship",
+      "wheat",
+      "corn"
+    ],
+    "text_column": "text",
+    "batch_size": 32,
+    "batches_completed": 1,
+    "total_batches": 1,
+    "predictions_count": 18,
+    "last_updated": "2025-12-02T15:31:17.161521"
+  },
+  "predictions": [
+    {
+      "text": "MONTROSE HOLDING TO ACQUIRE VIRGINIA FEDERAL\n  &lt;Virginia Federal Savings and Loan\n  Association> said it has signed a definitive agreement to be\n  acquired by &lt;Montrose Holding Co>, an affiliate of &lt;Montrose\n  Capital Corp> for 20 mln dlrs.\n      Virginia Federal and Montrose Capital said the agreement\n  provides for the conversion of Virginia Federal from a mutual\n  to a stock association and the purchase of 100 pct of its stock\n  for 20 mln dlrs by Montrose.\n      According to the companies, Virginia Federal has over 700\n  mln dlrs in assets and operates 16 branches in Virginia.\n      Virginia Federal said the proceeds would enable it to\n  provide increased mortgage and lending services and enable the\n  company to compete more effectively in the Virginia market.\n      The companies said the agreement is subject to Federal Home\n  Loan Bank Board approval, expected later this year.\n      Additionally, the companies said the converted association\n  would be managed by a board of directors consisting of the six\n  current Virginia Federal directors and two representatives of\n  Montrose Holding.\n      The senior management of Virginia Federal was expected to\n  continue in office after the conversion, the companies said.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "DALLAS CORP &lt;DLS> 3RD QTR NET\n  Shr 30 cts vs 12 cts\n      Net 2,191,000 vs 852,000\n      Sales 106.6 mln vs 102.9 mln\n      Nine mths\n      Shr 44 cts vs 40 cts\n      Net 3,236,000 vs 2,919,000\n      Sales 297.9 mln vs 297.9 mln\n  \n\n",
+      "prediction": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "NAT'L COMPUTER &lt;NLCS.O> TO BUY DATA CARD STAKE\n  National Computer Systems Inc\n  said it agreed to acquire Deluxe Check Printers Inc's &lt;DLX> 38\n  pct stake in Data Card Corp.\n      National Computer said it plans to issue 45 mln dlrs in\n  five year subordinated convertible debentures to purchase the\n  3,749,401 shares of Data Card from Deluxe.\n      Completion of the proposed transaction, subject to\n  regulatory approval, is expected in mid-July, it said.\n     \n      The debenture will bear an increasing rate of interest over\n  its term, with a 7.3 pct weighted average rate and will be\n  convertible into National Computer common stock at 20 dlrs a\n  share, it said.\n      Separately, Deluxe said its Data Card investment no longer\n  fits its business strategy. Deluxe has held an interest in Data\n  Card since 1975 when it provided funds for Data Card to buy\n  Troy Computer Products Corp. In November 1986, Data Card said\n  it planned to sell its Troy division.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "A. SCHULMAN INC &lt;SHLM.O> 4TH QTR AUG 31 NET\n  Shr 63 cts vs 49 cts\n      Net 5,635,000 vs 4,330,000\n      Sales 117.8 mln vs 96.2 mln\n      Year\n      Shr 2.21 dlrs vs 1.71 dlrs\n      Net 19.8 mln vs 15.2 mln\n      Sales 465.1 mln vs 388.5 mln\n      NOTE: Share adjusted for February 1987 three-for-two split.\n      Prior year results restated.\n  \n\n",
+      "prediction": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "THE ONE BANCORP &lt;TONE> 1ST QTR NET\n  Shr 76 cts vs 51 cts\n      Net 5,952,000 vs 4,374,000\n      Avg shrs 7,837,511 vs 7,446,356\n      NOTE: Includes gains of 1.3 mln dlrs vs 239,000 dlrs from\n  benefit of tax loss carryforwards.\n      Includes operations of Bank of Hartford, acquired Feb 23.\n      Year-ago shr figures reflect 2-for-1 split on April 15,\n  1986.\n  \n\n",
+      "prediction": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "DATACARD &lt;DATC.O> ADOPTS DIVIDEND RIGHTS PLAN\n  DataCard Corp said it adopted a\n  dividend rights plan in response to Deluxe Check Printers Inc\n  &lt;DLX> having agreed to sell its 38 pct interest in DataCard to\n  National Computer Systems Inc &lt;NLCS.O>.\n      DataCard declared a dividend distribution of one preferred\n  stock purchase right on each outstanding share its common\n  stock. The dividend is designed to deter National Computer or\n  other potential suitors from preventing DataCard from\n  evaluating all alternatives to maximize shareholder value,\n  DataCard said.\n     \n      National Computer told Reuters June 22 it could make a bid\n  for DataCard. On June 25 DataCard filed suit in Hennepin County\n  District Court in Minnesota to block the sale of the 38 pct\n  stake of its stock to National Computer.\n      In announcing the rights plan, DataCard said it \"is not\n  designed to deter takeovers that would be consistent with the\n  objective of maximizing stockholders value to all of DataCard's\n  stockholders.\"\n      The rights will not become exercisable until 10 days after\n  an announcement that a person or group has acquired beneficial\n  ownership of 44 pct or more of DataCard's common stock.\n     \n      Once exercisable, each right would entitle a holder to buy\n  1/500th of a share of DataCard Series A junior participation\n  preferred Stock for 35 dlrs. Holders other than an acquirer\n  would be entitled to purchase, for six-months after the right\n  becomes exercisable, a number of shares of the new preferred\n  stock with a market value equal to twice the exercise price of\n  the rights.\n      The rights dividend distribution is payable July 9 to\n  shareholders of record July 9.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "TELECRAFTER CORP &lt;SWHI> 2ND QTR FEB 28 NET\n  Shr profit 12 cts vs loss 14 cts\n      Net profit 183,000 vs loss 234,000\n      Revs 2.4 mln vs 1.5 mln\n      Six months\n      Shr profit 22 cts vs loss 22 cts\n      Net profit 345,000 vs loss 358,000\n      Revs 5.2 mln vs 2.9 mln\n      NOTE:1987 2nd qtr and six months include gains of 78,000\n  dlrs and 154,000 dlrs for tax loss carryforward.\n  \n\n",
+      "prediction": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "ARTILLERY SHELLS SAID TO FALL ON KUWAIT BORDER\n  Artillery shells from an exchange of fire\n  between Iran and Iraq fell on Kuwait's northern border on\n  Tuesday but caused no casualties, the Kuwait News Agency KUNA\n  said, quoting a Defense Ministry official.\n      There were rumors in world oil markets on Tuesday that Iran\n  had fired shells at an oil camp in northern Kuwait in\n  retaliation for U.S. Attacks on Iranian oil platforms in the\n  Gulf on Monday. \"Several shells fell in a random manner on the\n  northern border of the country,\" the official told KUNA. \"It\n  seems these shells arose from an exchange of fire between Iran\n  and Iraq... No one was wounded and there were no losses.\"\n      Diplomats said shells from the nearby Iran-Iraq warfront\n  had in the past fallen in the northern Kuwaiti desert.\n      A senior Kuwait Petroleum Corporation official had earlier\n  told Reuters he was unaware of any attack against Kuwaiti oil\n  installations.\n  \n\n",
+      "prediction": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "Japan still asking institutions to limit speculative dlr\ndeals - Miyazawa\n\n  Japan still asking institutions to limit speculative dlr\n  deals - Miyazawa\n  \n\n",
+      "prediction": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "SALLIE MAE ADJUSTS SHORT-TERM DISCOUNT NOTE RATES\n  The Student Loan Marketing\n  Association said its rates on short-term discount notes were as\n  follows:\n      MATURITY   NEW RATE    OLD RATE  MATURITY\n      5-14 days  5.80 pct    5.75 pct     5-14 days\n    15-360 days  5.00 pct    5.00 pct    15-85 days\n                             5.80 pct    86-91 days\n                             5.00 pct   92-176 days\n                             5.83 pct  177-183 days\n                             5.00 pct  184-360 days\n  \n\n",
+      "prediction": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "ALLEGIS &lt;AEG> TO SELL CANADIAN HOTELS\n  Allegis Corp said it has created a\n  limited partnership to sell selected hotels in Canada to the\n  public.\n      It said the offering is expected to raise in excess of 350\n  mln Canadian dlrs and will be completed by the end of\n  September.\n      The limited partnership will be similar to the Westin\n  Hotels limited partnership completed last year when Allegis\n  sold Westin hotels in San Francisco and Chicago. Allegis\n  reported a pretax gain of 80.6 mln dlrs as a result of that\n  partnership.\n     \n      An Allegis spokesman said the offerings have been in\n  planning stages for a long time and are unrelated to recent\n  corporate developments such as the firm's recapitalization plan\n  and a threatened takeover by an investor group lead by Coniston\n  Partners and the pilots of its United Airlines unit.\n      The spokesman said the company has not yet identified which\n  of its Canadian hotels will be offered for sale.\n      Allegis has 100 pct ownership in Westin hotels in\n  Vancouver, Calgary, Ottawa and Toronto, and 100 pct interest in\n  Hilton International hotels in Toronto and Montreal. It owns 60\n  pct of the Westin in Edmonton.\n      Richard Ferris, chairman of Allegis, said in a statement\n  the hotel limited partnerships allow the company to convert\n  unrecognized asset appreciation into cash.\n      As with the proceeds from the earlier limited partnership,\n  the money will be used for general corporate needs, the\n  spokesman said.\n      Merrill Lynch Capital Markets and Wood Gundy will be lead\n  underwriters for to the public offering. The limited\n  partnership will be offered outside the U.S, Allegis said.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "USDA ESTIMATES SOUTH AFRICA CORN CROP, EXPORTS\n  The U.S. Agriculture Department\n  forecast South Africa's 1986/87 corn crop at 8.50 mln tonnes,\n  vs 9.50 mln tonnes last month. It estimated the 1985/86 crop at\n  8.08 mln, vs 8.08 mln last month.\n      USDA forecast South African 1986/87 corn exports at 2.10\n  mln tonnes, vs 3.00 mln tonnes last month, and 1985/86 exports\n  at 2.75 mln tonnes, vs 2.75 mln tonnes last month.\n  \n\n",
+      "prediction": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "text": "SOUTHMARK &lt;SM> TO PURCHASE &lt;NATIONAL SELF>\n  National Self Storage said\n  has sold nine storage facilities to Southmark Corp for 37.1 mln\n  dlrs.\n      National Self, a developer of storage space for business\n  records, said the purchase includes nine storage facilties.\n  National Self also said it and Southmark plan a two-year 100\n  facility expansion program in South Florida and across the\n  country.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "WILLIS FABER BIDS FOR STEWART WRIGHTSON\n  Willis Faber Plc &lt;WIFL.L> will make an\n  agreed 302.6 mln stg offer for fellow insurance broker &lt;Stewart\n  Wrightson Plc>, a joint statement said.\n      The offer would be on the basis of three Willis shares for\n  every two in Stewart, valuing each Stewart share at about\n  655.5p.\n      Willis already owns 2.05 mln shares, or 4.62 pct, and has\n  received acceptances from Stewart's directors for a further\n  247,469 shares.\n      Full acceptance of the offer would involve the issue of\n  66.2 mln new Willis shares, or 28.2 pct of the enlarged total.\n      The companies said the proposed merger would bring together\n  businesses that were largely complementary. Both believed the\n  combination would permit more effective competition throughout\n  the world and enahnce the service provided to clients.\n      Following the merger, the two companies saw significant\n  opportunities for growth in brokerage income and considerable\n  scope for improved operating efficiency.\n      Willis shares were suspended on Friday at 437p. When\n  trading restarted they dropped sharply to 393p.\n      Stewart Wrightson shares rose to 576p at 0835 gmt from a\n  suspension price of 499p.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "RAPID-AMERICAN COMPLETES K MART &lt;KM> STORE BUY\n  Privately-held Rapid-American Corp said\n  it has completed the previously-announced acquisition of 66\n  Kresge and Jupiter stores from K Mart Corp.\n      The company said it plans to operate 57 of the stores as\n  McCrory Five and 10 variety stores and close the others by the\n  end of July.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "BASS GROUP CUTS NATIONAL DISTILLERS &lt;DR> STAKE\n  An investor group led by members of\n  the Bass family of Fort Worth, Texas, said it lowered its stake\n  in National Distillers and Chemical Corp to 1,159,400 shares,\n  or 3.6 pct of the total common, from 1,727,200, or 5.3 pct.\n      In a filing with the Securities and Exchange Commission,\n  the Bass group said it sold 567,800 National Distillers common\n  shares between May 15 and 29 at prices ranging from 59.94 to\n  63.44 dlrs a share.\n      As long as the group's stake is below five pct, it is not\n  required to disclose its further dealings in National\n  Distillers' common stock.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "PROFESSOR LIFTS BANC TEXAS &lt;BTX> PREFERRED STAKE\n  A University of Massachusetts finance\n  professor said he raised his stake in Banc Texas Group Inc to\n  45,340 shares of 1.4625 dlr cumulative preferred stock, or 7.4\n  pct of the total, from 30,300 shares, or 5.0 pct.\n      In a filing with the Securities and Exchange Commission,\n  Ben Shirley Branch also said he bought 52,025 shares of Class A\n  cumulative convertible preferred stock, or 5.9 pct of the\n  total, for 160,000 dlrs, bringing his total investment in both\n  preferred series to about 330,000 dlrs.\n      Branch said he bought the stock as an investment, but\n  reserved the right to try to influence the company.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "text": "INTERCO &lt;ISS> COMPLETES LANE&lt;LANE> ACQUISITION\n  Interco Inc said its shareholders and\n  those of Lane Co approved a merger of the two companies at\n  special meetings.\n      As previously announced, Lane's shareholders will receive\n  1.5 shares of Interco common stock for each share of Lane stock\n  held.\n      Interco said the merger becomes effective April 14.\n  \n\n",
+      "prediction": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "batch_num": 1,
+      "true_labels": [
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

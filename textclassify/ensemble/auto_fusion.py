@@ -97,9 +97,9 @@ class AutoFusionClassifier(BaseClassifier):
         self.output_dir.mkdir(exist_ok=True, parents=True)
         
         print(f"🤖 AutoFusion Classifier initialized")
-        print(f"   📊 LLM Provider: {self.llm_provider}")
+        print(f"    LLM Provider: {self.llm_provider}")
         print(f"   🏷️  Labels: {self.label_columns}")
-        print(f"   📝 Classification: {'Multi-label' if self.multi_label else 'Multi-class'}")
+        print(f"    Classification: {'Multi-label' if self.multi_label else 'Multi-class'}")
         print(f"   🤖 ML Model: {self.ml_model_name}")
     
     def fit(self, training_data: Union[TrainingData, pd.DataFrame, Dict]) -> None:
@@ -111,14 +111,14 @@ class AutoFusionClassifier(BaseClassifier):
                 - pandas DataFrame with text and label columns
                 - Dict with 'texts' and 'labels' keys
         """
-        print("\n🚀 Starting Automatic Fusion Training...")
+        print("\n Starting Automatic Fusion Training...")
         print("="*50)
         
         # Step 1: Create ML model (but don't train yet - fusion will handle training)
         print("1️⃣  Setting up ML model...")
         self.ml_model = self._create_ml_model()
-        print(f"   🔧 Created {self.ml_model_name} classifier")
-        print("   📝 ML training will be handled by fusion ensemble")
+        print(f"    Created {self.ml_model_name} classifier")
+        print("    ML training will be handled by fusion ensemble")
         
         # Step 2: Create LLM model
         print("\n2️⃣  Setting up LLM model...")
@@ -140,14 +140,14 @@ class AutoFusionClassifier(BaseClassifier):
         try:
             # Pass raw training data directly to fusion ensemble
             self.fusion_ensemble.fit(training_data)
-            print("   ✅ Fusion training completed successfully!")
+            print("    Fusion training completed successfully!")
         except Exception as e:
             raise ModelTrainingError(f"Fusion training failed: {str(e)}", self.config.model_name)
         
         # Step 5: Save everything
         print("\n5️⃣  Saving trained models...")
         self._save_models()
-        print(f"   💾 Models saved to {self.output_dir}")
+        print(f"    Models saved to {self.output_dir}")
         
         self.is_trained = True
         
@@ -476,12 +476,12 @@ class AutoFusionClassifier(BaseClassifier):
             ml_model_path = self.output_dir / 'ml_model'
             self.ml_model.save_model(str(ml_model_path))
         
-        print(f"   💾 Saved classifier state to {state_path}")
-        print(f"   💾 Saved configuration to {config_path}")
+        print(f"    Saved classifier state to {state_path}")
+        print(f"    Saved configuration to {config_path}")
         if self.fusion_ensemble and hasattr(self.fusion_ensemble, 'fusion_wrapper') and self.fusion_ensemble.fusion_wrapper:
-            print(f"   💾 Saved fusion model to {self.output_dir / 'fusion_model.pt'}")
+            print(f"    Saved fusion model to {self.output_dir / 'fusion_model.pt'}")
         if self.ml_model and hasattr(self.ml_model, 'save_model'):
-            print(f"   💾 Saved ML model to {self.output_dir / 'ml_model'}")
+            print(f"    Saved ML model to {self.output_dir / 'ml_model'}")
     
     @classmethod
     def load(cls, model_path: str) -> 'AutoFusionClassifier':
@@ -553,7 +553,7 @@ class AutoFusionClassifier(BaseClassifier):
             classifier.fusion_ensemble.fusion_hidden_dims = fusion_data['fusion_hidden_dims']
             classifier.fusion_ensemble.is_trained = True
         
-        print(f"✅ Loaded AutoFusion classifier from {model_path}")
+        print(f" Loaded AutoFusion classifier from {model_path}")
         return classifier
     
     @property
