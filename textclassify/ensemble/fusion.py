@@ -274,18 +274,18 @@ class FusionEnsemble(BaseEnsemble):
                             print(f"📦 Loading cached ML model from: {model_path}")
                             self.ml_model.load_model(str(model_path))
                             ml_model_loaded = True
-                            print(f"✅ ML model loaded from cache (hash: {dataset_hash})")
+                            print(f" ML model loaded from cache (hash: {dataset_hash})")
                             break
                         except Exception as e:
-                            print(f"⚠️  Failed to load model from {model_path}: {e}")
+                            print(f"  Failed to load model from {model_path}: {e}")
                             continue
             
             if not ml_model_loaded:
-                print(f"🔧 Training ML model on training set (hash: {dataset_hash})...")
+                print(f" Training ML model on training set (hash: {dataset_hash})...")
                 # Use DataFrame interface directly
                 self.ml_model.fit(train_df, val_df)
         else:
-            print("✅ ML model already trained")
+            print(" ML model already trained")
             # Compute hash for already-trained model
             import hashlib
             text_column = self.ml_model.text_column or 'text'
@@ -408,7 +408,7 @@ class FusionEnsemble(BaseEnsemble):
                             "val", 
                             "openai_classifier"
                         )
-                        print(f"📊 LLM validation metrics saved: {metrics_file}")
+                        print(f" LLM validation metrics saved: {metrics_file}")
                     except Exception as e:
                         print(f"Warning: Could not save LLM validation metrics: {e}")
                 
@@ -486,7 +486,7 @@ class FusionEnsemble(BaseEnsemble):
                     )
                     saved_files["metrics"] = metrics_file
                 
-                print(f"📁 Validation results saved: {saved_files}")
+                print(f" Validation results saved: {saved_files}")
                 
             except Exception as e:
                 print(f"Warning: Could not save validation results: {e}")
@@ -539,12 +539,12 @@ class FusionEnsemble(BaseEnsemble):
                 training_result['experiment_info'] = exp_info
                 training_result['output_directory'] = exp_info['experiment_dir']
                 
-                print(f"📁 Results saved to: {exp_info['experiment_dir']}")
+                print(f" Results saved to: {exp_info['experiment_dir']}")
                 
             except Exception as e:
                 print(f"Warning: Could not save training results: {e}")
         
-        print("✅ Fusion ensemble training completed!")
+        print(" Fusion ensemble training completed!")
         return training_result
     
     def get_llm_predictions(self, df: pd.DataFrame, train_df: Optional[pd.DataFrame] = None) -> List[Union[str, List[str]]]:
@@ -634,10 +634,10 @@ class FusionEnsemble(BaseEnsemble):
                                 cached_hash_map[text_hash] = entry['prediction']
                             else:
                                 cached_hash_map[text_hash] = entry
-                        print(f"🔍 Built hash map from {len(cached_hash_map)} cached predictions (new format)")
+                        print(f" Built hash map from {len(cached_hash_map)} cached predictions (new format)")
                     else:
                         # Old format: no text field, can't use hash matching - fall back to positional
-                        print(f"⚠️  Cache in old format without text field - using positional matching")
+                        print(f"  Cache in old format without text field - using positional matching")
                         preds = list(cached_data)
                         
                         # Determine missing indices using positional matching
@@ -685,7 +685,7 @@ class FusionEnsemble(BaseEnsemble):
                                 print(f"Warning: Could not save merged cache: {e}")
                 else:
                     # Empty cache or invalid format
-                    print(f"⚠️  Empty or invalid cache format")
+                    print(f"  Empty or invalid cache format")
                     final_predictions = self._generate_llm_predictions(df, train_df, mode)
                     predictions_source = "generated"
                     self._save_cached_llm_predictions(final_predictions, cache_path, df)
@@ -708,11 +708,11 @@ class FusionEnsemble(BaseEnsemble):
                     
                     if not missing_indices:
                         # All predictions found in cache
-                        print(f"✅ All {len(final_predictions)} predictions found in cache (hash-matched)")
+                        print(f" All {len(final_predictions)} predictions found in cache (hash-matched)")
                         predictions_source = "cached"
                     else:
                         # Generate missing predictions with incremental batch-wise caching
-                        print(f"🔍 Found {len(missing_indices)} missing predictions (hash-matched); generating them...")
+                        print(f" Found {len(missing_indices)} missing predictions (hash-matched); generating them...")
                         
                         # Create DataFrame with only missing rows
                         df_uncached = df.iloc[missing_indices].copy()
@@ -733,7 +733,7 @@ class FusionEnsemble(BaseEnsemble):
                         
                         # Initialize cache if it doesn't exist
                         if not cache_file_path.exists():
-                            print(f"📝 Initializing cache file: {cache_file_path}")
+                            print(f" Initializing cache file: {cache_file_path}")
                             import json
                             import datetime
                             cache_data = {
@@ -772,9 +772,9 @@ class FusionEnsemble(BaseEnsemble):
                         
                         try:
                             # Now generate predictions - LLM will write to correct cache after each batch
-                            print(f"🔄 Generating {len(df_uncached)} predictions with incremental caching...")
+                            print(f" Generating {len(df_uncached)} predictions with incremental caching...")
                             generated = self._generate_llm_predictions(df_uncached, train_df, mode)
-                            print(f"✅ Generated {len(generated)} predictions (saved incrementally to {cache_file_path})")
+                            print(f" Generated {len(generated)} predictions (saved incrementally to {cache_file_path})")
                         finally:
                             # Restore original method
                             self.llm_model._initialize_batch_cache_file = original_init_batch_cache
@@ -812,7 +812,7 @@ class FusionEnsemble(BaseEnsemble):
                     
                     if predictions_source in ["cached", "provided"]:
                         # For cached/provided predictions: create metrics and save directly WITHOUT calling LLM API
-                        print(f"📝 Creating metrics and saving results for {predictions_source} predictions (no API calls)...")
+                        print(f" Creating metrics and saving results for {predictions_source} predictions (no API calls)...")
                         
                         # Check if predictions are already in binary format or need conversion
                         if final_predictions and isinstance(final_predictions[0], list) and all(isinstance(x, (int, float)) for x in final_predictions[0]):
@@ -870,7 +870,7 @@ class FusionEnsemble(BaseEnsemble):
                         
                         # Save results using the LLM model's results manager
                         if self.llm_model.results_manager:
-                            print(f"💾 Saving {predictions_source} prediction results to experiments folder...")
+                            print(f" Saving {predictions_source} prediction results to experiments folder...")
                             
                             # Save predictions using correct ResultsManager methods
                             prediction_files = self.llm_model.results_manager.save_predictions(
@@ -897,13 +897,13 @@ class FusionEnsemble(BaseEnsemble):
                                 "timestamp": pd.Timestamp.now().isoformat()
                             })
                             
-                            print(f"✅ {predictions_source.title()} prediction results saved to experiments folder")
-                            print(f"📁 Saved files: predictions={prediction_files}, metrics={metrics_file}, config={config_file}")
+                            print(f" {predictions_source.title()} prediction results saved to experiments folder")
+                            print(f" Saved files: predictions={prediction_files}, metrics={metrics_file}, config={config_file}")
                         
                         
                     else:
                         # For fresh predictions: use the normal LLM classifier workflow (with API calls)
-                        print(f"🔄 Using LLM classifier predict_texts for fresh predictions...")
+                        print(f" Using LLM classifier predict_texts for fresh predictions...")
                         
                         # Temporarily disable LLM results saving if intermediate saving is disabled
                         original_llm_results_manager = None
@@ -917,19 +917,19 @@ class FusionEnsemble(BaseEnsemble):
                                 true_labels=true_labels
                             )
                             if not self.save_intermediate_llm_predictions:
-                                print(f"✅ Fresh LLM predictions generated (intermediate saving disabled)")
+                                print(f" Fresh LLM predictions generated (intermediate saving disabled)")
                             else:
-                                print(f"✅ Fresh LLM prediction results saved to experiments folder")
+                                print(f" Fresh LLM prediction results saved to experiments folder")
                         finally:
                             # Restore the original results manager
                             if original_llm_results_manager is not None:
                                 self.llm_model.results_manager = original_llm_results_manager
                     
                 else:
-                    print(f"ℹ️ No true labels available in DataFrame - skipping metrics calculation")
+                    print(f" No true labels available in DataFrame - skipping metrics calculation")
                     
             except Exception as e:
-                print(f"⚠️ Warning: Could not save LLM results for {mode} set: {e}")
+                print(f" Warning: Could not save LLM results for {mode} set: {e}")
                 print(f"   Continuing with {predictions_source} predictions only...")
         
         # STEP 3: Save predictions to experiments directory (fallback)
@@ -992,7 +992,7 @@ class FusionEnsemble(BaseEnsemble):
             cache_path: Base cache path for saving
             mode: Dataset mode ('val', 'test', etc.)
         """
-        print(f"🔄 Starting incremental prediction generation for {len(missing_indices)} missing samples...")
+        print(f" Starting incremental prediction generation for {len(missing_indices)} missing samples...")
         
         # Create DataFrame with only missing rows
         df_uncached = df.iloc[missing_indices].copy()
@@ -1001,7 +1001,7 @@ class FusionEnsemble(BaseEnsemble):
         batch_size = getattr(self.llm_model, 'batch_size', 32)
         total_batches = (len(df_uncached) + batch_size - 1) // batch_size
         
-        print(f"📊 Will process {len(df_uncached)} samples in {total_batches} batches of size {batch_size}")
+        print(f" Will process {len(df_uncached)} samples in {total_batches} batches of size {batch_size}")
         
         # Process in batches
         generated_count = 0
@@ -1049,10 +1049,10 @@ class FusionEnsemble(BaseEnsemble):
                 
                 # Save incrementally to cache after each batch (uses FULL df for correct hash)
                 self._save_cached_llm_predictions(final_predictions, cache_path, df)
-                print(f"✅ Batch {batch_idx + 1}/{total_batches} saved to cache ({generated_count}/{len(missing_indices)} total)")
+                print(f" Batch {batch_idx + 1}/{total_batches} saved to cache ({generated_count}/{len(missing_indices)} total)")
                 
             except Exception as e:
-                print(f"⚠️  Error processing batch {batch_idx + 1}: {e}")
+                print(f"  Error processing batch {batch_idx + 1}: {e}")
                 import traceback
                 traceback.print_exc()
                 # Continue with next batch
@@ -1066,7 +1066,7 @@ class FusionEnsemble(BaseEnsemble):
                 if original_prediction_cache is not None:
                     self.llm_model._prediction_cache = original_prediction_cache
         
-        print(f"✅ Incremental generation complete: {generated_count}/{len(missing_indices)} predictions generated and saved")
+        print(f" Incremental generation complete: {generated_count}/{len(missing_indices)} predictions generated and saved")
     
     def _attach_hashes_to_predictions(self, predictions: List, texts: List[str], 
                                       embeddings: Optional[List] = None) -> List[Dict[str, Any]]:
@@ -1165,7 +1165,7 @@ class FusionEnsemble(BaseEnsemble):
             cache_filename = f"{base_cache_path}_{current_hash}.json"
             
             if not os.path.exists(cache_filename):
-                print(f"❌ No cache found: {cache_filename}")
+                print(f" No cache found: {cache_filename}")
                 return None
             
             # Load cache file
@@ -1175,14 +1175,14 @@ class FusionEnsemble(BaseEnsemble):
             # Handle both formats: dict with metadata or list
             if isinstance(cache_data, dict) and 'predictions' in cache_data:
                 predictions = cache_data['predictions']
-                print(f"✅ Loaded cached predictions: {cache_filename} (Hash: {current_hash})")
+                print(f" Loaded cached predictions: {cache_filename} (Hash: {current_hash})")
                 return predictions  # Return full prediction entries (with 'text' field)
             elif isinstance(cache_data, list):
                 # Old format - direct list of predictions (no text field)
-                print(f"✅ Loaded cached predictions: {cache_filename} (Hash: {current_hash}, old format)")
+                print(f" Loaded cached predictions: {cache_filename} (Hash: {current_hash}, old format)")
                 return cache_data
             else:
-                print(f"⚠️ Invalid cache format: {cache_filename}")
+                print(f" Invalid cache format: {cache_filename}")
                 return None
             
         except Exception as e:
@@ -1201,11 +1201,11 @@ class FusionEnsemble(BaseEnsemble):
             df: DataFrame for hash calculation and metadata (MUST be the FULL dataset)
         """
         if not base_cache_path or not base_cache_path.strip():
-            print("⚠️  No cache path provided, skipping save")
+            print("  No cache path provided, skipping save")
             return
         
         if not self.llm_model:
-            print("⚠️  No LLM model available to save predictions")
+            print("  No LLM model available to save predictions")
             return
         
         try:
@@ -1250,7 +1250,7 @@ class FusionEnsemble(BaseEnsemble):
                     },
                     'predictions': []
                 }
-                print(f"📝 Creating new cache file: {cache_file_path}")
+                print(f" Creating new cache file: {cache_file_path}")
             
             # Build hash set of existing cached texts
             existing_hashes = set()
@@ -1260,7 +1260,7 @@ class FusionEnsemble(BaseEnsemble):
                         text_hash = self._compute_text_hash(entry['text'])
                         existing_hashes.add(text_hash)
             
-            print(f"🔍 Found {len(existing_hashes)} existing predictions in cache")
+            print(f" Found {len(existing_hashes)} existing predictions in cache")
             
             # Add only new predictions (based on text hash)
             new_count = 0
@@ -1301,10 +1301,10 @@ class FusionEnsemble(BaseEnsemble):
             with open(cache_file_path, 'w') as f:
                 json.dump(cache_data, f, indent=2)
             
-            print(f"✅ Added {new_count} new predictions to cache (total: {len(cache_data['predictions'])}/{len(df)})")
+            print(f" Added {new_count} new predictions to cache (total: {len(cache_data['predictions'])}/{len(df)})")
             
         except Exception as e:
-            print(f"⚠️  Warning: Could not save predictions to cache {base_cache_path}: {e}")
+            print(f"  Warning: Could not save predictions to cache {base_cache_path}: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1345,7 +1345,7 @@ class FusionEnsemble(BaseEnsemble):
                 llm_result, f"llm_{mode}", df
             )
             
-            print(f"📁 LLM {mode} predictions saved to experiments: {saved_files}")
+            print(f" LLM {mode} predictions saved to experiments: {saved_files}")
             
         except Exception as e:
             print(f"Warning: Could not save LLM predictions to experiments: {e}")
@@ -1376,7 +1376,7 @@ class FusionEnsemble(BaseEnsemble):
             cache_filename = f"{base_cache_path}_{current_hash}.json"
             
             if not os.path.exists(cache_filename):
-                print(f"❌ No fusion cache found: {cache_filename}")
+                print(f" No fusion cache found: {cache_filename}")
                 return None
             
             # Load cache file
@@ -1399,14 +1399,14 @@ class FusionEnsemble(BaseEnsemble):
                     else:
                         predictions.append(item)
                 
-                print(f"✅ Loaded cached fusion predictions: {cache_filename} (Hash: {current_hash}, Count: {len(predictions)})")
+                print(f" Loaded cached fusion predictions: {cache_filename} (Hash: {current_hash}, Count: {len(predictions)})")
                 return predictions
             elif isinstance(cache_data, list):
                 # Old format - direct list of predictions
-                print(f"✅ Loaded cached fusion predictions: {cache_filename} (Hash: {current_hash}, Count: {len(cache_data)})")
+                print(f" Loaded cached fusion predictions: {cache_filename} (Hash: {current_hash}, Count: {len(cache_data)})")
                 return cache_data
             else:
-                print(f"⚠️ Invalid fusion cache format: {cache_filename}")
+                print(f" Invalid fusion cache format: {cache_filename}")
                 return None
             
         except Exception as e:
@@ -1481,7 +1481,7 @@ class FusionEnsemble(BaseEnsemble):
             with open(cache_filename, 'w') as f:
                 json.dump(cache_data, f, indent=2)
             
-            print(f"✅ Fusion predictions saved to {cache_filename} (Hash: {dataset_hash}, Count: {len(predictions)})")
+            print(f" Fusion predictions saved to {cache_filename} (Hash: {dataset_hash}, Count: {len(predictions)})")
             
         except Exception as e:
             print(f"Warning: Could not save fusion predictions to cache {base_cache_path}: {e}")
@@ -1532,24 +1532,24 @@ class FusionEnsemble(BaseEnsemble):
             if self.val_llm_cache_path:
                 cached_predictions = self._load_cached_llm_predictions(self.val_llm_cache_path, df)
                 if cached_predictions is not None:
-                    print(f"✅ Found cached validation predictions for {len(df)} samples")
+                    print(f" Found cached validation predictions for {len(df)} samples")
                     return cached_predictions
                 elif mode == "validation":
-                    print(f"❌ No cached validation predictions found for {len(df)} samples")
+                    print(f" No cached validation predictions found for {len(df)} samples")
                     return None
         
         if mode == "test" or mode == "auto":
             if self.test_llm_cache_path:
                 cached_predictions = self._load_cached_llm_predictions(self.test_llm_cache_path, df)
                 if cached_predictions is not None:
-                    print(f"✅ Found cached test predictions for {len(df)} samples")
+                    print(f" Found cached test predictions for {len(df)} samples")
                     return cached_predictions
                 elif mode == "test":
-                    print(f"❌ No cached test predictions found for {len(df)} samples")
+                    print(f" No cached test predictions found for {len(df)} samples")
                     return None
         
         if mode == "auto":
-            print(f"❌ No cached predictions found for {len(df)} samples in either validation or test cache")
+            print(f" No cached predictions found for {len(df)} samples in either validation or test cache")
         
         return None
     
@@ -1618,19 +1618,19 @@ class FusionEnsemble(BaseEnsemble):
         """
         # Try to load cached validation predictions if not provided
         if val_llm_predictions is None:
-            print("🔍 Attempting to load cached validation LLM predictions...")
+            print(" Attempting to load cached validation LLM predictions...")
             cached_val_predictions = self.load_cached_predictions_for_dataset(val_df, "validation")
             
             if cached_val_predictions is not None:
                 val_llm_predictions = cached_val_predictions
-                print(f"✅ Using cached validation predictions ({len(cached_val_predictions)} samples)")
+                print(f" Using cached validation predictions ({len(cached_val_predictions)} samples)")
             elif force_load_from_cache:
                 raise EnsembleError(
                     "force_load_from_cache=True but no cached validation predictions found",
                     "FusionEnsemble"
                 )
             else:
-                print("⚠️ No cached validation predictions found, will generate new ones during training")
+                print(" No cached validation predictions found, will generate new ones during training")
         
         # Call the regular fit method
         return self.fit(train_df, val_df, val_llm_predictions)
@@ -1656,19 +1656,19 @@ class FusionEnsemble(BaseEnsemble):
         """
         # Try to load cached test predictions if not provided
         if test_llm_predictions is None:
-            print("🔍 Attempting to load cached test LLM predictions...")
+            print(" Attempting to load cached test LLM predictions...")
             cached_test_predictions = self.load_cached_predictions_for_dataset(test_df, "test")
             
             if cached_test_predictions is not None:
                 test_llm_predictions = cached_test_predictions
-                print(f"✅ Using cached test predictions ({len(cached_test_predictions)} samples)")
+                print(f" Using cached test predictions ({len(cached_test_predictions)} samples)")
             elif force_load_from_cache:
                 raise EnsembleError(
                     "force_load_from_cache=True but no cached test predictions found",
                     "FusionEnsemble"
                 )
             else:
-                print("⚠️ No cached test predictions found, will generate new ones during prediction")
+                print(" No cached test predictions found, will generate new ones during prediction")
         
         # Call the regular predict method
         return self.predict(test_df, true_labels, test_llm_predictions)
@@ -1729,25 +1729,25 @@ class FusionEnsemble(BaseEnsemble):
         
         # Validation cache status
         val_cache = summary["validation_cache"]
-        print(f"\n📊 VALIDATION CACHE:")
+        print(f"\n VALIDATION CACHE:")
         print(f"   Path: {val_cache['path'] or 'Not configured'}")
         if val_cache["available"]:
-            print(f"   Status: ✅ Available ({len(val_cache['files'])} files)")
+            print(f"   Status:  Available ({len(val_cache['files'])} files)")
             print(f"   Latest: {os.path.basename(val_cache['latest_file'])}")
         else:
-            print(f"   Status: ❌ No cached files found")
+            print(f"   Status:  No cached files found")
         
         # Test cache status
         test_cache = summary["test_cache"]
         print(f"\n🧪 TEST CACHE:")
         print(f"   Path: {test_cache['path'] or 'Not configured'}")
         if test_cache["available"]:
-            print(f"   Status: ✅ Available ({len(test_cache['files'])} files)")
+            print(f"   Status:  Available ({len(test_cache['files'])} files)")
             print(f"   Latest: {os.path.basename(test_cache['latest_file'])}")
         else:
-            print(f"   Status: ❌ No cached files found")
+            print(f"   Status:  No cached files found")
         
-        print("\n💡 USAGE TIPS:")
+        print("\n USAGE TIPS:")
         print("   • Use fit_with_cached_predictions() to automatically load cached validation predictions")
         print("   • Use predict_with_cached_predictions() to automatically load cached test predictions")
         print("   • Use load_cached_predictions_for_dataset() for manual cache loading")
@@ -1816,8 +1816,8 @@ class FusionEnsemble(BaseEnsemble):
         fusion_train_llm_predictions = [llm_preds[i] for i in train_indices]
         fusion_val_llm_predictions = [llm_preds[i] for i in val_indices]
         
-        print(f"   🔧 Fusion training: {len(fusion_train_df)} samples")
-        print(f"   🔧 Fusion validation: {len(fusion_val_df)} samples")
+        print(f"    Fusion training: {len(fusion_train_df)} samples")
+        print(f"    Fusion validation: {len(fusion_val_df)} samples")
         
         # Create data loaders using both ML and LLM predictions
         train_dataset = self._create_fusion_dataset(
@@ -1938,11 +1938,11 @@ class FusionEnsemble(BaseEnsemble):
         
         # Debug: Check what keys are in the first prediction
         if ml_has_hashes and len(ml_predictions) > 0:
-            print(f"🔍 ML prediction dict keys: {list(ml_predictions[0].keys())}")
+            print(f" ML prediction dict keys: {list(ml_predictions[0].keys())}")
             if 'embedding' in ml_predictions[0]:
-                print(f"✅ Embeddings found! Shape: {len(ml_predictions[0]['embedding'])}")
+                print(f" Embeddings found! Shape: {len(ml_predictions[0]['embedding'])}")
             else:
-                print(f"⚠️ No embeddings in ML predictions, falling back to predictions")
+                print(f" No embeddings in ML predictions, falling back to predictions")
         
         # Get embedding dimension (default 768 for RoBERTa)
         embedding_dim = getattr(self.fusion_wrapper, 'embedding_dim', 768)
@@ -1954,7 +1954,7 @@ class FusionEnsemble(BaseEnsemble):
         if ml_has_hashes or llm_has_hashes:
             # NEW FORMAT: Use hash-based matching
             use_type = "embeddings" if ml_has_embeddings else "predictions"
-            print(f"🔐 Using hash-based {use_type} matching (robust against reordering)")
+            print(f" Using hash-based {use_type} matching (robust against reordering)")
             
             # Compute hashes for current texts
             text_hashes = [self._compute_text_hash(text) for text in texts]
@@ -1989,7 +1989,7 @@ class FusionEnsemble(BaseEnsemble):
                 ml_data = ml_hash_map.get(text_hash)
                 if ml_data is None:
                     mismatches += 1
-                    print(f"⚠️ Warning: No ML data found for text hash {text_hash} at index {i}")
+                    print(f" Warning: No ML data found for text hash {text_hash} at index {i}")
                 else:
                     if ml_has_embeddings:
                         # Use embedding directly
@@ -2005,7 +2005,7 @@ class FusionEnsemble(BaseEnsemble):
                 llm_pred = llm_hash_map.get(text_hash)
                 if llm_pred is None:
                     mismatches += 1
-                    print(f"⚠️ Warning: No LLM prediction found for text hash {text_hash} at index {i}")
+                    print(f" Warning: No LLM prediction found for text hash {text_hash} at index {i}")
                 else:
                     llm_tensor[i] = self._prediction_to_tensor(llm_pred)
             
@@ -2015,11 +2015,11 @@ class FusionEnsemble(BaseEnsemble):
                     "FusionEnsemble"
                 )
             
-            print(f"✅ Successfully matched {len(texts)} {use_type} by hash")
+            print(f" Successfully matched {len(texts)} {use_type} by hash")
             
         else:
             # OLD FORMAT: Position-based matching (backward compatible)
-            print("⚠️ Using position-based prediction matching (assumes DataFrame order unchanged)")
+            print(" Using position-based prediction matching (assumes DataFrame order unchanged)")
             
             # Validate lengths match
             if len(ml_predictions) != len(texts):
@@ -2149,21 +2149,21 @@ class FusionEnsemble(BaseEnsemble):
         
         if cached_fusion_predictions is not None:
             # Use cached predictions
-            print(f"🎯 Using cached fusion predictions (count: {len(cached_fusion_predictions)})")
+            print(f" Using cached fusion predictions (count: {len(cached_fusion_predictions)})")
             
             # Generate ML test metrics if we have true labels
             if extracted_labels is not None and self.ml_model is not None:
                 try:
-                    print("📊 Generating ML test metrics from cached predictions...")
+                    print(" Generating ML test metrics from cached predictions...")
                     ml_test_result = self.ml_model.predict(test_df)
-                    print(f"📊 ML test metrics generated and saved")
+                    print(f" ML test metrics generated and saved")
                 except Exception as e:
                     print(f"Warning: Could not generate ML test metrics: {e}")
             
             # Still need to get LLM predictions for metrics calculation
             llm_train_df = train_df if train_df is not None else getattr(self, 'train_df_cache', None)
             if llm_train_df is None:
-                print("⚠️ Warning: No training data available for LLM few-shot examples")
+                print(" Warning: No training data available for LLM few-shot examples")
             
             llm_test_predictions = self._get_or_generate_llm_predictions(
                 df=test_df,
@@ -2250,7 +2250,7 @@ class FusionEnsemble(BaseEnsemble):
                                 "test", 
                                 "openai_classifier"
                             )
-                            print(f"📊 LLM test metrics saved: {metrics_file}")
+                            print(f" LLM test metrics saved: {metrics_file}")
                         except Exception as e:
                             print(f"Warning: Could not save LLM test metrics: {e}")
                 except Exception as e:
@@ -2277,7 +2277,7 @@ class FusionEnsemble(BaseEnsemble):
                         )
                         saved_files["metrics"] = metrics_file
                     
-                    print(f"📁 Test results saved: {saved_files}")
+                    print(f" Test results saved: {saved_files}")
                     
                     # Add file paths to result metadata
                     if not result.metadata:
@@ -2290,7 +2290,7 @@ class FusionEnsemble(BaseEnsemble):
             return result
         
         # No cache found - generate predictions
-        print("🔄 Generating fresh fusion predictions...")
+        print(" Generating fresh fusion predictions...")
         
         # Step 1: Get ML predictions on test data with hashes
         print("Getting ML predictions on test data...")
@@ -2308,7 +2308,7 @@ class FusionEnsemble(BaseEnsemble):
         # Use provided train_df, or fall back to cached training data
         llm_train_df = train_df if train_df is not None else getattr(self, 'train_df_cache', None)
         if llm_train_df is None:
-            print("⚠️ Warning: No training data available for LLM few-shot examples")
+            print(" Warning: No training data available for LLM few-shot examples")
         
         llm_test_predictions = self._get_or_generate_llm_predictions(
             df=test_df,
@@ -2349,7 +2349,7 @@ class FusionEnsemble(BaseEnsemble):
                                 "test", 
                                 self.llm_model.model_name or "openai_classifier"
                             )
-                            print(f"📊 LLM test metrics saved: {metrics_file}")
+                            print(f" LLM test metrics saved: {metrics_file}")
                         except Exception as e:
                             print(f"Warning: Could not save LLM test metrics: {e}")
                 
@@ -2402,7 +2402,7 @@ class FusionEnsemble(BaseEnsemble):
                     )
                     saved_files["metrics"] = metrics_file
                 
-                print(f"📁 Test results saved: {saved_files}")
+                print(f" Test results saved: {saved_files}")
                 
                 # Add file paths to result metadata
                 if not result.metadata:

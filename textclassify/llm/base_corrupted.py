@@ -496,7 +496,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 self.cache.save_cache()
                 if self.verbose:
                     cache_stats = self.cache.get_cache_stats()
-                    self.logger.info(f"💾 Cache saved: {cache_stats['total_predictions']} predictions, "
+                    self.logger.info(f" Cache saved: {cache_stats['total_predictions']} predictions, "
                                    f"{cache_stats['cache_size_mb']:.2f}MB")
                     print(f"Cache: {cache_stats['total_predictions']} predictions saved to {cache_stats['cache_directory']}")
             
@@ -710,8 +710,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         failed_predictions = 0
         
         if self.verbose:
-            self.logger.info(f"🚀 Starting prediction for {total_samples} samples in {total_batches} batches")
-            print(f"\n📊 Processing {total_samples} samples in {total_batches} batches of size {self.batch_size}")
+            self.logger.info(f" Starting prediction for {total_samples} samples in {total_batches} batches")
+            print(f"\n Processing {total_samples} samples in {total_batches} batches of size {self.batch_size}")
         
         # Create simple, visible progress bar
         if self.verbose:
@@ -740,9 +740,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                     # Update postfix with current batch info
                     pbar.set_postfix({
                         'Batch': f'{i+1}/{total_batches}',
-                        'Cache': f'💾{cache_hits}',
+                        'Cache': f'{cache_hits}',
                         'Miss': f'🌐{cache_misses}',
-                        'Fail': f'❌{failed_predictions}'
+                        'Fail': f'{failed_predictions}'
                     })
                 
                 # Process batch and track individual predictions
@@ -770,18 +770,18 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if self.verbose:
                 # Final statistics update
                 pbar.set_postfix({
-                    'Cache': f'💾{cache_hits}',
+                    'Cache': f'{cache_hits}',
                     'API': f'🌐{cache_misses}',
-                    'Success': f'✅{successful_predictions}',
-                    'Failed': f'❌{failed_predictions}'
+                    'Success': f'{successful_predictions}',
+                    'Failed': f'{failed_predictions}'
                 })
                 pbar.close()
                 
                 # Print final summary
-                print(f"\n📊 Prediction Summary:")
-                print(f"   ✅ Successful: {successful_predictions}/{total_samples}")
-                print(f"   ❌ Failed: {failed_predictions}/{total_samples}")
-                print(f"   💾 Cache hits: {cache_hits}/{total_samples}")
+                print(f"\n Prediction Summary:")
+                print(f"    Successful: {successful_predictions}/{total_samples}")
+                print(f"    Failed: {failed_predictions}/{total_samples}")
+                print(f"    Cache hits: {cache_hits}/{total_samples}")
                 print(f"   🌐 API calls: {cache_misses}/{total_samples}")
         
         return predictions
