@@ -857,6 +857,10 @@ class RoBERTaClassifier(BaseMLClassifier):
             confidence_scores=confidence_scores
         )
         
+        # Add embeddings directly to result if provided
+        if 'embeddings' in metadata:
+            result.embeddings = metadata['embeddings']
+        
         # Add metadata to the result
         if result.metadata is None:
             result.metadata = {}
