@@ -46,3 +46,6 @@ __pycache__/
 
 __pycache__/
 *.pyc
+
+# Egg-info artifacts
+textclassify.egg-info/
