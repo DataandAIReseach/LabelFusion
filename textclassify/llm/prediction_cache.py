@@ -21,7 +21,7 @@ class LLMPredictionCache:
         self,
         cache_dir: str = "cache/llm",
         session_id: Optional[str] = None,
-        auto_save_interval: int = 10,  # Save every N predictions
+        auto_save_interval: int = 5,  # Save every N predictions
         enable_compression: bool = True,
         verbose: bool = True
     ):
@@ -91,6 +91,39 @@ class LLMPredictionCache:
                     self.metadata.update(saved_metadata)
                     if self.verbose:
                         self.logger.info(f"Loaded existing metadata: {len(saved_metadata)} items")
+            else:
+                # If there's no metadata for this session id, try to find the most
+                # recent metadata/cache files in the cache directory and load them.
+                meta_files = sorted(self.cache_dir.glob('metadata_*.json'), reverse=True)
+                cache_files = sorted(self.cache_dir.glob('cache_*.pkl'), reverse=True)
+                if meta_files or cache_files:
+                    # Prefer metadata file to pick session id, otherwise pick cache file
+                    chosen_meta = meta_files[0] if meta_files else None
+                    chosen_cache = cache_files[0] if cache_files else None
+                    if chosen_meta:
+                        try:
+                            with open(chosen_meta, 'r') as f:
+                                saved_metadata = json.load(f)
+                                self.metadata.update(saved_metadata)
+                                # update session id and file paths to match discovered file
+                                sid = chosen_meta.stem.replace('metadata_', '')
+                                self.session_id = sid
+                                self.metadata_file = chosen_meta
+                                self.predictions_file = self.cache_dir / f"predictions_{sid}.csv"
+                                self.cache_file = self.cache_dir / f"cache_{sid}.pkl"
+                                if self.verbose:
+                                    self.logger.info(f"Auto-loaded metadata from {chosen_meta.name}")
+                        except Exception:
+                            pass
+                    elif chosen_cache:
+                        # derive session id from cache filename
+                        sid = chosen_cache.stem.replace('cache_', '')
+                        self.session_id = sid
+                        self.metadata_file = self.cache_dir / f"metadata_{sid}.json"
+                        self.predictions_file = self.cache_dir / f"predictions_{sid}.csv"
+                        self.cache_file = chosen_cache
+                        if self.verbose:
+                            self.logger.info(f"Auto-selected cache file {chosen_cache.name}")
             
             # Load cache
             if self.cache_file.exists():
@@ -317,6 +350,37 @@ class LLMPredictionCache:
         
         if self.verbose:
             self.logger.info("Cache cleared")
+    
+    def add_prediction_direct(self, text: str, prediction: List[int], 
+                             response_text: str = "", prompt: str = "",
+                             metadata: Optional[Dict[str, Any]] = None) -> None:
+        """Add prediction to cache directly without auto-save trigger.
+        
+        This is useful for bulk loading predictions from existing cache files.
+        
+        Args:
+            text: Original input text
+            prediction: Binary vector prediction
+            response_text: Raw LLM response
+            prompt: The prompt sent to LLM
+            metadata: Additional metadata
+        """
+        text_hash = self._get_text_hash(text)
+        
+        prediction_data = {
+            "text_hash": text_hash,
+            "text": text,
+            "prediction": prediction,
+            "response_text": response_text,
+            "prompt": prompt,
+            "success": True,
+            "error_message": None,
+            "timestamp": datetime.now().isoformat(),
+            "metadata": metadata or {}
+        }
+        
+        # Store in cache without triggering auto-save
+        self.predictions_cache[text_hash] = prediction_data
     
     def get_failed_predictions(self) -> List[Dict[str, Any]]:
         """Get all failed predictions for retry."""

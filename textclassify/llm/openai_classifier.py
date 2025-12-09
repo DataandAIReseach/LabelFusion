@@ -26,7 +26,7 @@ class OpenAIClassifier(BaseLLMClassifier):
         experiment_name: Optional[str] = None,
         auto_save_results: bool = True,
         # Cache management parameters
-        auto_use_cache: bool = False
+        auto_use_cache: bool = True
     ):
         """Initialize OpenAI classifier.
         
@@ -54,7 +54,8 @@ class OpenAIClassifier(BaseLLMClassifier):
             experiment_name=experiment_name,
             auto_save_results=auto_save_results,
             auto_use_cache=auto_use_cache,
-            cache_dir=cache_dir
+            cache_dir=cache_dir,
+            
         )
         
         # Handle legacy caching parameter
@@ -72,7 +73,56 @@ class OpenAIClassifier(BaseLLMClassifier):
         self.temperature = self.config.parameters.get('temperature', 1)
         self.max_completion_tokens = self.config.parameters.get('max_completion_tokens', 150)
         
+        # Mode tracking (train/val/test) - inherited from base but can be set here too
+        if not hasattr(self, 'mode'):
+            self.mode = None
+        
         # No need to create separate client - use the service layer from BaseLLMClassifier
+    
+    def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
+        """Return True if a test cache file matching the given DataFrame exists, else False.
+
+        Computes an 8-char dataset hash from the provided DataFrame and checks
+        cached test JSON filenames and their metadata for a match. Uses self.cache_dir.
+        """
+        from pathlib import Path
+        import hashlib
+        import json
+
+        cache_dir = getattr(self, 'cache_dir', 'cache')
+        p = Path(cache_dir)
+        if not p.exists():
+            return False
+
+        # Compute stable 8-char hash for DataFrame
+        try:
+            hashed = pd.util.hash_pandas_object(df, index=True).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+        except Exception:
+            csv_bytes = df.to_csv(index=True).encode('utf-8')
+            dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+
+        discovered = self.discover_cached_predictions(cache_dir)
+        if not discovered:
+            return False
+
+        candidates = discovered.get('test_predictions', []) or []
+        for file_path in candidates:
+            try:
+                fname = Path(file_path).name
+                if fname.endswith(f"_{dataset_hash}.json"):
+                    return True
+
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                meta = data.get('metadata', {}) if isinstance(data, dict) else {}
+                if meta.get('dataset_hash') == dataset_hash:
+                    return True
+
+            except Exception:
+                continue
+
+        return False
     
     def predict(
         self,
@@ -97,6 +147,9 @@ class OpenAIClassifier(BaseLLMClassifier):
         Returns:
             ClassificationResult with predictions, metrics, and saved files info
         """
+        # Set mode to 'test' when predicting
+        self.mode = 'test'
+        
         # Store test_df reference for results saving
         if test_df is not None:
             self._current_test_df = test_df
@@ -110,92 +163,89 @@ class OpenAIClassifier(BaseLLMClassifier):
             label_definitions=label_definitions
         )
         
-        # 🚀 EXPLICIT RESULTS SAVING (like RoBERTa)
-        if self.results_manager and hasattr(self, '_current_test_df'):
-            try:
-                # 1. Save predictions (CSV + JSON)
-                saved_files = self.results_manager.save_predictions(
-                    result, "test", self._current_test_df
-                )
-                
-                # 2. Save metrics YAML (if available)
-                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
-                    metrics_file = self.results_manager.save_metrics(
-                        result.metadata['metrics'], "test", "openai_classifier"
+        #  EXPLICIT RESULTS SAVING (like RoBERTa)
+        if self.results_manager:
+            dataset_type = getattr(self, '_current_dataset_type', 'test')
+            current_df = getattr(self, '_current_test_df', None)
+            
+            if current_df is not None:
+                try:
+                    # 1. Save predictions (CSV + JSON)
+                    saved_files = self.results_manager.save_predictions(
+                        result, dataset_type, current_df
                     )
-                    saved_files["metrics"] = metrics_file
-                
-                # 3. Save model configuration YAML
-                model_config_dict = {
-                    'provider': 'openai',
-                    'model_name': self.model,
-                    'temperature': self.temperature,
-                    'max_completion_tokens': self.max_completion_tokens,
-                    'multi_label': self.multi_label,
-                    'text_column': self.text_column,
-                    'label_columns': self.label_columns,
-                    'classes': self.classes_,
-                    'batch_size': getattr(self, 'batch_size', 32),
-                    'threshold': getattr(self, 'threshold', 0.5),
-                    'few_shot_mode': self.few_shot_mode,
-                    'classification_type': 'multi_label' if self.multi_label else 'single_label',
-                    'enable_cache': self.enable_cache,
-                    'cache_dir': self.cache_dir
-                }
-                
-                config_file = self.results_manager.save_model_config(
-                    model_config_dict, 
-                    "openai_classifier"
-                )
-                saved_files["config"] = config_file
-                
-                # 4. Save experiment summary
-                experiment_summary = {
-                    'model_type': 'llm',
-                    'provider': 'openai',
-                    'model_name': self.model,
-                    'num_labels': len(self.classes_),
-                    'classes': self.classes_,
-                    'test_samples': len(self._current_test_df),
-                    'train_samples': len(train_df) if train_df is not None else 0,
-                    'classification_type': 'multi_label' if self.multi_label else 'single_label',
-                    'metrics': result.metadata.get('metrics', {}) if result.metadata else {},
-                    'temperature': self.temperature,
-                    'max_completion_tokens': self.max_completion_tokens,
-                    'batch_size': getattr(self, 'batch_size', 32),
-                    'completed': True
-                }
-                
-                self.results_manager.save_experiment_summary(experiment_summary)
-                
-                # 5. Detailed logging (like RoBERTa)
-                if getattr(self, 'verbose', True):
-                    exp_info = self.results_manager.get_experiment_info()
-                    if hasattr(self, 'logger'):
-                        self.logger.info(f"📁 OpenAI prediction results saved to: {exp_info['experiment_dir']}")
-                        self.logger.info(f"💾 Files saved:")
-                        for file_type, file_path in saved_files.items():
-                            self.logger.info(f"   - {file_type}: {file_path}")
-                
-                print(f"📁 OpenAI prediction results saved: {saved_files}")
-                
-                # 6. Add file paths to result metadata
-                if not result.metadata:
-                    result.metadata = {}
-                result.metadata['saved_files'] = saved_files
-                
-                # Clean up temporary reference
-                delattr(self, '_current_test_df')
-                
-            except Exception as e:
-                if getattr(self, 'verbose', True):
-                    if hasattr(self, 'logger'):
-                        self.logger.error(f"Warning: Could not save OpenAI prediction results: {e}")
-                print(f"Warning: Could not save OpenAI prediction results: {e}")
-                
-                # Clean up temporary reference even if saving failed
-                if hasattr(self, '_current_test_df'):
-                    delattr(self, '_current_test_df')
+                    
+                    # 2. Save metrics YAML (if available)
+                    if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                        metrics_file = self.results_manager.save_metrics(
+                            result.metadata['metrics'], "test", "openai_classifier"
+                        )
+                        saved_files["metrics"] = metrics_file
+                    
+                    # 3. Save model configuration YAML
+                    model_config_dict = {
+                        'provider': 'openai',
+                        'model_name': self.model,
+                        'temperature': self.temperature,
+                        'max_completion_tokens': self.max_completion_tokens,
+                        'multi_label': self.multi_label,
+                        'text_column': self.text_column,
+                        'label_columns': self.label_columns,
+                        'classes': self.classes_,
+                        'batch_size': getattr(self, 'batch_size', 32),
+                        'threshold': getattr(self, 'threshold', 0.5),
+                        'few_shot_mode': self.few_shot_mode,
+                        'classification_type': 'multi_label' if self.multi_label else 'single_label',
+                        'enable_cache': self.enable_cache,
+                        'cache_dir': self.cache_dir
+                    }
+                    
+                    config_file = self.results_manager.save_model_config(
+                        model_config_dict, 
+                        "openai_classifier"
+                    )
+                    saved_files["config"] = config_file
+                    
+                    # 4. Save experiment summary
+                    experiment_summary = {
+                        'model_type': 'llm',
+                        'provider': 'openai',
+                        'model_name': self.model,
+                        'num_labels': len(self.classes_),
+                        'classes': self.classes_,
+                        'test_samples': len(self._current_test_df),
+                        'train_samples': len(train_df) if train_df is not None else 0,
+                        'classification_type': 'multi_label' if self.multi_label else 'single_label',
+                        'metrics': result.metadata.get('metrics', {}) if result.metadata else {},
+                        'temperature': self.temperature,
+                        'max_completion_tokens': self.max_completion_tokens,
+                        'batch_size': getattr(self, 'batch_size', 32),
+                        'completed': True
+                    }
+                    
+                    self.results_manager.save_experiment_summary(experiment_summary)
+                    
+                    # 5. Detailed logging (like RoBERTa)
+                    if getattr(self, 'verbose', True):
+                        exp_info = self.results_manager.get_experiment_info()
+                        if hasattr(self, 'logger'):
+                            self.logger.info(f" OpenAI prediction results saved to: {exp_info['experiment_dir']}")
+                            self.logger.info(f" Files saved:")
+                            for file_type, file_path in saved_files.items():
+                                self.logger.info(f"   - {file_type}: {file_path}")
+                    
+                    print(f" OpenAI prediction results saved: {saved_files}")
+                    
+                    # 6. Add file paths to result metadata
+                    if not result.metadata:
+                        result.metadata = {}
+                    result.metadata['saved_files'] = saved_files
+                    
+                except Exception as e:
+                    if getattr(self, 'verbose', True):
+                        if hasattr(self, 'logger'):
+                            self.logger.error(f"Warning: Could not save OpenAI prediction results: {e}")
+                    print(f"Warning: Could not save OpenAI prediction results: {e}")
         
         return result
 

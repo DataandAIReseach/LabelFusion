@@ -78,6 +78,13 @@ class BaseMLClassifier(BaseClassifier):
             self.is_trained = model_data['is_trained']
             self.model_path = path
             
+            # Load num_labels if it exists in the saved model
+            if 'num_labels' in model_data:
+                self.num_labels = model_data['num_labels']
+            elif self.classes_ is not None:
+                # Fallback: calculate from classes_
+                self.num_labels = len(self.classes_)
+            
             # Update config if needed
             if 'config' in model_data:
                 saved_config = model_data['config']

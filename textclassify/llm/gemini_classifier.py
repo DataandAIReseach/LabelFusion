@@ -24,7 +24,7 @@ class GeminiClassifier(BaseLLMClassifier):
         experiment_name: Optional[str] = None,
         auto_save_results: bool = True,
         # Cache management parameters
-        auto_use_cache: bool = False,
+        auto_use_cache: bool = True,
         cache_dir: str = "cache"
     ):
         """Initialize Gemini classifier.
@@ -73,6 +73,10 @@ class GeminiClassifier(BaseLLMClassifier):
         # Gemini-specific parameters
         self.top_p = self.config.parameters.get('top_p', 0.95)
         self.top_k = self.config.parameters.get('top_k', 40)
+        
+        # Mode tracking (train/val/test) - inherited from base but can be set here too
+        if not hasattr(self, 'mode'):
+            self.mode = None
     
     def predict(
         self,
@@ -87,6 +91,9 @@ class GeminiClassifier(BaseLLMClassifier):
         This method overrides the base class to add comprehensive results saving
         similar to RoBERTa classifier.
         """
+        # Set mode to 'test' when predicting
+        self.mode = 'test'
+        
         # Store test_df reference for results saving
         if test_df is not None:
             self._current_test_df = test_df
@@ -100,69 +107,68 @@ class GeminiClassifier(BaseLLMClassifier):
             label_definitions=label_definitions
         )
         
-        # 🚀 EXPLICIT RESULTS SAVING (like RoBERTa)
-        if self.results_manager and hasattr(self, '_current_test_df'):
-            try:
-                # Save predictions and configuration
-                saved_files = self.results_manager.save_predictions(
-                    result, "test", self._current_test_df
-                )
-                
-                # Save metrics YAML
-                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
-                    metrics_file = self.results_manager.save_metrics(
-                        result.metadata['metrics'], "test", "gemini_classifier"
+        #  EXPLICIT RESULTS SAVING (like RoBERTa)
+        if self.results_manager:
+            dataset_type = getattr(self, '_current_dataset_type', 'test')
+            current_df = getattr(self, '_current_test_df', None)
+            
+            if current_df is not None:
+                try:
+                    # Save predictions and configuration
+                    saved_files = self.results_manager.save_predictions(
+                        result, dataset_type, current_df
                     )
-                    saved_files["metrics"] = metrics_file
-                
-                # Save model configuration
-                model_config_dict = {
-                    'provider': 'gemini',
-                    'model_name': self.model,
-                    'temperature': self.temperature,
-                    'max_completion_tokens': self.max_completion_tokens,
-                    'top_p': self.top_p,
-                    'top_k': self.top_k,
-                    'multi_label': self.multi_label,
-                    'text_column': self.text_column,
-                    'label_columns': self.label_columns,
-                    'classes': self.classes_,
-                    'classification_type': 'multi_label' if self.multi_label else 'single_label'
-                }
-                
-                config_file = self.results_manager.save_model_config(
-                    model_config_dict, "gemini_classifier"
-                )
-                saved_files["config"] = config_file
-                
-                # Save experiment summary
-                experiment_summary = {
-                    'model_type': 'llm',
-                    'provider': 'gemini',
-                    'model_name': self.model,
-                    'test_samples': len(self._current_test_df),
-                    'train_samples': len(train_df) if train_df is not None else 0,
-                    'classification_type': 'multi_label' if self.multi_label else 'single_label',
-                    'metrics': result.metadata.get('metrics', {}) if result.metadata else {},
-                    'completed': True
-                }
-                
-                self.results_manager.save_experiment_summary(experiment_summary)
-                
-                print(f"📁 Gemini prediction results saved: {saved_files}")
-                
-                # Add file paths to result metadata
-                if not result.metadata:
-                    result.metadata = {}
-                result.metadata['saved_files'] = saved_files
-                
-                # Clean up temporary reference
-                delattr(self, '_current_test_df')
-                
-            except Exception as e:
-                print(f"Warning: Could not save Gemini prediction results: {e}")
-                if hasattr(self, '_current_test_df'):
-                    delattr(self, '_current_test_df')
+                    
+                    # Save metrics YAML
+                    if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                        metrics_file = self.results_manager.save_metrics(
+                            result.metadata['metrics'], "test", "gemini_classifier"
+                        )
+                        saved_files["metrics"] = metrics_file
+                    
+                    # Save model configuration
+                    model_config_dict = {
+                        'provider': 'gemini',
+                        'model_name': self.model,
+                        'temperature': self.temperature,
+                        'max_completion_tokens': self.max_completion_tokens,
+                        'top_p': self.top_p,
+                        'top_k': self.top_k,
+                        'multi_label': self.multi_label,
+                        'text_column': self.text_column,
+                        'label_columns': self.label_columns,
+                        'classes': self.classes_,
+                        'classification_type': 'multi_label' if self.multi_label else 'single_label'
+                    }
+                    
+                    config_file = self.results_manager.save_model_config(
+                        model_config_dict, "gemini_classifier"
+                    )
+                    saved_files["config"] = config_file
+                    
+                    # Save experiment summary
+                    experiment_summary = {
+                        'model_type': 'llm',
+                        'provider': 'gemini',
+                        'model_name': self.model,
+                        'test_samples': len(self._current_test_df),
+                        'train_samples': len(train_df) if train_df is not None else 0,
+                        'classification_type': 'multi_label' if self.multi_label else 'single_label',
+                        'metrics': result.metadata.get('metrics', {}) if result.metadata else {},
+                        'completed': True
+                    }
+                    
+                    self.results_manager.save_experiment_summary(experiment_summary)
+                    
+                    print(f" Gemini prediction results saved: {saved_files}")
+                    
+                    # Add file paths to result metadata
+                    if not result.metadata:
+                        result.metadata = {}
+                    result.metadata['saved_files'] = saved_files
+                    
+                except Exception as e:
+                    print(f"Warning: Could not save Gemini prediction results: {e}")
         
         return result
     
