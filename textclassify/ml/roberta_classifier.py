@@ -398,7 +398,7 @@ class RoBERTaClassifier(BaseMLClassifier):
                 print(f"  Average validation loss: {avg_val_loss:.4f}")
         
         self.is_trained = True
-        print("✅ Model training completed!")
+        print(" Model training completed!")
         
         # Auto-save model in cache directory with dataset hash
         if self.auto_save_path:
@@ -418,12 +418,12 @@ class RoBERTaClassifier(BaseMLClassifier):
             save_path = str(cache_dir / f"roberta_{dataset_hash}")
         
         self.save_model(save_path)
-        print(f"💾 Model cached at: {save_path}")
+        print(f" Model cached at: {save_path}")
         
         # Generate and save validation predictions if validation data is provided
         val_predictions_saved = None
         if val_df is not None and self.enable_validation:
-            print("📝 Generating validation predictions...")
+            print(" Generating validation predictions...")
             try:
                 val_result = self._predict_on_dataset(val_df, mode="validation")
                 # Extract all validation metrics and saved file paths
@@ -439,7 +439,7 @@ class RoBERTaClassifier(BaseMLClassifier):
                 # Print key metrics and file locations
                 if val_metrics:
                     if 'accuracy' in val_metrics:
-                        print(f"✅ Validation accuracy: {val_metrics['accuracy']:.4f}")
+                        print(f" Validation accuracy: {val_metrics['accuracy']:.4f}")
                     if 'f1_weighted' in val_metrics:
                         print(f"   F1 (weighted): {val_metrics['f1_weighted']:.4f}")
                     if 'precision_weighted' in val_metrics:
@@ -451,9 +451,9 @@ class RoBERTaClassifier(BaseMLClassifier):
                     if 'metrics' in saved_files:
                         print(f"   Metrics saved to: {saved_files['metrics']}")
                 else:
-                    print(f"✅ Validation predictions saved for {len(val_df)} samples")
+                    print(f" Validation predictions saved for {len(val_df)} samples")
             except Exception as e:
-                print(f"⚠️ Warning: Could not save validation predictions: {e}")
+                print(f" Warning: Could not save validation predictions: {e}")
                 val_predictions_saved = None
         
         # Prepare training result
@@ -497,7 +497,7 @@ class RoBERTaClassifier(BaseMLClassifier):
                 training_result['experiment_info'] = exp_info
                 training_result['output_directory'] = exp_info['experiment_dir']
                 
-                print(f"📁 Training results saved to: {exp_info['experiment_dir']}")
+                print(f" Training results saved to: {exp_info['experiment_dir']}")
                 
             except Exception as e:
                 print(f"Warning: Could not save training results: {e}")
@@ -736,7 +736,7 @@ class RoBERTaClassifier(BaseMLClassifier):
                         )
                         saved_files["metrics"] = metrics_file
                     
-                    print(f"📁 Prediction results saved: {saved_files}")
+                    print(f" Prediction results saved: {saved_files}")
                     
                     # Add file paths to result metadata
                     if not result.metadata:
@@ -1098,7 +1098,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         with open(save_dir / 'model_metadata.json', 'w') as f:
             json.dump(metadata, f, indent=2)
         
-        print(f"✅ Model saved to: {save_dir}")
+        print(f" Model saved to: {save_dir}")
     
     def load_model(self, path: str) -> None:
         """Load a trained RoBERTa model from disk.
@@ -1140,7 +1140,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.model.to(self.device)
         self.is_trained = True
         
-        print(f"✅ Model loaded from: {load_dir}")
+        print(f" Model loaded from: {load_dir}")
     
     @property
     def model_info(self) -> Dict[str, Any]:

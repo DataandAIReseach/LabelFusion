@@ -154,8 +154,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             
             if self.verbose:
                 exp_info = self.results_manager.get_experiment_info()
-                self.logger.info(f"📁 Results will be saved to: {exp_info['experiment_dir']}")
-                self.logger.info(f"🔬 Experiment ID: {self.results_manager.experiment_id}")
+                self.logger.info(f" Results will be saved to: {exp_info['experiment_dir']}")
+                self.logger.info(f" Experiment ID: {self.results_manager.experiment_id}")
         
         self._setup_config()
     
@@ -201,10 +201,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         start_time = time.time()
         
-        # 🚀 AUTO-CACHE: Check for cached predictions if enabled
+        #  AUTO-CACHE: Check for cached predictions if enabled
         if self.auto_use_cache:
             if self.verbose:
-                print("\n🔍 Auto-cache enabled, checking for cached predictions...")
+                print("\n Auto-cache enabled, checking for cached predictions...")
             
             # Compute dataset hash for test_df to find exact match
             try:
@@ -242,27 +242,27 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 
                 if matching_cache:
                     if self.verbose:
-                        print(f"✅ Found matching cached predictions: {Path(matching_cache).name}")
-                        print("📥 Loading from cache (1000-5000x faster than inference)...")
+                        print(f" Found matching cached predictions: {Path(matching_cache).name}")
+                        print(" Loading from cache (1000-5000x faster than inference)...")
                     
                     try:
                         # Load and return cached predictions
                         result = self.predict_with_cached_predictions(test_df, matching_cache, train_df)
                         
                         if self.verbose:
-                            print(f"⚡ Cache load completed in {time.time() - start_time:.2f} seconds")
+                            print(f" Cache load completed in {time.time() - start_time:.2f} seconds")
                         
                         return result
                         
                     except Exception as e:
                         if self.verbose:
-                            print(f"⚠️  Cache load failed: {e}")
-                            print("🔄 Falling back to normal inference...")
+                            print(f"  Cache load failed: {e}")
+                            print(" Falling back to normal inference...")
                 elif self.verbose:
-                    print(f"ℹ️  Found {len(discovered['test_predictions'])} test cache file(s), but none match current dataset (hash: {test_dataset_hash})")
-                    print("🔄 Running inference...")
+                    print(f"  Found {len(discovered['test_predictions'])} test cache file(s), but none match current dataset (hash: {test_dataset_hash})")
+                    print(" Running inference...")
             elif self.verbose:
-                print("ℹ️  No cached predictions found, running inference...")
+                print("  No cached predictions found, running inference...")
 
         # Initialize incremental prediction cache for resume/skip functionality
         if self.auto_use_cache:
@@ -719,11 +719,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         # Skip cache initialization if flag is set (e.g., when filling missing predictions)
         if getattr(self, '_skip_batch_cache_write', False):
-            print(f"🔍 DEBUG: Skipping batch cache initialization (_skip_batch_cache_write=True)")
+            print(f" DEBUG: Skipping batch cache initialization (_skip_batch_cache_write=True)")
             return None
         
         # DEBUG: Log DataFrame size used for hash calculation
-        print(f"🔍 DEBUG: _initialize_batch_cache_file called with df size: {len(df)} rows, mode: {mode}")
+        print(f" DEBUG: _initialize_batch_cache_file called with df size: {len(df)} rows, mode: {mode}")
         
         # Create cache directory if it doesn't exist
         cache_dir = Path(self.cache_dir)
@@ -741,7 +741,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             csv_bytes = text_series.to_csv(index=False).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
         
-        print(f"🔍 DEBUG: Computed dataset_hash: {dataset_hash} for {len(df)} rows")
+        print(f" DEBUG: Computed dataset_hash: {dataset_hash} for {len(df)} rows")
         
         # Create cache filename: mode_hash.json (e.g. val_b6e3cb0f.json)
         cache_filename = f"{mode}_{dataset_hash}.json"
@@ -1548,7 +1548,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 saved_files["config"] = config_file
                 
                 if self.verbose:
-                    self.logger.info(f"📁 Results saved: {saved_files}")
+                    self.logger.info(f" Results saved: {saved_files}")
                 
                 # Add file paths to result metadata
                 if not result.metadata:
@@ -1638,7 +1638,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                         result.metadata['saved_files']['metrics'] = metrics_file
                         
                         if self.verbose:
-                            print(f"📁 {self.provider.title()} classifier metrics saved: {metrics_file}")
+                            print(f" {self.provider.title()} classifier metrics saved: {metrics_file}")
                             
                     except Exception as e:
                         if self.verbose:
@@ -1674,7 +1674,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         cache_path = Path(cache_dir)
         if not cache_path.exists():
-            print(f"⚠️  Cache directory not found: {cache_dir}")
+            print(f"  Cache directory not found: {cache_dir}")
             return {}
         
         discovered = {}
@@ -1700,11 +1700,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 discovered[dataset_type] = matching_files
         
         if discovered:
-            print(f"📁 Discovered {sum(len(v) for v in discovered.values())} cached prediction files")
+            print(f" Discovered {sum(len(v) for v in discovered.values())} cached prediction files")
             for dataset_type, files in discovered.items():
                 print(f"  • {dataset_type}: {len(files)} file(s)")
         else:
-            print(f"ℹ️  No cached prediction files found in {cache_dir}")
+            print(f"  No cached prediction files found in {cache_dir}")
         
         return discovered
     
@@ -1726,7 +1726,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         cache_path = Path(cache_file)
         if not cache_path.exists():
-            print(f"❌ Cache file not found: {cache_file}")
+            print(f" Cache file not found: {cache_file}")
             return None
         
         try:
@@ -1734,12 +1734,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 cached_data = json.load(f)
             
             if self.verbose:
-                print(f"✅ Loaded {len(cached_data.get('predictions', []))} cached predictions from {cache_file}")
+                print(f" Loaded {len(cached_data.get('predictions', []))} cached predictions from {cache_file}")
             
             return cached_data
             
         except Exception as e:
-            print(f"❌ Error loading cache file {cache_file}: {e}")
+            print(f" Error loading cache file {cache_file}: {e}")
             return None
     
     def get_cached_predictions_summary(
@@ -1923,7 +1923,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             metrics = self._calculate_metrics(formatted_predictions, true_labels)
             
             if self.verbose:
-                print(f"📊 Metrics from cached predictions:")
+                print(f" Metrics from cached predictions:")
                 for metric, value in metrics.items():
                     print(f"  • {metric}: {value:.4f}")
         
@@ -1957,13 +1957,13 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         discovered = self.discover_cached_predictions(cache_dir)
         
         if not discovered:
-            print("\n❌ No cached predictions found")
+            print("\n No cached predictions found")
             print(f"   Cache directory: {cache_dir}")
-            print("\n💡 TIP: Run predictions with caching enabled to create cache files")
+            print("\n TIP: Run predictions with caching enabled to create cache files")
             return
         
-        print(f"\n📁 Cache directory: {cache_dir}")
-        print(f"✅ Found {sum(len(v) for v in discovered.values())} cached prediction file(s)\n")
+        print(f"\n Cache directory: {cache_dir}")
+        print(f" Found {sum(len(v) for v in discovered.values())} cached prediction file(s)\n")
         
         for dataset_type, files in discovered.items():
             print(f"\n{dataset_type.upper().replace('_', ' ')}:")
@@ -1989,5 +1989,5 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 print(f"\n  ... and {len(files) - 3} more file(s)")
         
         print("\n" + "="*60)
-        print("💡 Use load_cached_predictions_for_dataset() to load a specific file")
+        print(" Use load_cached_predictions_for_dataset() to load a specific file")
         print("="*60 + "\n")

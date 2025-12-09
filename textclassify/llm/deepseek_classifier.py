@@ -104,7 +104,7 @@ class DeepSeekClassifier(BaseLLMClassifier):
             label_definitions=label_definitions
         )
         
-        # 🚀 EXPLICIT RESULTS SAVING (like RoBERTa)
+        #  EXPLICIT RESULTS SAVING (like RoBERTa)
         if self.results_manager:
             dataset_type = getattr(self, '_current_dataset_type', 'test')
             current_df = getattr(self, '_current_test_df', None)
@@ -157,7 +157,7 @@ class DeepSeekClassifier(BaseLLMClassifier):
                     
                     self.results_manager.save_experiment_summary(experiment_summary)
                     
-                    print(f"📁 DeepSeek prediction results saved: {saved_files}")
+                    print(f" DeepSeek prediction results saved: {saved_files}")
                     
                     # Add file paths to result metadata
                     if not result.metadata:
