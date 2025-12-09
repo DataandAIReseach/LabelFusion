@@ -54,7 +54,7 @@ class FusionWrapper(nn.Module):
     """Wrapper that combines ML model with frozen LLM scores via Fusion MLP."""
     
     def __init__(self, ml_model, num_labels: int, task: str = "multiclass", 
-                 hidden_dims: List[int] = [64, 32]):
+                 hidden_dims: List[int] = [64, 32], embedding_dim: int = 768):
         """Initialize Fusion Wrapper.
         
         Args:
@@ -62,42 +62,44 @@ class FusionWrapper(nn.Module):
             num_labels: Number of output labels
             task: "multiclass" or "multilabel"
             hidden_dims: Hidden dimensions for fusion MLP
+            embedding_dim: Dimension of ML embeddings (default 768 for RoBERTa)
         """
         super().__init__()
         self.ml_model = ml_model
         self.num_labels = num_labels
         self.task = task
+        self.embedding_dim = embedding_dim
         
-        # Fusion MLP takes ML logits + LLM scores
-        fusion_input_dim = num_labels * 2  # ML logits + LLM scores
+        # Fusion MLP takes ML embeddings + LLM scores
+        fusion_input_dim = embedding_dim + num_labels  # ML embeddings (768) + LLM scores
         self.fusion_mlp = FusionMLP(fusion_input_dim, num_labels, hidden_dims)
         
         # Device management
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
     
-    def forward(self, ml_predictions: torch.Tensor, llm_predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """Forward pass combining ML and LLM predictions.
+    def forward(self, ml_embeddings: torch.Tensor, llm_predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
+        """Forward pass combining ML embeddings and LLM predictions.
         
         Args:
-            ml_predictions: Pre-computed ML predictions/logits
+            ml_embeddings: Pre-computed ML embeddings (768-dim for RoBERTa)
             llm_predictions: Pre-computed LLM predictions/scores
             
         Returns:
-            Dict containing ML predictions, LLM predictions, and fused logits
+            Dict containing ML embeddings, LLM predictions, and fused logits
         """
-        # Ensure predictions are detached (no gradient flow to original models)
-        ml_predictions = ml_predictions.detach()
+        # Ensure inputs are detached (no gradient flow to original models)
+        ml_embeddings = ml_embeddings.detach()
         llm_predictions = llm_predictions.detach()
         
-        # Concatenate ML and LLM predictions
-        fusion_input = torch.cat([ml_predictions, llm_predictions], dim=1)
+        # Concatenate ML embeddings and LLM predictions
+        fusion_input = torch.cat([ml_embeddings, llm_predictions], dim=1)
         
         # Generate fused predictions through MLP
         fused_logits = self.fusion_mlp(fusion_input)
         
         return {
-            "ml_predictions": ml_predictions,
+            "ml_embeddings": ml_embeddings,
             "llm_predictions": llm_predictions,
             "fused_logits": fused_logits
         }
@@ -250,6 +252,9 @@ class FusionEnsemble(BaseEnsemble):
             hashed = pd.util.hash_pandas_object(text_series, index=False).values
             dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
             
+            # Store ML training hash for fusion cache identification
+            self.ml_train_hash = dataset_hash
+            
             # Check cache directory for matching model
             cache_dir = Path("cache")
             cached_model_path = cache_dir / f"roberta_{dataset_hash}"
@@ -281,6 +286,12 @@ class FusionEnsemble(BaseEnsemble):
                 self.ml_model.fit(train_df, val_df)
         else:
             print("✅ ML model already trained")
+            # Compute hash for already-trained model
+            import hashlib
+            text_column = self.ml_model.text_column or 'text'
+            text_series = train_df[text_column] if text_column in train_df.columns else train_df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            self.ml_train_hash = hashlib.md5(hashed).hexdigest()[:8]
         
         # Set up classes from ML model
         self.classes_ = self.ml_model.classes_
@@ -290,9 +301,13 @@ class FusionEnsemble(BaseEnsemble):
         print("Getting ML predictions on validation set...")
         ml_val_result = self.ml_model.predict_without_saving(val_df, mode="validation")
         text_column = self.ml_model.text_column or 'text'
+        
+        # Extract embeddings from ML result if available
+        ml_val_embeddings = getattr(ml_val_result, 'embeddings', None)
         ml_val_predictions_hashed = self._attach_hashes_to_predictions(
             ml_val_result.predictions, 
-            val_df[text_column].tolist()
+            val_df[text_column].tolist(),
+            embeddings=ml_val_embeddings
         )
         
         # Step 3: Get LLM predictions on validation set
@@ -425,11 +440,14 @@ class FusionEnsemble(BaseEnsemble):
         # Step 4: Create fusion wrapper
         print("Creating fusion wrapper...")
         task = "multilabel" if self.classification_type == ClassificationType.MULTI_LABEL else "multiclass"
+        # Get embedding dimension from ML model (default 768 for RoBERTa)
+        embedding_dim = getattr(self.ml_model, 'embedding_dim', 768)
         self.fusion_wrapper = FusionWrapper(
             ml_model=self.ml_model,
             num_labels=self.num_labels,
             task=task,
-            hidden_dims=self.fusion_hidden_dims
+            hidden_dims=self.fusion_hidden_dims,
+            embedding_dim=embedding_dim
         )
         
         # Step 5: Train fusion MLP on validation set predictions
@@ -1050,15 +1068,17 @@ class FusionEnsemble(BaseEnsemble):
         
         print(f"✅ Incremental generation complete: {generated_count}/{len(missing_indices)} predictions generated and saved")
     
-    def _attach_hashes_to_predictions(self, predictions: List, texts: List[str]) -> List[Dict[str, Any]]:
+    def _attach_hashes_to_predictions(self, predictions: List, texts: List[str], 
+                                      embeddings: Optional[List] = None) -> List[Dict[str, Any]]:
         """Attach text hashes to predictions for robust matching.
         
         Args:
             predictions: List of predictions (any format)
             texts: List of text strings corresponding to predictions
+            embeddings: Optional list of embeddings (e.g., 768-dim vectors from RoBERTa)
             
         Returns:
-            List of dictionaries with 'text_hash' and 'prediction' keys
+            List of dictionaries with 'text_hash', 'prediction', and optionally 'embedding' keys
         """
         if len(predictions) != len(texts):
             raise EnsembleError(
@@ -1066,12 +1086,21 @@ class FusionEnsemble(BaseEnsemble):
                 "FusionEnsemble"
             )
         
+        if embeddings is not None and len(embeddings) != len(texts):
+            raise EnsembleError(
+                f"Embeddings length ({len(embeddings)}) must match texts length ({len(texts)})",
+                "FusionEnsemble"
+            )
+        
         hashed_predictions = []
-        for pred, text in zip(predictions, texts):
-            hashed_predictions.append({
+        for i, (pred, text) in enumerate(zip(predictions, texts)):
+            item = {
                 'text_hash': self._compute_text_hash(text),
                 'prediction': pred
-            })
+            }
+            if embeddings is not None:
+                item['embedding'] = embeddings[i]
+            hashed_predictions.append(item)
         
         return hashed_predictions
     
@@ -1881,23 +1910,22 @@ class FusionEnsemble(BaseEnsemble):
     
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
                               ml_predictions: List, llm_predictions: List):
-        """Create dataset for fusion training using hash-based prediction matching.
+        """Create dataset for fusion training using hash-based embedding/prediction matching.
         
-        This method uses text hashes to match predictions with texts, making it
-        robust against DataFrame reordering.
+        This method uses text hashes to match embeddings and predictions with texts, making it
+        robust against DataFrame reordering. Now uses ML embeddings instead of predictions.
         
         Args:
             texts: List of text strings
             labels: List of label vectors
-            ml_predictions: List of ML predictions (can be dict with 'text_hash' or raw predictions)
-            llm_predictions: List of LLM predictions (can be dict with 'text_hash' or raw predictions)
+            ml_predictions: List of ML predictions (dict with 'text_hash', 'prediction', and 'embedding')
+            llm_predictions: List of LLM predictions (dict with 'text_hash' and 'prediction')
             
         Returns:
-            TensorDataset with matched predictions
+            TensorDataset with matched embeddings and predictions
         """
         
         # Check if predictions have hash information (new format)
-        # or are plain predictions (old format - backward compatible)
         ml_has_hashes = (len(ml_predictions) > 0 and 
                         isinstance(ml_predictions[0], dict) and 
                         'text_hash' in ml_predictions[0])
@@ -1905,22 +1933,39 @@ class FusionEnsemble(BaseEnsemble):
                          isinstance(llm_predictions[0], dict) and 
                          'text_hash' in llm_predictions[0])
         
+        # Check if ML predictions have embeddings
+        ml_has_embeddings = (ml_has_hashes and 'embedding' in ml_predictions[0])
+        
+        # Debug: Check what keys are in the first prediction
+        if ml_has_hashes and len(ml_predictions) > 0:
+            print(f"🔍 ML prediction dict keys: {list(ml_predictions[0].keys())}")
+            if 'embedding' in ml_predictions[0]:
+                print(f"✅ Embeddings found! Shape: {len(ml_predictions[0]['embedding'])}")
+            else:
+                print(f"⚠️ No embeddings in ML predictions, falling back to predictions")
+        
+        # Get embedding dimension (default 768 for RoBERTa)
+        embedding_dim = getattr(self.fusion_wrapper, 'embedding_dim', 768)
+        
         # Initialize tensors
-        ml_tensor = torch.zeros(len(texts), self.num_labels)
+        ml_tensor = torch.zeros(len(texts), embedding_dim if ml_has_embeddings else self.num_labels)
         llm_tensor = torch.zeros(len(texts), self.num_labels)
         
         if ml_has_hashes or llm_has_hashes:
             # NEW FORMAT: Use hash-based matching
-            print("🔐 Using hash-based prediction matching (robust against reordering)")
+            use_type = "embeddings" if ml_has_embeddings else "predictions"
+            print(f"🔐 Using hash-based {use_type} matching (robust against reordering)")
             
             # Compute hashes for current texts
             text_hashes = [self._compute_text_hash(text) for text in texts]
             
-            # Build hash-to-prediction mappings
+            # Build hash-to-data mappings
             ml_hash_map = {}
             if ml_has_hashes:
                 for pred_dict in ml_predictions:
-                    ml_hash_map[pred_dict['text_hash']] = pred_dict['prediction']
+                    # Use embedding if available, otherwise fall back to prediction
+                    ml_data = pred_dict.get('embedding', pred_dict.get('prediction'))
+                    ml_hash_map[pred_dict['text_hash']] = ml_data
             else:
                 # Old format ML predictions - create mapping by position
                 for i, pred in enumerate(ml_predictions):
@@ -1937,16 +1982,24 @@ class FusionEnsemble(BaseEnsemble):
                     if i < len(text_hashes):
                         llm_hash_map[text_hashes[i]] = pred
             
-            # Match predictions to texts by hash
+            # Match data to texts by hash
             mismatches = 0
             for i, text_hash in enumerate(text_hashes):
-                # Match ML prediction
-                ml_pred = ml_hash_map.get(text_hash)
-                if ml_pred is None:
+                # Match ML embedding/prediction
+                ml_data = ml_hash_map.get(text_hash)
+                if ml_data is None:
                     mismatches += 1
-                    print(f"⚠️ Warning: No ML prediction found for text hash {text_hash} at index {i}")
+                    print(f"⚠️ Warning: No ML data found for text hash {text_hash} at index {i}")
                 else:
-                    ml_tensor[i] = self._prediction_to_tensor(ml_pred)
+                    if ml_has_embeddings:
+                        # Use embedding directly
+                        if isinstance(ml_data, np.ndarray):
+                            ml_tensor[i] = torch.from_numpy(ml_data).float()
+                        else:
+                            ml_tensor[i] = torch.tensor(ml_data, dtype=torch.float)
+                    else:
+                        # Convert prediction to tensor
+                        ml_tensor[i] = self._prediction_to_tensor(ml_data)
                 
                 # Match LLM prediction
                 llm_pred = llm_hash_map.get(text_hash)
@@ -1958,11 +2011,11 @@ class FusionEnsemble(BaseEnsemble):
             
             if mismatches > 0:
                 raise EnsembleError(
-                    f"Found {mismatches} prediction mismatches. This indicates DataFrame reordering or missing predictions.",
+                    f"Found {mismatches} data mismatches. This indicates DataFrame reordering or missing data.",
                     "FusionEnsemble"
                 )
             
-            print(f"✅ Successfully matched {len(texts)} predictions by hash")
+            print(f"✅ Successfully matched {len(texts)} {use_type} by hash")
             
         else:
             # OLD FORMAT: Position-based matching (backward compatible)
@@ -2060,7 +2113,36 @@ class FusionEnsemble(BaseEnsemble):
             extracted_labels = true_labels
         
         # Try to load cached fusion predictions first
-        fusion_cache_path = self.test_llm_cache_path.replace('_llm', '') if self.test_llm_cache_path else 'cache/test'
+        # Create unique fusion cache hash from:
+        # 1. ML training data hash (which ML model)
+        # 2. LLM training data hash (which LLM was trained with)
+        # 3. Test dataset hash (which test data)
+        base_fusion_cache_path = self.test_llm_cache_path.replace('_llm', '') if self.test_llm_cache_path else 'cache/test'
+        
+        # Get ML training hash
+        ml_train_hash = getattr(self, 'ml_train_hash', 'unknown')
+        
+        # Get LLM training hash (compute from train_df if available)
+        llm_train_hash = 'unknown'
+        if train_df is not None:
+            import hashlib
+            text_column = self.ml_model.text_column or 'text'
+            if text_column in train_df.columns:
+                text_series = train_df[text_column]
+                hashed = pd.util.hash_pandas_object(text_series, index=False).values
+                llm_train_hash = hashlib.md5(hashed).hexdigest()[:8]
+        
+        # Get test dataset hash
+        test_hash = self._create_dataset_hash(test_df)
+        
+        # Combine all three hashes into one deterministic fusion hash
+        import hashlib
+        combined = f"{ml_train_hash}_{llm_train_hash}_{test_hash}"
+        fusion_hash = hashlib.md5(combined.encode()).hexdigest()[:8]
+        
+        # Create final cache path: cache/test_fusion_{hash}.json
+        fusion_cache_path = f"{base_fusion_cache_path}_fusion_{fusion_hash}"
+        
         cached_fusion_predictions = self._load_cached_fusion_predictions(
             fusion_cache_path, test_df, texts
         )
@@ -2175,6 +2257,7 @@ class FusionEnsemble(BaseEnsemble):
                     print(f"Warning: Could not generate LLM test metrics: {e}")
             
             # Create fusion result
+
             result = self._create_result(
                 predictions=cached_fusion_predictions,
                 true_labels=extracted_labels
@@ -2212,9 +2295,13 @@ class FusionEnsemble(BaseEnsemble):
         # Step 1: Get ML predictions on test data with hashes
         print("Getting ML predictions on test data...")
         ml_test_result = self.ml_model.predict(test_df)
+        
+        # Extract embeddings from ML result if available
+        ml_test_embeddings = getattr(ml_test_result, 'embeddings', None)
         ml_test_predictions_hashed = self._attach_hashes_to_predictions(
             ml_test_result.predictions,
-            texts
+            texts,
+            embeddings=ml_test_embeddings
         )
         
         # Step 2: Get LLM predictions on test data
