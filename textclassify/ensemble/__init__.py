@@ -8,7 +8,7 @@ FusionEnsemble now supports automatic cache management:
     # Enable auto-cache for LLM predictions
     fusion = FusionEnsemble(
         config,
-        auto_use_cache=True,  # ✨ Automatically reuse cached LLM predictions
+        auto_use_cache=True,  #  Automatically reuse cached LLM predictions
         cache_dir="cache"
     )
     

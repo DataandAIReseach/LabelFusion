@@ -163,7 +163,7 @@ class OpenAIClassifier(BaseLLMClassifier):
             label_definitions=label_definitions
         )
         
-        # 🚀 EXPLICIT RESULTS SAVING (like RoBERTa)
+        #  EXPLICIT RESULTS SAVING (like RoBERTa)
         if self.results_manager:
             dataset_type = getattr(self, '_current_dataset_type', 'test')
             current_df = getattr(self, '_current_test_df', None)
@@ -229,12 +229,12 @@ class OpenAIClassifier(BaseLLMClassifier):
                     if getattr(self, 'verbose', True):
                         exp_info = self.results_manager.get_experiment_info()
                         if hasattr(self, 'logger'):
-                            self.logger.info(f"📁 OpenAI prediction results saved to: {exp_info['experiment_dir']}")
-                            self.logger.info(f"💾 Files saved:")
+                            self.logger.info(f" OpenAI prediction results saved to: {exp_info['experiment_dir']}")
+                            self.logger.info(f" Files saved:")
                             for file_type, file_path in saved_files.items():
                                 self.logger.info(f"   - {file_type}: {file_path}")
                     
-                    print(f"📁 OpenAI prediction results saved: {saved_files}")
+                    print(f" OpenAI prediction results saved: {saved_files}")
                     
                     # 6. Add file paths to result metadata
                     if not result.metadata:
