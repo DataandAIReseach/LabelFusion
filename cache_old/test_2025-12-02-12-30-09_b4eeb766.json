@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "provider": "openai",
+    "model": "gpt-5-nano",
+    "dataset_hash": "b4eeb766",
+    "dataset_size": 2545,
+    "timestamp": "2025-12-02-12-30-09",
+    "multi_label": true,
+    "label_columns": [
+      "earn",
+      "acq",
+      "money-fx",
+      "grain",
+      "crude",
+      "trade",
+      "interest",
+      "ship",
+      "wheat",
+      "corn"
+    ],
+    "text_column": "text",
+    "batch_size": 32
+  },
+  "predictions": []
+}

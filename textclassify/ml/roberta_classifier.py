@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 
 from ..core.types import ClassificationResult, ClassificationType, ModelType
-from ..core.exceptions import ModelTrainingError, PredictionError, ValidationError
+from ..core.exceptions import ModelTrainingError, PredictionError, ValidationError, CudaOutOfMemoryError
 from ..utils.results_manager import ResultsManager, ModelResultsManager
 from .base import BaseMLClassifier
 from .preprocessing import TextPreprocessor, clean_text, normalize_text
@@ -169,7 +169,6 @@ class RoBERTaClassifier(BaseMLClassifier):
                 self.results_manager,
                 f"roberta_{self.config.model_name}"
             )
-        
         # Set up classes
         self.classes_ = label_columns if label_columns else []
         
@@ -194,6 +193,18 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.model = None
         self.label_encoder = None
         self.num_labels = None
+        
+        # Mode tracking (train/val/test)
+        self.mode = None
+        self._current_data_df = None  # DataFrame reference for results saving
+    
+    def set_mode(self, mode: str) -> None:
+        """Set the current prediction mode.
+        
+        Args:
+            mode: The mode to set ('train', 'val', or 'test')
+        """
+        self.mode = mode
     
     def fit(
         self,
@@ -247,7 +258,14 @@ class RoBERTaClassifier(BaseMLClassifier):
             num_labels=self.num_labels,
             problem_type="multi_label_classification" if self.multi_label else "single_label_classification"
         )
-        self.model.to(self.device)
+        # Move model to device with explicit OOM handling
+        try:
+            self.model.to(self.device)
+        except Exception as e:
+            if 'out of memory' in str(e).lower():
+                # Raise a structured CUDA OOM exception with parsed details
+                self._handle_cuda_oom(e, context="moving model to device")
+            raise
         
         # Create datasets
         train_dataset = TextDataset(
@@ -283,7 +301,7 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         total_steps = len(train_loader) * self.num_epochs
         scheduler = get_linear_schedule_with_warmup(
-            optimizer,g
+            optimizer,
             num_warmup_steps=self.warmup_steps,
             num_training_steps=total_steps
         )
@@ -316,9 +334,9 @@ class RoBERTaClassifier(BaseMLClassifier):
                     print(f"  [epoch {epoch+1}] processing batch {batch_idx}")
 
                 try:
-                    input_ids = batch['input_ids'].to(self.device)
-                    attention_mask = batch['attention_mask'].to(self.device)
-                    labels = batch['labels'].to(self.device)
+                    input_ids = self._to_device(batch['input_ids'], name='input_ids')
+                    attention_mask = self._to_device(batch['attention_mask'], name='attention_mask')
+                    labels = self._to_device(batch['labels'], name='labels')
 
                     optimizer.zero_grad()
 
@@ -362,9 +380,9 @@ class RoBERTaClassifier(BaseMLClassifier):
                 
                 with torch.no_grad():
                     for batch in val_loader:
-                        input_ids = batch['input_ids'].to(self.device)
-                        attention_mask = batch['attention_mask'].to(self.device)
-                        labels = batch['labels'].to(self.device)
+                        input_ids = self._to_device(batch['input_ids'], name='input_ids')
+                        attention_mask = self._to_device(batch['attention_mask'], name='attention_mask')
+                        labels = self._to_device(batch['labels'], name='labels')
                         
                         outputs = self.model(
                             input_ids=input_ids,
@@ -380,25 +398,62 @@ class RoBERTaClassifier(BaseMLClassifier):
                 print(f"  Average validation loss: {avg_val_loss:.4f}")
         
         self.is_trained = True
-        print("✅ Model training completed!")
+        print(" Model training completed!")
         
-        # Auto-save model if path is provided
+        # Auto-save model in cache directory with dataset hash
         if self.auto_save_path:
-            self.save_model(self.auto_save_path)
+            save_path = self.auto_save_path
+        else:
+            # Generate cache path based on training data hash
+            import hashlib
+            from pathlib import Path
+            
+            # Compute dataset hash from text column
+            text_series = train_df[self.text_column] if self.text_column in train_df.columns else train_df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+            
+            # Create cache path: cache/roberta_{hash}
+            cache_dir = Path("cache")
+            save_path = str(cache_dir / f"roberta_{dataset_hash}")
+        
+        self.save_model(save_path)
+        print(f" Model cached at: {save_path}")
         
         # Generate and save validation predictions if validation data is provided
         val_predictions_saved = None
         if val_df is not None and self.enable_validation:
-            print("📝 Generating validation predictions...")
+            print(" Generating validation predictions...")
             try:
-                val_result = self._predict_on_dataset(val_df, dataset_type="validation")
+                val_result = self._predict_on_dataset(val_df, mode="validation")
+                # Extract all validation metrics and saved file paths
+                val_metrics = val_result.metadata.get('metrics', {}) if val_result.metadata else {}
+                saved_files = val_result.metadata.get('saved_files', {}) if val_result.metadata else {}
+                
                 val_predictions_saved = {
-                    'accuracy': val_result.metadata.get('metrics', {}).get('accuracy', 0.0) if val_result.metadata else 0.0,
-                    'num_samples': len(val_df)
+                    'num_samples': len(val_df),
+                    'metrics': val_metrics,
+                    'saved_files': saved_files  # Include paths to saved files
                 }
-                print(f"✅ Validation predictions saved with accuracy: {val_predictions_saved['accuracy']:.4f}")
+                
+                # Print key metrics and file locations
+                if val_metrics:
+                    if 'accuracy' in val_metrics:
+                        print(f" Validation accuracy: {val_metrics['accuracy']:.4f}")
+                    if 'f1_weighted' in val_metrics:
+                        print(f"   F1 (weighted): {val_metrics['f1_weighted']:.4f}")
+                    if 'precision_weighted' in val_metrics:
+                        print(f"   Precision (weighted): {val_metrics['precision_weighted']:.4f}")
+                    if 'recall_weighted' in val_metrics:
+                        print(f"   Recall (weighted): {val_metrics['recall_weighted']:.4f}")
+                    
+                    # Print metrics file location
+                    if 'metrics' in saved_files:
+                        print(f"   Metrics saved to: {saved_files['metrics']}")
+                else:
+                    print(f" Validation predictions saved for {len(val_df)} samples")
             except Exception as e:
-                print(f"⚠️ Warning: Could not save validation predictions: {e}")
+                print(f" Warning: Could not save validation predictions: {e}")
                 val_predictions_saved = None
         
         # Prepare training result
@@ -442,7 +497,7 @@ class RoBERTaClassifier(BaseMLClassifier):
                 training_result['experiment_info'] = exp_info
                 training_result['output_directory'] = exp_info['experiment_dir']
                 
-                print(f"📁 Training results saved to: {exp_info['experiment_dir']}")
+                print(f" Training results saved to: {exp_info['experiment_dir']}")
                 
             except Exception as e:
                 print(f"Warning: Could not save training results: {e}")
@@ -452,13 +507,13 @@ class RoBERTaClassifier(BaseMLClassifier):
     def _predict_on_dataset(
         self, 
         data_df: pd.DataFrame, 
-        dataset_type: str = "test"
+        mode: str = "test"
     ) -> ClassificationResult:
-        """Predict on a dataset with specified dataset type for proper file naming.
+        """Predict on a dataset with specified mode for proper file naming.
         
         Args:
             data_df: DataFrame for prediction with text and optionally label columns
-            dataset_type: Type of dataset ("test", "validation", etc.) for file naming
+            mode: Prediction mode ("test", "validation", "train") for file naming
             
         Returns:
             ClassificationResult with predictions and metrics
@@ -480,19 +535,14 @@ class RoBERTaClassifier(BaseMLClassifier):
         if all(col in data_df.columns for col in self.label_columns):
             true_labels = data_df[self.label_columns].values.tolist()
         
-        # Store DataFrame reference for results saving with specified dataset type
-        if self.results_manager:
-            self._current_test_df = data_df
-            self._current_dataset_type = dataset_type
+        # Set mode
+        self.mode = mode
+        
+        # Store DataFrame reference for results saving (always store it)
+        self._current_data_df = data_df
         
         # Make predictions using the internal text method
         result = self._predict_texts_internal(texts, true_labels)
-        
-        # Clean up temporary references
-        if hasattr(self, '_current_test_df'):
-            delattr(self, '_current_test_df')
-        if hasattr(self, '_current_dataset_type'):
-            delattr(self, '_current_dataset_type')
             
         return result
 
@@ -510,16 +560,18 @@ class RoBERTaClassifier(BaseMLClassifier):
         Returns:
             ClassificationResult with predictions and metrics
         """
-        return self._predict_on_dataset(test_df, dataset_type="test")
+        return self._predict_on_dataset(test_df, mode="test")
 
     def predict_without_saving(
         self,
-        data_df: pd.DataFrame
+        data_df: pd.DataFrame,
+        mode: str = "test"
     ) -> ClassificationResult:
         """Predict on data without saving results (for internal use by ensembles).
         
         Args:
             data_df: DataFrame for prediction with text and optionally label columns
+            mode: Prediction mode ("test", "validation", "train") for proper file naming
             
         Returns:
             ClassificationResult with predictions and metrics
@@ -540,6 +592,12 @@ class RoBERTaClassifier(BaseMLClassifier):
         true_labels = None
         if all(col in data_df.columns for col in self.label_columns):
             true_labels = data_df[self.label_columns].values.tolist()
+        
+        # Set mode for proper file naming
+        self.mode = mode
+        
+        # Store DataFrame reference
+        self._current_data_df = data_df
         
         # Make predictions using the internal text method (no saving)
         return self._predict_texts_internal(texts, true_labels)
@@ -594,14 +652,21 @@ class RoBERTaClassifier(BaseMLClassifier):
         self.model.eval()
         all_predictions = []
         all_probabilities = []
+        all_embeddings = []  # Store embeddings for fusion ensemble
         
         with torch.no_grad():
             for batch in dataloader:
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
+                input_ids = self._to_device(batch['input_ids'], name='input_ids')
+                attention_mask = self._to_device(batch['attention_mask'], name='attention_mask')
                 
-                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+                # Get both logits and hidden states (embeddings)
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
                 logits = outputs.logits
+                hidden_states = outputs.hidden_states[-1]  # Last layer hidden states
+                
+                # Extract [CLS] token embeddings (first token)
+                cls_embeddings = hidden_states[:, 0, :]  # Shape: [batch_size, 768]
+                all_embeddings.extend(cls_embeddings.cpu().numpy())
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
                     # Get probabilities using softmax
@@ -622,15 +687,22 @@ class RoBERTaClassifier(BaseMLClassifier):
                 else:
                     # Multi-label classification
                     probabilities = torch.sigmoid(logits)
-                    threshold = self.config.parameters.get('threshold', 0.5)
+                    threshold = self.config.parameters.get('threshold', 0.3)
                     predictions = (probabilities > threshold).cpu().numpy()
                     
-                    # Convert predictions to class names
+                    # Convert predictions to class names with dynamic fallback
                     for pred_array, prob_vector in zip(predictions, probabilities.cpu().numpy()):
                         active_classes = []
                         for i, is_active in enumerate(pred_array):
                             if is_active and i < len(self.classes_):
                                 active_classes.append(self.classes_[i])
+                        
+                        # Dynamic fallback: if no predictions above threshold, take top label
+                        if len(active_classes) == 0:
+                            top_idx = prob_vector.argmax()
+                            if top_idx < len(self.classes_):
+                                active_classes = [self.classes_[top_idx]]
+                        
                         all_predictions.append(active_classes)
                         
                         # Create probability dictionary for all classes
@@ -641,38 +713,35 @@ class RoBERTaClassifier(BaseMLClassifier):
         result = self._create_result(
             predictions=all_predictions,
             probabilities=all_probabilities if all_probabilities else None,
-            true_labels=true_labels if true_labels is not None else None
+            true_labels=true_labels if true_labels is not None else None,
+            embeddings=all_embeddings if all_embeddings else None  # Add embeddings to result
         )
         
-        # Save prediction results using ResultsManager (if it's the main predict call)
-        if self.results_manager and hasattr(self, '_current_test_df'):
+        # Save prediction results using ResultsManager (always save when available)
+        if self.results_manager:
             try:
-                # Use dataset type if available, otherwise default to "test"
-                dataset_type = getattr(self, '_current_dataset_type', 'test')
+                # Use mode if available, otherwise default to "test"
+                mode = self.mode if self.mode else 'test'
+                current_df = getattr(self, '_current_data_df', None)
                 
-                saved_files = self.results_manager.save_predictions(
-                    result, dataset_type, self._current_test_df
-                )
-                
-                # Save metrics if available
-                if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
-                    metrics_file = self.results_manager.save_metrics(
-                        result.metadata['metrics'], dataset_type, "roberta_classifier"
+                if current_df is not None:
+                    saved_files = self.results_manager.save_predictions(
+                        result, mode, current_df
                     )
-                    saved_files["metrics"] = metrics_file
-                
-                print(f"📁 Prediction results saved: {saved_files}")
-                
-                # Add file paths to result metadata
-                if not result.metadata:
-                    result.metadata = {}
-                result.metadata['saved_files'] = saved_files
-                
-                # Clean up temporary references
-                if hasattr(self, '_current_test_df'):
-                    delattr(self, '_current_test_df')
-                if hasattr(self, '_current_dataset_type'):
-                    delattr(self, '_current_dataset_type')
+                    
+                    # Save metrics if available
+                    if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
+                        metrics_file = self.results_manager.save_metrics(
+                            result.metadata['metrics'], mode, "roberta_classifier"
+                        )
+                        saved_files["metrics"] = metrics_file
+                    
+                    print(f" Prediction results saved: {saved_files}")
+                    
+                    # Add file paths to result metadata
+                    if not result.metadata:
+                        result.metadata = {}
+                    result.metadata['saved_files'] = saved_files
                 
             except Exception as e:
                 print(f"Warning: Could not save prediction results: {e}")
@@ -788,6 +857,10 @@ class RoBERTaClassifier(BaseMLClassifier):
             confidence_scores=confidence_scores
         )
         
+        # Add embeddings directly to result if provided
+        if 'embeddings' in metadata:
+            result.embeddings = metadata['embeddings']
+        
         # Add metadata to the result
         if result.metadata is None:
             result.metadata = {}
@@ -860,8 +933,8 @@ class RoBERTaClassifier(BaseMLClassifier):
         
         with torch.no_grad():
             for batch in dataloader:
-                input_ids = batch['input_ids'].to(self.device)
-                attention_mask = batch['attention_mask'].to(self.device)
+                input_ids = self._to_device(batch['input_ids'], name='input_ids')
+                attention_mask = self._to_device(batch['attention_mask'], name='attention_mask')
                 
                 outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
                 logits = outputs.logits
@@ -891,13 +964,20 @@ class RoBERTaClassifier(BaseMLClassifier):
                 else:
                     # Multi-label classification
                     probabilities = torch.sigmoid(logits)
-                    threshold = self.config.parameters.get('threshold', 0.5)
+                    threshold = self.config.parameters.get('threshold', 0.3)
                     predictions = (probabilities > threshold).cpu().numpy()
                     batch_probabilities = probabilities.cpu().numpy()
                     
-                    # Convert predictions to class names using self.classes_
+                    # Convert predictions to class names using self.classes_ with dynamic fallback
                     for i, pred_array in enumerate(predictions):
                         active_labels = [self.classes_[j] for j, is_active in enumerate(pred_array) if is_active]
+                        
+                        # Dynamic fallback: if no predictions above threshold, take top label
+                        if len(active_labels) == 0:
+                            top_idx = batch_probabilities[i].argmax()
+                            if top_idx < len(self.classes_):
+                                active_labels = [self.classes_[top_idx]]
+                        
                         all_predictions.append(active_labels)
                         
                         # Create probability dictionary
@@ -916,6 +996,151 @@ class RoBERTaClassifier(BaseMLClassifier):
             confidence_scores=all_confidence_scores,
             true_labels=true_labels if true_labels is not None else None
         )
+
+    # --- Helper methods for robust CUDA OOM handling ---
+    def _handle_cuda_oom(self, exc: Exception, context: str = ""):
+        """Parse PyTorch CUDA OOM message and raise a structured CudaOutOfMemoryError.
+
+        The parser attempts to extract commonly included details from the
+        PyTorch CUDA OOM message (attempted allocation, total/free memory,
+        process id). These are best-effort and may be None if parsing fails.
+        """
+        import re
+
+        msg = str(exc)
+        attempted = None
+        total = None
+        free = None
+        pid = None
+
+        m = re.search(r"Tried to allocate ([0-9\.]+) MiB", msg)
+        if m:
+            attempted = f"{m.group(1)} MiB"
+
+        m = re.search(r"has a total capacity of ([0-9\.]+) GiB", msg)
+        if m:
+            total = f"{m.group(1)} GiB"
+
+        m = re.search(r"of which ([0-9\.]+) MiB is free", msg)
+        if m:
+            free = f"{m.group(1)} MiB"
+
+        m = re.search(r"Process (\d+)", msg)
+        if m:
+            try:
+                pid = int(m.group(1))
+            except Exception:
+                pid = None
+
+        suggestion = (
+            "Try freeing GPU memory, set PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True, "
+            "reduce batch size, run on CPU, or reboot the node to clear defunct allocations."
+        )
+
+        raise CudaOutOfMemoryError(
+            message=f"CUDA out of memory while {context}: {msg}",
+            attempted_allocation=attempted,
+            total_memory=total,
+            free_memory=free,
+            process_id=pid,
+            suggestion=suggestion,
+            model_name=getattr(self, 'model_name', None)
+        ) from exc
+
+    def _to_device(self, tensor: torch.Tensor, name: str = "tensor") -> torch.Tensor:
+        """Move a tensor to the configured device and convert CUDA OOM into a structured exception."""
+        try:
+            return tensor.to(self.device)
+        except Exception as e:
+            if 'out of memory' in str(e).lower():
+                self._handle_cuda_oom(e, context=f"moving {name} to device")
+            raise
+    
+    def save_model(self, path: str, safe_serialization: bool = True) -> None:
+        """Save the trained RoBERTa model to disk.
+        
+        Args:
+            path: Directory path to save the model
+            safe_serialization: If True, saves as .safetensors (default). 
+                              If False, saves as pytorch_model.bin (legacy format).
+        """
+        if not self.is_trained:
+            raise ValueError("Model must be trained before saving")
+        
+        from pathlib import Path
+        import json
+        
+        save_dir = Path(path)
+        save_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save model and tokenizer using HuggingFace methods
+        # safe_serialization=True → model.safetensors (recommended, secure)
+        # safe_serialization=False → pytorch_model.bin (legacy, larger file)
+        self.model.save_pretrained(save_dir, safe_serialization=safe_serialization)
+        self.tokenizer.save_pretrained(save_dir)
+        
+        # Save additional metadata
+        metadata = {
+            'model_name': self.model_name,
+            'max_length': self.max_length,
+            'batch_size': self.batch_size,
+            'learning_rate': self.learning_rate,
+            'num_epochs': self.num_epochs,
+            'multi_label': self.multi_label,
+            'num_labels': self.num_labels,
+            'classes_': self.classes_,
+            'text_column': self.text_column,
+            'label_columns': self.label_columns,
+            'classification_type': str(self.classification_type) if self.classification_type else None,
+            'device': str(self.device)
+        }
+        
+        with open(save_dir / 'model_metadata.json', 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        print(f" Model saved to: {save_dir}")
+    
+    def load_model(self, path: str) -> None:
+        """Load a trained RoBERTa model from disk.
+        
+        Args:
+            path: Directory path containing the saved model
+        """
+        from pathlib import Path
+        import json
+        
+        load_dir = Path(path)
+        if not load_dir.exists():
+            raise FileNotFoundError(f"Model directory not found: {load_dir}")
+        
+        # Load metadata
+        metadata_path = load_dir / 'model_metadata.json'
+        if metadata_path.exists():
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            
+            self.model_name = metadata.get('model_name', self.model_name)
+            self.max_length = metadata.get('max_length', self.max_length)
+            self.multi_label = metadata.get('multi_label', self.multi_label)
+            self.num_labels = metadata.get('num_labels', self.num_labels)
+            self.classes_ = metadata.get('classes_', self.classes_)
+            self.text_column = metadata.get('text_column', self.text_column)
+            self.label_columns = metadata.get('label_columns', self.label_columns)
+            
+            # Restore classification type
+            if metadata.get('classification_type'):
+                if 'MULTI_LABEL' in metadata['classification_type']:
+                    self.classification_type = ClassificationType.MULTI_LABEL
+                else:
+                    self.classification_type = ClassificationType.MULTI_CLASS
+        
+        # Load tokenizer and model
+        self.tokenizer = AutoTokenizer.from_pretrained(load_dir)
+        self.model = AutoModelForSequenceClassification.from_pretrained(load_dir)
+        self.model.to(self.device)
+        self.is_trained = True
+        
+        print(f" Model loaded from: {load_dir}")
     
     @property
     def model_info(self) -> Dict[str, Any]:

@@ -5,10 +5,12 @@ import json
 import re
 import logging
 import time
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Tuple, Iterator
 import pandas as pd
 from tqdm import tqdm
+import datetime
 
 from ..core.base import AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType
@@ -17,6 +19,7 @@ from ..prompt_engineer.base import PromptEngineer
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
 from ..utils.results_manager import ResultsManager, ModelResultsManager
+from .prediction_cache import LLMPredictionCache
 
 class BaseLLMClassifier(AsyncBaseClassifier):
     """Base class for all LLM-based text classifiers."""
@@ -35,7 +38,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         experiment_name: Optional[str] = None,
         auto_save_results: bool = True,
         # Cache management parameters
-        auto_use_cache: bool = False,
+        auto_use_cache: bool = True,
         cache_dir: str = "cache"
     ):
         """Initialize the LLM classifier.
@@ -59,6 +62,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self.multi_label = multi_label
         self.few_shot_mode = few_shot_mode
         self.verbose = verbose
+        self.mode = None
         
         # Set provider - use parameter if provided, otherwise get from config, default to openai
         self.provider = provider or getattr(self.config, 'provider', 'openai')
@@ -150,10 +154,13 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             
             if self.verbose:
                 exp_info = self.results_manager.get_experiment_info()
-                self.logger.info(f"📁 Results will be saved to: {exp_info['experiment_dir']}")
-                self.logger.info(f"🔬 Experiment ID: {self.results_manager.experiment_id}")
+                self.logger.info(f" Results will be saved to: {exp_info['experiment_dir']}")
+                self.logger.info(f" Experiment ID: {self.results_manager.experiment_id}")
         
         self._setup_config()
+    
+    def set_mode(self, mode: str) -> None:
+        self.mode = mode
 
     def _setup_config(self) -> None:
         """Initialize configuration parameters."""
@@ -194,36 +201,82 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         start_time = time.time()
         
-        # 🚀 AUTO-CACHE: Check for cached predictions if enabled
+        #  AUTO-CACHE: Check for cached predictions if enabled
         if self.auto_use_cache:
             if self.verbose:
-                print("\n🔍 Auto-cache enabled, checking for cached predictions...")
+                print("\n Auto-cache enabled, checking for cached predictions...")
+            
+            # Compute dataset hash for test_df to find exact match
+            try:
+                text_series = test_df[self.text_column] if self.text_column in test_df.columns else test_df.iloc[:, 0]
+                hashed = pd.util.hash_pandas_object(text_series, index=False).values
+                test_dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+            except Exception:
+                text_series = test_df[self.text_column] if self.text_column in test_df.columns else test_df.iloc[:, 0]
+                csv_bytes = text_series.to_csv(index=False).encode('utf-8')
+                test_dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+            
+            if self.verbose:
+                print(f"🔑 Test dataset hash: {test_dataset_hash}")
             
             discovered = self.discover_cached_predictions(self.cache_dir)
             
-            # Try to find a matching cache file for test predictions
+            # Try to find a matching cache file for test predictions with matching hash
             if 'test_predictions' in discovered and discovered['test_predictions']:
-                cache_file = discovered['test_predictions'][0]  # Use most recent
+                matching_cache = None
+                for cache_file in discovered['test_predictions']:
+                    # Check if filename contains the hash
+                    if test_dataset_hash in Path(cache_file).name:
+                        matching_cache = cache_file
+                        break
+                    
+                    # Also check metadata inside the file
+                    try:
+                        with open(cache_file, 'r') as f:
+                            cache_data = json.load(f)
+                        if cache_data.get('metadata', {}).get('dataset_hash') == test_dataset_hash:
+                            matching_cache = cache_file
+                            break
+                    except Exception:
+                        continue
                 
-                if self.verbose:
-                    print(f"✅ Found cached predictions: {Path(cache_file).name}")
-                    print("📥 Loading from cache (1000-5000x faster than inference)...")
-                
-                try:
-                    # Load and return cached predictions
-                    result = self.predict_with_cached_predictions(test_df, cache_file, train_df)
-                    
+                if matching_cache:
                     if self.verbose:
-                        print(f"⚡ Cache load completed in {time.time() - start_time:.2f} seconds")
+                        print(f" Found matching cached predictions: {Path(matching_cache).name}")
+                        print(" Loading from cache (1000-5000x faster than inference)...")
                     
-                    return result
-                    
-                except Exception as e:
-                    if self.verbose:
-                        print(f"⚠️  Cache load failed: {e}")
-                        print("🔄 Falling back to normal inference...")
+                    try:
+                        # Load and return cached predictions
+                        result = self.predict_with_cached_predictions(test_df, matching_cache, train_df)
+                        
+                        if self.verbose:
+                            print(f" Cache load completed in {time.time() - start_time:.2f} seconds")
+                        
+                        return result
+                        
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"  Cache load failed: {e}")
+                            print(" Falling back to normal inference...")
+                elif self.verbose:
+                    print(f"  Found {len(discovered['test_predictions'])} test cache file(s), but none match current dataset (hash: {test_dataset_hash})")
+                    print(" Running inference...")
             elif self.verbose:
-                print("ℹ️  No cached predictions found, running inference...")
+                print("  No cached predictions found, running inference...")
+
+        # Initialize incremental prediction cache for resume/skip functionality
+        if self.auto_use_cache:
+            try:
+                # LLMPredictionCache will load any existing per-session cache files
+                self._prediction_cache = LLMPredictionCache(cache_dir=self.cache_dir, verbose=self.verbose, auto_save_interval=1)
+                if self.verbose:
+                    self.logger.info(f"Prediction cache initialized (session: {self._prediction_cache.session_id})")
+            except Exception as e:
+                if self.verbose:
+                    self.logger.warning(f"Could not initialize prediction cache: {e}")
+                    self._prediction_cache = None
+        else:
+            self._prediction_cache = None
         
         try:
             if self.verbose:
@@ -480,6 +533,56 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # few_shot_mode and multi_label are already set in constructor
         label_type = getattr(self.config, 'label_type', 'single')
         self.prompt_engineer.multi_label = (label_type == "multiple")
+    
+    def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
+        """Return True if a test cache file matching the given DataFrame exists, else False.
+
+        Computes an 8-char dataset hash from the provided DataFrame and checks
+        cached test JSON filenames and their metadata for a match. Uses self.cache_dir.
+        """
+        from pathlib import Path
+        import hashlib
+        import json
+
+        cache_dir = getattr(self, 'cache_dir', 'cache')
+        p = Path(cache_dir)
+        if not p.exists():
+            return False
+
+        # Compute stable 8-char hash for DataFrame using ONLY text column (consistent with _initialize_batch_cache_file)
+        try:
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+        except Exception:
+            # Fallback: hash text column as CSV
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
+            dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+
+        discovered = self.discover_cached_predictions(cache_dir)
+        if not discovered:
+            return False
+
+        candidates = discovered.get('test_predictions', []) or []
+        for file_path in candidates:
+            try:
+                fname = Path(file_path).name
+                if fname.endswith(f"_{dataset_hash}.json"):
+                    return True
+
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                meta = data.get('metadata', {}) if isinstance(data, dict) else {}
+                if meta.get('dataset_hash') == dataset_hash:
+                    return True
+
+            except Exception:
+                continue
+
+        return False
+
+
 
     async def _generate_predictions(
         self,
@@ -491,32 +594,276 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         Returns:
             List[List[int]]: List of binary vectors representing predictions
         """
-        predictions = []
-        total_batches = (len(df) + self.batch_size - 1) // self.batch_size
+        # If an incremental prediction cache is available, skip already-predicted rows
+        predictions: List[Optional[List[int]]] = [None] * len(df)
+        
+        # Initialize batch-wise cache file with proper mode
+        mode = self.mode if self.mode else "test"
+        cache_file_path = self._initialize_batch_cache_file(df, mode=mode)
+
+        # Build list of indices for which we need to run inference
+        if self.has_test_cache_for_dataset(df):
+            uncached_positions: List[int] = []
+            for pos, (_, row) in enumerate(df.iterrows()):
+                text = row.get(text_column, "")
+                try:
+                    if self._prediction_cache.has_prediction(text):
+                        cached = self._prediction_cache.get_prediction(text)
+                        pred = cached.get('prediction') if isinstance(cached, dict) else None
+                        if isinstance(pred, list):
+                            predictions[pos] = pred
+                            continue
+                except Exception:
+                    # On any cache error, treat as uncached and continue
+                    pass
+                uncached_positions.append(pos)
+
+            if len(uncached_positions) == 0:
+                # All samples cached — return formatted cached predictions
+                final_preds = [p for p in predictions if p is not None]
+                return final_preds
+
+            # Create a DataFrame with only uncached rows (preserve order)
+            df_uncached = df.iloc[uncached_positions]
+            total_batches = (len(df_uncached) + self.batch_size - 1) // self.batch_size
+        else:
+            df_uncached = df
+            total_batches = (len(df) + self.batch_size - 1) // self.batch_size
         
         if self.verbose:
             self.logger.info(f"Processing {len(df)} samples in {total_batches} batches of size {self.batch_size}")
             print(f"Processing in {total_batches} batches...")
         
         # Use tqdm for progress bar if verbose mode is enabled
-        batch_iterator = range(0, len(df), self.batch_size)
+        batch_iterator = range(0, len(df_uncached), self.batch_size)
         if self.verbose:
             batch_iterator = tqdm(batch_iterator, desc="Processing batches", total=total_batches)
         
         for i, batch_start in enumerate(batch_iterator):
-            batch_df = df.iloc[batch_start:batch_start + self.batch_size]
+            batch_df = df_uncached.iloc[batch_start:batch_start + self.batch_size]
             
             if self.verbose and not isinstance(batch_iterator, tqdm):
                 self.logger.info(f"Processing batch {i+1}/{total_batches} ({len(batch_df)} samples)")
                 print(f"Batch {i+1}/{total_batches} processing...")
             
             batch_predictions = await self._process_batch(batch_df, text_column)
-            predictions.extend(batch_predictions)
+
+            # If using an incremental cache, write batch predictions back into the
+            # main predictions list at their original positions
+            if hasattr(self, '_prediction_cache') and self._prediction_cache and df_uncached is not df:
+                # Map batch_df positions back to original positional indices in `predictions`.
+                # `df_uncached.index` contains DataFrame index labels which may not be
+                # 0..N-1 contiguous positions; using them directly as list indices
+                # causes IndexError when labels are large or non-sequential. Use the
+                # previously-built `uncached_positions` (positional offsets) instead.
+                try:
+                    batch_positions = uncached_positions[batch_start: batch_start + self.batch_size]
+                except Exception:
+                    # Fallback: compute positional indices from labels (slower)
+                    batch_positions = [df.index.get_loc(lbl) for lbl in df_uncached.index[batch_start: batch_start + self.batch_size]]
+
+                for rel_idx, orig_pos in enumerate(batch_positions):
+                    if rel_idx < len(batch_predictions):
+                        predictions[orig_pos] = batch_predictions[rel_idx]
+            else:
+                # No cache in use or full run — append sequentially
+                # When not using cache, predictions list may be all None placeholders,
+                # so we append to build the final list
+                if all(p is None for p in predictions):
+                    # fresh append mode
+                    predictions = []
+                    predictions.extend(batch_predictions)
+                else:
+                    # mix-mode: fill next available None slots
+                    fill_idx = 0
+                    for j in range(len(predictions)):
+                        if predictions[j] is None and fill_idx < len(batch_predictions):
+                            predictions[j] = batch_predictions[fill_idx]
+                            fill_idx += 1
             
             if self.verbose and not isinstance(batch_iterator, tqdm):
                 self.logger.info(f"Batch {i+1} completed ({len(batch_predictions)} predictions)")
+            
+            # Write batch predictions to cache file
+            self._write_batch_to_cache(cache_file_path, batch_df, batch_predictions, text_column, i+1, total_batches)
         
-        return predictions
+        # Final cleanup: ensure no None remain (fallback defaults)
+        final_predictions: List[List[int]] = []
+        for p in predictions:
+            if p is None:
+                # fallback to a safe default
+                if self.multi_label:
+                    final_predictions.append([0] * len(self.classes_))
+                else:
+                    final_predictions.append([1] + [0] * (len(self.classes_) - 1) if self.classes_ else [1])
+            else:
+                final_predictions.append(p)
+
+        return final_predictions
+    
+    def _initialize_batch_cache_file(self, df: pd.DataFrame, mode: str = "test") -> str:
+        """Initialize or load existing JSON cache file for batch-wise prediction storage.
+        
+        If cache file exists, loads it. Otherwise creates a new one.
+        
+        Args:
+            df: DataFrame being processed
+            mode: Dataset mode ('test', 'val', 'train') for file naming
+            
+        Returns:
+            str: Path to the cache file, or None if caching is disabled
+        """
+        import hashlib
+        from datetime import datetime as dt
+        from pathlib import Path
+        
+        # Skip cache initialization if flag is set (e.g., when filling missing predictions)
+        if getattr(self, '_skip_batch_cache_write', False):
+            print(f" DEBUG: Skipping batch cache initialization (_skip_batch_cache_write=True)")
+            return None
+        
+        # DEBUG: Log DataFrame size used for hash calculation
+        print(f" DEBUG: _initialize_batch_cache_file called with df size: {len(df)} rows, mode: {mode}")
+        
+        # Create cache directory if it doesn't exist
+        cache_dir = Path(self.cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Compute dataset hash based on text column only (deterministic)
+        try:
+            # Hash only the text column, not LLM predictions
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+        except Exception:
+            # Fallback: hash text column as CSV
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
+            dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+        
+        print(f" DEBUG: Computed dataset_hash: {dataset_hash} for {len(df)} rows")
+        
+        # Create cache filename: mode_hash.json (e.g. val_b6e3cb0f.json)
+        cache_filename = f"{mode}_{dataset_hash}.json"
+        cache_file_path = cache_dir / cache_filename
+        
+        # If cache file exists, load it into _prediction_cache; otherwise create new one
+        if cache_file_path.exists():
+            if self.verbose:
+                self.logger.info(f"Loading existing batch cache file: {cache_file_path}")
+            
+            # Load predictions from JSON cache file into _prediction_cache
+            try:
+                with open(cache_file_path, 'r') as f:
+                    cache_data = json.load(f)
+                    predictions_list = cache_data.get('predictions', [])
+                    
+                    # Populate _prediction_cache with predictions from the file
+                    if self._prediction_cache and predictions_list:
+                        for pred_entry in predictions_list:
+                            text = pred_entry.get('text', '')
+                            if text:
+                                # Add prediction using add_prediction_direct (no auto-save)
+                                prediction = pred_entry.get('prediction', [])
+                                response_text = pred_entry.get('response_text', '')
+                                prompt = pred_entry.get('prompt', '')
+                                
+                                # Use add_prediction_direct to avoid triggering auto-save
+                                self._prediction_cache.add_prediction_direct(
+                                    text=text,
+                                    prediction=prediction,
+                                    response_text=response_text,
+                                    prompt=prompt,
+                                    metadata=pred_entry
+                                )
+                        
+                        if self.verbose:
+                            self.logger.info(f"✓ Loaded {len(predictions_list)} predictions into memory cache")
+            except Exception as e:
+                if self.verbose:
+                    self.logger.warning(f"Failed to load predictions into cache: {e}")
+            
+            return str(cache_file_path)
+        
+        # Initialize new cache file with metadata
+        provider = getattr(self, 'provider', 'llm')
+        cache_data = {
+            'metadata': {
+                'provider': provider,
+                'model': self.config.parameters.get('model', 'unknown'),
+                'dataset_hash': dataset_hash,
+                'dataset_size': len(df),
+                'num_samples': len(df),
+                'mode': mode,
+                'multi_label': self.multi_label,
+                'label_columns': self.label_columns,
+                'text_column': self.text_column,
+                'batch_size': self.batch_size
+            },
+            'predictions': []
+        }
+        
+        with open(cache_file_path, 'w') as f:
+            json.dump(cache_data, f, indent=2)
+        
+        if self.verbose:
+            self.logger.info(f"Initialized new batch cache file: {cache_file_path}")
+        
+        return str(cache_file_path)
+    
+    def _write_batch_to_cache(self, cache_file_path: str, batch_df: pd.DataFrame, 
+                              batch_predictions: List[List[int]], text_column: str,
+                              batch_num: int, total_batches: int) -> None:
+        """Write batch predictions to the cache JSON file.
+        
+        Args:
+            cache_file_path: Path to cache file
+            batch_df: DataFrame for current batch
+            batch_predictions: Predictions for current batch
+            text_column: Name of text column
+            batch_num: Current batch number
+            total_batches: Total number of batches
+        """
+        # Skip if cache file path is None or if skip flag is set
+        if cache_file_path is None or getattr(self, '_skip_batch_cache_write', False):
+            return
+            
+        try:
+            # Read existing cache data
+            with open(cache_file_path, 'r') as f:
+                cache_data = json.load(f)
+            
+            # Add batch predictions
+            for idx, (_, row) in enumerate(batch_df.iterrows()):
+                if idx < len(batch_predictions):
+                    prediction_entry = {
+                        'text': row.get(text_column, ''),
+                        'prediction': batch_predictions[idx],
+                        'batch_num': batch_num
+                    }
+                    
+                    # Add original labels if available
+                    if self.label_columns:
+                        prediction_entry['true_labels'] = [int(row.get(col, 0)) for col in self.label_columns]
+                    
+                    cache_data['predictions'].append(prediction_entry)
+            
+            # Update metadata
+            cache_data['metadata']['batches_completed'] = batch_num
+            cache_data['metadata']['total_batches'] = total_batches
+            cache_data['metadata']['predictions_count'] = len(cache_data['predictions'])
+            cache_data['metadata']['last_updated'] = datetime.datetime.now().isoformat()
+            
+            # Write updated cache data
+            with open(cache_file_path, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+            
+            if self.verbose and batch_num % 5 == 0:  # Log every 5 batches to avoid spam
+                self.logger.info(f"Wrote batch {batch_num}/{total_batches} to cache ({len(batch_predictions)} predictions)")
+                
+        except Exception as e:
+            if self.verbose:
+                self.logger.warning(f"Failed to write batch {batch_num} to cache: {e}")
 
     def _get_batches(
         self,
@@ -532,7 +879,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         batch_df: pd.DataFrame,
         text_column: str
     ) -> List[List[int]]:
-        """Process a batch of texts for prediction with detailed logging.
+        """Process a batch of texts for prediction with detailed logging and retry logic.
         
         Returns:
             List[List[int]]: List of binary vectors representing predictions
@@ -562,11 +909,83 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if self.verbose and failed_responses > 0:
             self.logger.warning(f"WARNING: {failed_responses} out of {len(responses)} LLM calls failed")
         
-        return [
-            self._parse_prediction_response(r) if not isinstance(r, Exception)
-            else self._handle_error(r)
-            for r in responses
-        ]
+        # Parse responses and retry if needed for multi-label with wrong length
+        predictions = []
+        max_retries = 3
+        
+        for i, r in enumerate(responses):
+            if isinstance(r, Exception):
+                predictions.append(self._handle_error(r))
+                continue
+            
+            # Try parsing with retries for multi-label binary format issues
+            prediction = None
+            for attempt in range(max_retries):
+                prediction = self._parse_prediction_response(r)
+                
+                # Check if we got the right number of labels (only for multi-label)
+                if self.multi_label and len(prediction) == len(self.classes_):
+                    break  # Success!
+                elif not self.multi_label:
+                    break  # For single-label, we don't need to retry
+                else:
+                    # Wrong number of labels in multi-label - retry
+                    if attempt < max_retries - 1:
+                        if self.verbose:
+                            self.logger.warning(f"Retry {attempt + 1}/{max_retries}: Wrong label count ({len(prediction)} != {len(self.classes_)}), retrying LLM call...")
+                        # Call LLM again
+                        r = await self._call_llm(prompts[i])
+                        if isinstance(r, Exception):
+                            prediction = self._handle_error(r)
+                            break
+                    else:
+                        if self.verbose:
+                            self.logger.warning(f"After {max_retries} retries, still wrong label count. Using best-effort prediction.")
+            
+            predictions.append(prediction)
+
+        # If incremental cache is enabled, store the raw responses + parsed predictions
+        try:
+            if hasattr(self, '_prediction_cache') and self._prediction_cache:
+                for idx, pred in enumerate(predictions):
+                    # Determine success and response text
+                    resp = responses[idx]
+                    success = not isinstance(resp, Exception)
+                    response_text = resp if success else ''
+                    prompt = prompts[idx] if idx < len(prompts) else ''
+                    text_val = batch_df.iloc[idx].get(self.text_column, '')
+
+                    # Attempt to lift an identifier from the DataFrame row if present
+                    meta = {}
+                    for id_key in ('id', 'ID', 'Id', 'index', 'row_id'):
+                        if id_key in batch_df.columns:
+                            try:
+                                meta['id'] = batch_df.iloc[idx][id_key]
+                                break
+                            except Exception:
+                                pass
+
+                    try:
+                        # store_prediction expects binary vector as prediction
+                        self._prediction_cache.store_prediction(
+                            text_val,
+                            pred,
+                            response_text,
+                            prompt,
+                            success=success,
+                            error_message=None if success else str(resp),
+                            metadata=meta or None
+                        )
+                    except Exception:
+                        # non-fatal: continue without failing the batch
+                        if self.verbose:
+                            self.logger.debug("Could not store prediction to cache for a sample")
+        except Exception:
+            # If anything goes wrong with caching, do not fail predictions
+            if self.verbose:
+                self.logger.debug("Prediction caching encountered an error; continuing without persisting this batch")
+
+        return predictions
 
     def _parse_prediction_response(self, response: str) -> List[int]:
         """Parse the LLM response for predictions.
@@ -688,15 +1107,31 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         if '|' in response:
             binary_parts = [part.strip() for part in response.split('|')]
             # Check if this looks like a binary format (all parts are '0' or '1')
-            if (len(binary_parts) == len(self.classes_) and 
-                all(part in ['0', '1'] for part in binary_parts)):
-                # Convert to integer list and return
-                return [int(part) for part in binary_parts]
+            if all(part in ['0', '1'] for part in binary_parts):
+                # Check if length matches
+                if len(binary_parts) == len(self.classes_):
+                    # Perfect match - convert to integer list and return
+                    return [int(part) for part in binary_parts]
+                else:
+                    # Wrong length - pad or truncate to match expected length
+                    if self.verbose:
+                        self.logger.warning(f"Binary response length ({len(binary_parts)}) doesn't match classes count ({len(self.classes_)})")
+                    
+                    # Pad with zeros if too short
+                    if len(binary_parts) < len(self.classes_):
+                        binary_parts.extend(['0'] * (len(self.classes_) - len(binary_parts)))
+                        if self.verbose:
+                            self.logger.info(f"Padded binary response to {len(self.classes_)} labels")
+                    # Truncate if too long
+                    elif len(binary_parts) > len(self.classes_):
+                        binary_parts = binary_parts[:len(self.classes_)]
+                        if self.verbose:
+                            self.logger.info(f"Truncated binary response to {len(self.classes_)} labels")
+                    
+                    return [int(part) for part in binary_parts]
             else:
-                if self.verbose and len(binary_parts) == len(self.classes_):
-                    self.logger.warning(f"Binary response length matches but contains non-binary values: {binary_parts}")
-                elif self.verbose:
-                    self.logger.warning(f"Binary response length ({len(binary_parts)}) doesn't match classes count ({len(self.classes_)})")
+                if self.verbose:
+                    self.logger.warning(f"Binary response contains non-binary values: {binary_parts}")
         
         # Fallback: parse text-based responses and convert to binary vector
         predicted_classes = []
@@ -993,9 +1428,14 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         df_with_prompts = test_df.copy()
 
         if self.verbose:
-            self.logger.info(f"Engineering prompts for {len(test_df)} test samples")
-            if train_df is not None:
-                self.logger.info(f"Using {len(train_df)} training samples for few-shot learning")
+            # Prefer displaying the size of the few-shot training data when available
+            if train_df is not None and not train_df.empty:
+                self.logger.info(
+                    f"Engineering prompts using {len(train_df)} training samples for few-shot learning; "
+                    f"generating prompts for {len(test_df)} test samples"
+                )
+            else:
+                self.logger.info(f"Engineering prompts for {len(test_df)} test samples")
 
         # Engineer prompts using PromptEngineer
         engineered_prompts = await self.prompt_engineer.engineer_prompts(
@@ -1011,10 +1451,17 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Convert prompts to strings and add as new column
         if self.verbose:
             print("Rendering prompts...")
-            
+
         rendered_prompts = []
-        for i, prompt in enumerate(engineered_prompts):
-            if self.verbose and i % 10 == 0:  # Log every 10th prompt
+        # Choose progress total: prefer training-sample count when available, else prompt count
+        progress_total = len(test_df) if (test_df is not None and not test_df.empty) else len(engineered_prompts)
+        # Use tqdm to show progress; fall back to simple iteration if verbose is False
+        iterator = enumerate(engineered_prompts)
+        if self.verbose:
+            iterator = enumerate(tqdm(engineered_prompts, desc="Rendering prompts", total=progress_total))
+
+        for i, prompt in iterator:
+            if self.verbose and i % 10 == 0:
                 self.logger.debug(f"Rendering prompt {i+1}/{len(engineered_prompts)}")
             rendered_prompts.append(prompt.render())
         
@@ -1101,7 +1548,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 saved_files["config"] = config_file
                 
                 if self.verbose:
-                    self.logger.info(f"📁 Results saved: {saved_files}")
+                    self.logger.info(f" Results saved: {saved_files}")
                 
                 # Add file paths to result metadata
                 if not result.metadata:
@@ -1191,7 +1638,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                         result.metadata['saved_files']['metrics'] = metrics_file
                         
                         if self.verbose:
-                            print(f"📁 {self.provider.title()} classifier metrics saved: {metrics_file}")
+                            print(f" {self.provider.title()} classifier metrics saved: {metrics_file}")
                             
                     except Exception as e:
                         if self.verbose:
@@ -1227,18 +1674,19 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         cache_path = Path(cache_dir)
         if not cache_path.exists():
-            print(f"⚠️  Cache directory not found: {cache_dir}")
+            print(f"  Cache directory not found: {cache_dir}")
             return {}
         
         discovered = {}
         
         # Patterns to match different cache file types
-        # Supports both formats: YYYY-MM-DD-HH-MM-SS and YYYY_MM_DD_HH_MM_SS
+        # Supports: test_hash.json, test-hash.json, test_predictions_hash.json, test_YYYY-MM-DD_hash.json
         patterns = {
-            'train_predictions': r'train[_-](?:predictions[_-])?\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+\.json',
-            'validation_predictions': r'val(?:idation)?[_-](?:predictions[_-])?\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+\.json',
-            'test_predictions': r'test[_-](?:predictions[_-])?\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+\.json'
+        'train_predictions': r'train[_-](?:[a-f0-9]{8,}|predictions[_-][a-f0-9]{8,}|\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+)\.json',
+        'validation_predictions': r'val(?:idation)?[_-](?:[a-f0-9]{8,}|predictions[_-][a-f0-9]{8,}|\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+)\.json',
+        'test_predictions': r'test[_-](?:[a-f0-9]{8,}|predictions[_-][a-f0-9]{8,}|\d{4}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[-_]\d{2}[_-][a-f0-9]+)\.json'
         }
+
         
         for dataset_type, pattern in patterns.items():
             matching_files = []
@@ -1252,11 +1700,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 discovered[dataset_type] = matching_files
         
         if discovered:
-            print(f"📁 Discovered {sum(len(v) for v in discovered.values())} cached prediction files")
+            print(f" Discovered {sum(len(v) for v in discovered.values())} cached prediction files")
             for dataset_type, files in discovered.items():
                 print(f"  • {dataset_type}: {len(files)} file(s)")
         else:
-            print(f"ℹ️  No cached prediction files found in {cache_dir}")
+            print(f"  No cached prediction files found in {cache_dir}")
         
         return discovered
     
@@ -1278,7 +1726,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         cache_path = Path(cache_file)
         if not cache_path.exists():
-            print(f"❌ Cache file not found: {cache_file}")
+            print(f" Cache file not found: {cache_file}")
             return None
         
         try:
@@ -1286,12 +1734,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 cached_data = json.load(f)
             
             if self.verbose:
-                print(f"✅ Loaded {len(cached_data.get('predictions', []))} cached predictions from {cache_file}")
+                print(f" Loaded {len(cached_data.get('predictions', []))} cached predictions from {cache_file}")
             
             return cached_data
             
         except Exception as e:
-            print(f"❌ Error loading cache file {cache_file}: {e}")
+            print(f" Error loading cache file {cache_file}: {e}")
             return None
     
     def get_cached_predictions_summary(
@@ -1434,23 +1882,39 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 )
         
         # Convert cached predictions to the expected format
-        # Predictions might be stored as binary vectors or class names
+        # Predictions might be stored as:
+        # 1. List of dicts with 'prediction' key: [{"text": "...", "prediction": [0,1,0]}, ...]
+        # 2. Direct binary vectors: [[0,1,0], [1,0,0], ...]
+        # 3. Class names: ["class1", "class2", ...]
         formatted_predictions = []
         for pred in predictions:
-            if isinstance(pred, list) and all(isinstance(x, int) for x in pred):
-                # Already in binary format
+            # Handle dict format (from _write_batch_to_cache)
+            if isinstance(pred, dict) and 'prediction' in pred:
+                prediction_array = pred['prediction']
+                if isinstance(prediction_array, list) and all(isinstance(x, int) for x in prediction_array):
+                    formatted_predictions.append(prediction_array)
+                else:
+                    # Fallback for unexpected format
+                    formatted_predictions.append([0] * len(self.label_columns))
+            # Handle direct binary vector
+            elif isinstance(pred, list) and all(isinstance(x, int) for x in pred):
                 formatted_predictions.append(pred)
-            else:
-                # Convert to binary format
+            # Handle class name strings
+            elif isinstance(pred, str):
                 binary_pred = [0] * len(self.label_columns)
-                if isinstance(pred, str):
-                    if pred in self.label_columns:
-                        binary_pred[self.label_columns.index(pred)] = 1
-                elif isinstance(pred, list):
-                    for label in pred:
-                        if label in self.label_columns:
-                            binary_pred[self.label_columns.index(label)] = 1
+                if pred in self.label_columns:
+                    binary_pred[self.label_columns.index(pred)] = 1
                 formatted_predictions.append(binary_pred)
+            # Handle list of class names (multi-label)
+            elif isinstance(pred, list) and pred and isinstance(pred[0], str):
+                binary_pred = [0] * len(self.label_columns)
+                for label in pred:
+                    if label in self.label_columns:
+                        binary_pred[self.label_columns.index(label)] = 1
+                formatted_predictions.append(binary_pred)
+            else:
+                # Unknown format - use default
+                formatted_predictions.append([0] * len(self.label_columns))
         
         # Calculate metrics if test_df has labels
         metrics = None
@@ -1459,7 +1923,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             metrics = self._calculate_metrics(formatted_predictions, true_labels)
             
             if self.verbose:
-                print(f"📊 Metrics from cached predictions:")
+                print(f" Metrics from cached predictions:")
                 for metric, value in metrics.items():
                     print(f"  • {metric}: {value:.4f}")
         
@@ -1493,13 +1957,13 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         discovered = self.discover_cached_predictions(cache_dir)
         
         if not discovered:
-            print("\n❌ No cached predictions found")
+            print("\n No cached predictions found")
             print(f"   Cache directory: {cache_dir}")
-            print("\n💡 TIP: Run predictions with caching enabled to create cache files")
+            print("\n TIP: Run predictions with caching enabled to create cache files")
             return
         
-        print(f"\n📁 Cache directory: {cache_dir}")
-        print(f"✅ Found {sum(len(v) for v in discovered.values())} cached prediction file(s)\n")
+        print(f"\n Cache directory: {cache_dir}")
+        print(f" Found {sum(len(v) for v in discovered.values())} cached prediction file(s)\n")
         
         for dataset_type, files in discovered.items():
             print(f"\n{dataset_type.upper().replace('_', ' ')}:")
@@ -1525,5 +1989,5 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                 print(f"\n  ... and {len(files) - 3} more file(s)")
         
         print("\n" + "="*60)
-        print("💡 Use load_cached_predictions_for_dataset() to load a specific file")
+        print(" Use load_cached_predictions_for_dataset() to load a specific file")
         print("="*60 + "\n")

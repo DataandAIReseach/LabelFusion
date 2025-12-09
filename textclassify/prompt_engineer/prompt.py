@@ -40,18 +40,33 @@ class Prompt:
         rendered_parts = []
         for part in self.parts:
             try:
-                # Use safe string formatting to avoid issues with LaTeX symbols and backslashes
+                rendered = part["content"].format(**combined_vars)
+            except (KeyError, ValueError) as e:
+                # If format fails, it might be due to unescaped braces in the content
+                # Try to escape braces that are not part of variable placeholders
                 content = part["content"]
+                # First, protect actual variables by replacing them temporarily
+                import re
+                variables_found = re.findall(r'\{(\w+)\}', content)
+                temp_content = content
+                for i, var in enumerate(variables_found):
+                    if var in combined_vars:
+                        temp_content = temp_content.replace(f'{{{var}}}', f'__PLACEHOLDER_{i}__')
                 
-                # Replace variables one by one to avoid conflicts with special characters
-                for var_name, var_value in combined_vars.items():
-                    placeholder = "{" + var_name + "}"
-                    if placeholder in content:
-                        content = content.replace(placeholder, str(var_value))
+                # Escape remaining braces
+                temp_content = temp_content.replace('{', '{{').replace('}', '}}')
                 
-                rendered_parts.append(content)
-            except Exception as e:
-                raise ValueError(f"Error rendering prompt part '{part.get('name', 'unknown')}': {e}")
+                # Restore placeholders
+                for i, var in enumerate(variables_found):
+                    if var in combined_vars:
+                        temp_content = temp_content.replace(f'__PLACEHOLDER_{i}__', f'{{{var}}}')
+                
+                # Try rendering again
+                try:
+                    rendered = temp_content.format(**combined_vars)
+                except (KeyError, ValueError) as e2:
+                    raise ValueError(f"Failed to render prompt even after escaping: {e2}")
+            rendered_parts.append(rendered)
 
         return "\n\n".join(rendered_parts).strip()
 
