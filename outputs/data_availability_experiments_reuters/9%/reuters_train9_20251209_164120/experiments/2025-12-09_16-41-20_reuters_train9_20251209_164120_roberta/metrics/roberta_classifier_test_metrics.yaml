@@ -1,0 +1,83 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-12-09_16-41-20_reuters_train9_20251209_164120_roberta
+  git_commit: 9d0adf44b7826ffd0cd358a1c6df6b31a35bcae4
+  model_name: roberta_classifier
+  timestamp: '2025-12-09T16:42:35.308177'
+metrics:
+  classification_report:
+    acq:
+      f1-score: 0.6205704407951599
+      precision: 0.45015673981191223
+      recall: 0.9986091794158554
+      support: 719.0
+    corn:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 56.0
+    crude:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 189.0
+    earn:
+      f1-score: 0.598568281938326
+      precision: 0.42711198428290764
+      recall: 1.0
+      support: 1087.0
+    grain:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 149.0
+    interest:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 131.0
+    macro avg:
+      f1-score: 0.1219138722733486
+      precision: 0.08772687240948199
+      recall: 0.19986091794158553
+      support: 2787.0
+    micro avg:
+      f1-score: 0.5209987011112714
+      precision: 0.43577981651376146
+      recall: 0.6476498026551848
+      support: 2787.0
+    money-fx:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 179.0
+    samples avg:
+      f1-score: 0.5943156516044532
+      precision: 0.5384086444007858
+      recall: 0.7063523248199083
+      support: 2787.0
+    ship:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 89.0
+    trade:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 117.0
+    weighted avg:
+      f1-score: 0.39355359504796567
+      precision: 0.28271741041990867
+      recall: 0.6476498026551848
+      support: 2787.0
+    wheat:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 71.0
+  exact_match_accuracy: 0.36856581532416505
+  f1_weighted: 0.39355359504796567
+  hamming_loss: 0.13041257367387032
+  precision_weighted: 0.28271741041990867
+  recall_weighted: 0.6476498026551848

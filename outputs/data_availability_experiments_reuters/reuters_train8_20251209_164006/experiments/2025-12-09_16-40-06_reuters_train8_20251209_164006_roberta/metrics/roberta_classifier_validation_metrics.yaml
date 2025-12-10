@@ -1,0 +1,83 @@
+metadata:
+  dataset_name: validation
+  experiment_id: 2025-12-09_16-40-06_reuters_train8_20251209_164006_roberta
+  git_commit: 9d0adf44b7826ffd0cd358a1c6df6b31a35bcae4
+  model_name: roberta_classifier
+  timestamp: '2025-12-09T16:40:44.325501'
+metrics:
+  classification_report:
+    acq:
+      f1-score: 0.7956403269754768
+      precision: 0.7227722772277227
+      recall: 0.8848484848484849
+      support: 165.0
+    corn:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 18.0
+    crude:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 39.0
+    earn:
+      f1-score: 0.6160427807486631
+      precision: 0.44513137557959814
+      recall: 1.0
+      support: 288.0
+    grain:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 43.0
+    interest:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 35.0
+    macro avg:
+      f1-score: 0.14116831077241399
+      precision: 0.1167903652807321
+      recall: 0.18848484848484848
+      support: 720.0
+    micro avg:
+      f1-score: 0.5532186105799872
+      precision: 0.5111896348645465
+      recall: 0.6027777777777777
+      support: 720.0
+    money-fx:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 54.0
+    samples avg:
+      f1-score: 0.577537351880474
+      precision: 0.5347758887171561
+      recall: 0.6661514683153014
+      support: 720.0
+    ship:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 20.0
+    trade:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 37.0
+    weighted avg:
+      f1-score: 0.428751353898012
+      precision: 0.3436878637631924
+      recall: 0.6027777777777777
+      support: 720.0
+    wheat:
+      f1-score: 0.0
+      precision: 0.0
+      recall: 0.0
+      support: 21.0
+  exact_match_accuracy: 0.39258114374034003
+  f1_weighted: 0.428751353898012
+  hamming_loss: 0.10834621329211747
+  precision_weighted: 0.3436878637631924
+  recall_weighted: 0.6027777777777777
