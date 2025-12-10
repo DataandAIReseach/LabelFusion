@@ -1,7 +1,7 @@
 """Reuters data availability experiments.
 
 Trains fusion models with different percentages of:
-- Training data for ML model (20%, 40%, 100%)
+- Training data for ML model (1%, 2%, 3%, 4%, 5%, 6%, 7%, 8%, 9%, 10%)
 - Validation LLM predictions for fusion training (subsets of val set)
 
 Outputs a table showing performance at different data availability levels.
@@ -290,7 +290,7 @@ def main():
     cache_dir = os.getenv('CACHE_DIR', 'cache')
     
     # Training data percentages to test (for ML model)
-    train_percentages = [0.2, 0.4, 0.6, 0.8, 1.0]  # 20%, 40%, 60%, 80%, 100%
+    train_percentages = [0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10]  # 1%-10%
     
     # Note: Validation and test sets are kept constant (100% of data)
     # Only training data is sampled to test impact of training data size
