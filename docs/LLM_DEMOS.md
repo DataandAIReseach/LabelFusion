@@ -8,32 +8,25 @@ use the real library classes (OpenAIClassifier, FusionEnsemble, AutoFusion, etc.
 and falls back to simple mocks when those classes or credentials are not
 available.
 
-Files of interest (new/renamed)
+Current Example Files
 
-- `examples/cache_usage_demo.py` — Demonstrates writing and discovering simple
-  LLM cache JSON files. Writes a small mock cache under `cache/demo_llm_cache/`.
+**Standalone Usage Examples:**
+- `ml_standalone_example.py` — Complete ML (RoBERTa) examples for single-label (AG News) and multi-label (Reuters) classification
+- `llm_standalone_example.py` — Complete LLM (OpenAI) examples for single-label and multi-label classification
+- `fusion_ensemble_example.py` — Complete fusion ensemble examples combining ML and LLM with trainable MLP
 
-- `examples/ensemble_cache_interrupt_demo.py` — Creates small val/test sets and
-  writes simple mock cache files under `cache/mock_ensemble/val` and
-  `cache/mock_ensemble/test`.
+**Cache Demonstration:**
+- `cache_usage_demo.py` — Demonstrates writing and discovering LLM cache JSON files (safe fallback to mocks)
+- `ensemble_cache_interrupt_demo.py` — Creates mock cache files for val/test sets
+- `llm_cache_mock.py` — Integration test for `LLMPredictionCache` implementation
+- `ml_cache_mock.py` — Demonstrates ML model checkpointing and prediction caching
+- `llm_cache_usage_example.py` — Comprehensive cache management functions example
+- `minimal_precache_demo.py` — Minimal precache flow with real LLM fallback to MockLLM
 
-- `examples/llm_cache_mock.py` — Existing example that exercises the
-  `LLMPredictionCache` implementation. If the real `prediction_cache` module is
-  available it will use it; otherwise it will raise at import-time. This demo
-  is left as an integration-oriented example.
-
-- `examples/minimal_precache_demo.py` — Minimal precache flow that tries to use
-  a real LLM (OpenAI/DeepSeek) and falls back to `MockLLM`. It uses Fusion helper
-  `_save_cached_llm_predictions` to write canonical cache JSON files.
-
-- `examples/test_multilabel_autofusion.py` — Runnable multi-label AutoFusion
-  demo; falls back to `MockAutoFusion` if `AutoFusionClassifier` is unavailable.
-
-- `examples/test_singlelabel_ml.py` — Runnable single-label ML-only demo; uses
-  `RoBERTaClassifier` if available, otherwise `MockML`.
-
-- `examples/test_singlelabel_autofusion.py` — Runnable single-label AutoFusion
-  demo with a safe fallback.
+**Simplified Demos (with safe fallbacks):**
+- `test_singlelabel_ml.py` — Runnable single-label ML demo (RoBERTa or MockML)
+- `test_singlelabel_autofusion.py` — Runnable single-label AutoFusion demo with fallback
+- `test_multilabel_autofusion.py` — Runnable multi-label AutoFusion demo with fallback
 
 Why these demos exist
 
@@ -43,14 +36,27 @@ Why these demos exist
   discovering cached LLM predictions.
 - Provide reproducible scripted flows for CI smoke checks (syntax + import).
 
-How to run (quick)
+How to run
 
-Run a single demo with Python:
+Run standalone examples (require datasets and API keys):
+```bash
+python examples/ml_standalone_example.py
+python examples/llm_standalone_example.py
+python examples/fusion_ensemble_example.py
+```
 
+Run lightweight demos with mock fallbacks:
 ```bash
 python examples/test_singlelabel_ml.py
 python examples/cache_usage_demo.py
 python examples/test_multilabel_autofusion.py
+```
+
+Run cache demonstrations:
+```bash
+python examples/ml_cache_mock.py
+python examples/llm_cache_mock.py
+python examples/minimal_precache_demo.py
 ```
 
 Running under a minimal environment will activate mock fallbacks — this
