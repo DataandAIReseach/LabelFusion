@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: val
+  experiment_id: 2025-12-09_16-33-55_reuters_train2_20251209_163336_openai
+  git_commit: 9d0adf44b7826ffd0cd358a1c6df6b31a35bcae4
+  model_name: openai_classifier
+  timestamp: '2025-12-09T16:34:00.671196'
+metrics:
+  f1: 0.8747552807831015
+  hamming_loss: 0.029675425038639878
+  micro_f1: 0.9703245749613602
+  micro_precision: 0.9703245749613602
+  micro_recall: 0.9703245749613602
+  precision: 0.9036579082946934
+  recall: 0.8614116434827409
+  subset_accuracy: 0.8207109737248841
