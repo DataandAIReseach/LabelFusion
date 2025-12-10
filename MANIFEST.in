@@ -1,13 +1,18 @@
 include README.md
 include LICENSE
-include CHANGELOG.md
 include requirements.txt
-include pytest.ini
+include package_architecture.md
+include PACKAGE_OVERVIEW.md
+include paper.md
+include paper.bib
+include paper.pdf
 recursive-include textclassify *.py
-recursive-include textclassify/examples *.py
+recursive-include examples *.py
 recursive-include tests *.py
+recursive-include docs *.md
 exclude tests/integration/test_*_live.py
 global-exclude *.pyc
 global-exclude __pycache__
 global-exclude .DS_Store
+global-exclude .env
 
