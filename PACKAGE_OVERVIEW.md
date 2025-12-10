@@ -1,10 +1,10 @@
 # TextClassify Package Overview
 
-## 🎯 Project Summary
+Project Summary
 
 TextClassify is a comprehensive Python package for multi-class and multi-label text classification that combines the power of Large Language Models (LLMs) with traditional machine learning approaches. The package provides advanced ensemble methods to optimize classification performance by intelligently combining different models.
 
-## 📦 Package Structure
+Package Structure
 
 ```
 textclassify/
@@ -65,7 +65,7 @@ examples/                       # Top-level example scripts
 └── minimal_precache_demo.py
 ```
 
-## 🚀 Key Features
+## Key Features
 
 ### 1. Multiple Model Types
 - **LLM Providers**: OpenAI GPT, Claude, Google Gemini, DeepSeek
@@ -93,7 +93,7 @@ examples/                       # Top-level example scripts
 - **Evaluation Metrics**: Comprehensive metrics for both classification types
 - **Model Comparison**: Side-by-side performance analysis
 
-## 🛠️ Technical Implementation
+## Technical Implementation
 
 ### Core Architecture
 - **Abstract Base Classes**: Consistent interface across all model types
@@ -119,7 +119,7 @@ examples/                       # Top-level example scripts
 - **Fallback Strategies**: Graceful handling of model failures
 - **Performance Optimization**: Intelligent model selection strategies
 
-## 📊 Performance Features
+## Performance Features
 
 ### Optimization Strategies
 1. **Model Specialization**: Different models for different types of content
@@ -133,7 +133,7 @@ examples/                       # Top-level example scripts
 - **Confusion Matrices**: Detailed error analysis for multi-class tasks
 - **Performance Tracking**: Monitor model performance over time
 
-## 🔧 Usage Examples
+## Usage Examples
 
 ### Quick Start
 ```python
@@ -173,7 +173,7 @@ ensemble.fit(training_data)
 result = ensemble.predict(test_texts)
 ```
 
-## 📋 Dependencies
+## Dependencies
 
 ### Core Dependencies (Required)
 - `aiohttp>=3.8.0` - Async HTTP client for LLM APIs
@@ -194,7 +194,7 @@ result = ensemble.predict(test_texts)
 - `anthropic>=0.3.0` - Claude API client
 - `google-generativeai>=0.3.0` - Gemini API client
 
-## 🧪 Testing
+## Testing
 
 ### Test Coverage
 - **Unit Tests**: Core functionality, types, configuration
@@ -214,7 +214,7 @@ tests/
     └── ...
 ```
 
-## 📚 Documentation
+## Documentation
 
 ### Comprehensive Documentation
 - **README.md**: Complete usage guide with examples
@@ -224,11 +224,14 @@ tests/
 - **Troubleshooting**: Common issues and solutions
 
 ### Example Scripts
-- `multi_class_example.py`: Multi-class classification examples
-- `multi_label_example.py`: Multi-label classification examples
-- `ensemble_example.py`: Advanced ensemble strategies
+See the `examples/` directory for:
+- `ml_standalone_example.py`: RoBERTa classifier examples
+- `llm_standalone_example.py`: LLM classifier examples
+- `fusion_ensemble_example.py`: Fusion ensemble examples
+- `test_singlelabel_ml.py`, `test_singlelabel_autofusion.py`, `test_multilabel_autofusion.py`: Simplified demos with fallbacks
+- Cache demonstration scripts: `ml_cache_mock.py`, `llm_cache_mock.py`, `llm_cache_usage_example.py`
 
-## 🔒 Security & Best Practices
+## Security & Best Practices
 
 ### API Key Security
 - **Secure Storage**: API keys stored with restricted file permissions
@@ -242,7 +245,7 @@ tests/
 - **Detailed Logging**: Comprehensive logging for debugging
 - **Input Validation**: Thorough validation of user inputs
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ### Installation
 ```bash
@@ -268,7 +271,7 @@ cd textclassify
 pip install -e ".[dev]"
 ```
 
-## 🎯 Use Cases
+## Use Cases
 
 ### Business Applications
 - **Customer Support**: Automatic ticket classification and routing
@@ -282,7 +285,7 @@ pip install -e ".[dev]"
 - **Ensemble Studies**: Research on ensemble methods
 - **Performance Analysis**: Detailed evaluation metrics
 
-## 🔮 Future Enhancements
+## Future Enhancements
 
 ### Planned Features
 - Additional LLM providers (Llama, Mistral)
@@ -299,7 +302,7 @@ pip install -e ".[dev]"
 - **Preprocessing Pipeline**: Extensible text preprocessing
 - **Evaluation Metrics**: Custom metric implementations
 
-## 📈 Performance Characteristics
+## Performance Characteristics
 
 ### Scalability
 - **Async Processing**: Concurrent LLM requests
