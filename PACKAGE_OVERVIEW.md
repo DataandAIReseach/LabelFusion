@@ -9,6 +9,7 @@ TextClassify is a comprehensive Python package for multi-class and multi-label t
 ```
 textclassify/
 ├── __init__.py                 # Main package entry point
+├── auto_fusion.py              # High-level AutoFusion API
 ├── core/                       # Core functionality
 │   ├── __init__.py
 │   ├── types.py               # Data types and enums
@@ -17,7 +18,6 @@ textclassify/
 ├── llm/                       # LLM-based classifiers
 │   ├── __init__.py
 │   ├── base.py                # Base LLM classifier
-│   ├── prompts.py             # Prompt templates
 │   ├── openai_classifier.py   # OpenAI GPT models
 │   ├── claude_classifier.py   # Anthropic Claude models
 │   ├── gemini_classifier.py   # Google Gemini models
@@ -25,28 +25,44 @@ textclassify/
 ├── ml/                        # Traditional ML classifiers
 │   ├── __init__.py
 │   ├── base.py                # Base ML classifier
-│   ├── preprocessing.py       # Text preprocessing
 │   └── roberta_classifier.py  # RoBERTa-based classifier
 ├── ensemble/                  # Ensemble methods
 │   ├── __init__.py
 │   ├── base.py                # Base ensemble class
+│   ├── fusion.py              # Fusion ensemble (ML+LLM+MLP)
+│   ├── auto_fusion.py         # Simplified AutoFusion wrapper
 │   ├── voting.py              # Voting ensemble
 │   ├── weighted.py            # Weighted ensemble
 │   └── routing.py             # Class routing ensemble
+├── prompt_engineer/           # Prompt engineering utilities
+│   └── __init__.py
+├── services/                  # Service layer components
+│   └── __init__.py
 ├── config/                    # Configuration management
 │   ├── __init__.py
 │   ├── settings.py            # Configuration handling
 │   └── api_keys.py            # API key management
-├── utils/                     # Utility functions
-│   ├── __init__.py
-│   ├── logging.py             # Logging utilities
-│   ├── metrics.py             # Evaluation metrics
-│   └── data.py                # Data handling utilities
-└── examples/                  # Example scripts
+└── utils/                     # Utility functions
     ├── __init__.py
-    ├── multi_class_example.py
-    ├── multi_label_example.py
-    └── ensemble_example.py
+    ├── cache_helpers.py       # LLM prediction caching
+    ├── logging.py             # Logging utilities
+    ├── metrics.py             # Evaluation metrics
+    ├── results_manager.py     # Results management
+    └── data.py                # Data handling utilities
+
+examples/                       # Top-level example scripts
+├── ml_standalone_example.py
+├── llm_standalone_example.py
+├── fusion_ensemble_example.py
+├── test_singlelabel_ml.py
+├── test_singlelabel_autofusion.py
+├── test_multilabel_autofusion.py
+├── ml_cache_mock.py
+├── llm_cache_mock.py
+├── llm_cache_usage_example.py
+├── cache_usage_demo.py
+├── ensemble_cache_interrupt_demo.py
+└── minimal_precache_demo.py
 ```
 
 ## 🚀 Key Features
