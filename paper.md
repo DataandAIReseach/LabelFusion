@@ -155,7 +155,16 @@ Future development of TextClassify will focus on several key areas:
 
 # Acknowledgments
 
-The authors thank the open-source community for their contributions to the foundational libraries that make TextClassify possible, including the teams behind transformers, scikit-learn, and the various LLM providers who have made their APIs accessible for research and development. Special acknowledgment goes to the beta testers and early adopters who provided valuable feedback during the development process.
+The authors thank the open-source community for their contributions to the foundational libraries that make TextClassify possible, including the teams behind transformers, scikit-learn, and the various LLM providers who have made their APIs accessible for research and development. Special acknowledgment goes to the beta testers and early adopters who provided 
+valuable feedback during the development process.
+
+# AI Disclosure
+
+Generative artificial intelligence was used during the development of this project in accordance with the JOSS AI Usage Policy. Claude Sonnet 4.5 (Anthropic) was used to assist with code generation, code refactoring, test scaffolding, and copy-editing of software-related materials and documentation. Any AI-assisted outputs were reviewed, edited, and validated by the human authors, who made all core design, architectural, and methodological decisions.
+
+The manuscript itself was written entirely by hand by the authors and was not generated or drafted using AI tools. The authors take full responsibility for the accuracy, originality, licensing, and ethical and legal compliance of all submitted materials.
+
+No generative AI tools were used for conversational interactions with editors or reviewers.
 
 # References
 

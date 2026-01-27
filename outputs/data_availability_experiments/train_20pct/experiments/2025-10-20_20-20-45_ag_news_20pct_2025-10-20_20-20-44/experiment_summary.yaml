@@ -1,0 +1,40 @@
+created_at: '2025-10-20T20:22:23.580327'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq003
+    platform: Linux-4.18.0-553.74.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /mnt/vast-standard/home/schlee2/u19147/repos/LabelFusion
+  experiment_id: 2025-10-20_20-20-45_ag_news_20pct_2025-10-20_20-20-44
+  git_commit: 24f5d3e9febffa43560e191bcce5d720ba82fb21
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-10-20T20:20:45.475744'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/fusion_ensemble_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/validation_predictions_aa42076db442.csv
+  - predictions/validation_predictions_aa42076db442.json
+test_results: null
+training_results:
+  classes:
+  - label_1
+  - label_2
+  - label_3
+  - label_4
+  classification_type: multi_class
+  ensemble_method: fusion
+  fusion_mlp_trained: true
+  ml_model_trained: true
+  num_labels: 4
+  training_samples: 800
+  used_cached_val_llm_predictions: false
+  validation_samples: 500
