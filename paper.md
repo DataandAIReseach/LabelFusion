@@ -229,6 +229,8 @@ The approach enables pragmatic cost control (e.g., the fusion layer learns when 
 
 We thank contributors and users who reported issues and shared datasets. LabelFusion builds on the open‑source ecosystem, notably Hugging Face Transformers [@wolf2019huggingface], scikit‑learn [@pedregosa2011scikit], PyTorch [@paszke2019pytorch], and LLM provider SDKs. The work presented in this paper was conducted independently by the author Melchizedek Mashiku and is not affiliated with Tanaq Management Services LLC, Contracting Agency to the Division of Viral Diseases, Centers for Disease Control and Prevention, Chamblee, Georgia, USA. We acknowledge the use of the AG News and GoEmotions benchmark datasets for evaluation.
 
+## 
+
 ## Appendix A: Task Formalization
 
 Formally, multi-class classification assigns each input $x \in \mathcal{X}$ to exactly one label among $K$ mutually exclusive classes:
