@@ -51,11 +51,11 @@ In applied NLP, common tools such as scikit-learn [@pedregosa2011scikit] and Hug
 
 ## Software design
 
-The design of `LabelFusion` is based on three core principles: **modularity**, **composability**, and **reproducibility**. This is achieved through a consistent object-oriented API that unifies disparate model types—traditional machine learning (ML) and Large Language Models (LLMs)—under a common interface. All classifiers inherit from the `BaseClassifier` abstract base class, which standardizes the `predict()` interface and the `ClassificationResult` data structure. The `BaseLLMClassifier` further extends `AsyncBaseClassifier` to manage the latency of API calls.
+The design of `LabelFusion` is based on three core principles: modularity, composability, and reproducibility. This is achieved through a consistent object-oriented API that unifies disparate model types—traditional machine learning (ML) and Large Language Models (LLMs)—under a common interface. All classifiers inherit from the `BaseClassifier` abstract base class, which standardizes the `predict()` interface and the `ClassificationResult` data structure. The `BaseLLMClassifier` further extends `AsyncBaseClassifier` to manage the latency of API calls.
 
-Within the LLM module, the `PromptEngineer` dynamically constructs context-aware instructions and classification guidelines based on the label schema and training examples, ensuring the LLM produces semantically aligned per-class scores. The ML module, exemplified by the `RoBERTaClassifier`, extracts the **768-dimensional `[CLS]` token embeddings**, which serve as a crucial input signal for the fusion component.
+Within the LLM module, the `PromptEngineer` dynamically constructs context-aware instructions and classification guidelines based on the label schema and training examples, ensuring the LLM produces semantically aligned per-class scores. The ML module, exemplified by the `RoBERTaClassifier`, extracts the 768-dimensional `[CLS]` token embeddings, which serve as a crucial input signal for the fusion component.
 
-The core of the fusion module is the **Multi-Layer Perceptron (`FusionMLP`)**, implemented as a `torch.nn.Module`. The `FusionMLP` accepts a **concatenated input vector** combining the ML embeddings and the LLM’s per-class scores ($768 + K$ dimensions). Training employs a **differential learning rate strategy**: the ML backbone is fine-tuned with a low rate ($10^{-5}$), while the `FusionMLP` head is trained with a higher rate ($10^{-3}$) for rapid adaptation. The `AutoFusionClassifier` abstracts this entire orchestration behind a single `fit()` interface, prioritizing usability and reproducibility while retaining access to lower-level components.
+The core of the fusion module is the Multi-Layer Perceptron (`FusionMLP`), implemented as a `torch.nn.Module`. The `FusionMLP` accepts a concatenated input vector combining the ML embeddings and the LLM’s per-class scores ($768 + K$ dimensions). Training employs a differential learning rate strategy: the ML backbone is fine-tuned with a low rate ($10^{-5}$), while the `FusionMLP` head is trained with a higher rate ($10^{-3}$) for rapid adaptation. The `AutoFusionClassifier` abstracts this entire orchestration behind a single `fit()` interface, prioritizing usability and reproducibility while retaining access to lower-level components.
 
 
 ## Research Impact Statement
@@ -129,7 +129,9 @@ Beyond the core fusion methodology, LabelFusion includes features for practical 
 - **Results Management**: Built-in `ResultsManager` tracks experiments, stores predictions, and computes metrics automatically. Supports comparison across runs and configuration tracking.
 - **Batch Processing**: Efficient batched scoring of texts with configurable batch sizes for both ML and LLM components.
 
-## Impact and Use Cases
+## Research Impact
+
+Classifying texts into predefined categories is challenging without prior domain knowledge. LabelFusion helps researchers craft effective prompts by distilling domain knowledge from large language models (LLMs), which can substantially improve classification accuracy. Because data labeling is costly, LabelFusion provides a practical starting point for assessing the feasibility of text classification. It is especially useful in settings where traditional machine-learning methods struggle due to limited training data, as demonstrated in the following section.
 
 ### Empirical Performance
 
@@ -171,7 +173,7 @@ Evaluation on the AG News dataset [@zhang2015character] (4-class topic classific
 |---------------|----------|----------|----------|-----------|--------|
 | 20% (1168)    | **Fusion** | 72.0% | 0.752 | 0.769 | 0.745 |
 | 20% (1168)    | RoBERTa    | 67.3% | 0.534 | 0.465 | 0.643 |
-| 20% (1168)    | OpenAI     | 88.6% | 0.928 | 0.951 | 0.923 |
+| 20% (1168)    | OpenAI     | 87.6% | 0.928 | 0.951 | 0.923 |
 | 40% (2336)    | **Fusion** | 83.6% | 0.886 | 0.893 | 0.889 |
 | 40% (2336)    | RoBERTa    | 82.0% | 0.836 | 0.858 | 0.850 |
 | 40% (2336)    | OpenAI     | 87.9% | 0.931 | 0.952 | 0.917 |
