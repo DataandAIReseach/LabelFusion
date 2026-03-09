@@ -49,6 +49,19 @@ LabelFusion addresses this gap by: (1) exposing a minimal “AutoFusion” inter
 
 In applied NLP, common tools such as scikit-learn [@pedregosa2011scikit] and Hugging Face Transformers [@wolf2019huggingface] offer strong baselines but do not provide a learned fusion of LLMs with supervised transformers. Orchestration frameworks (e.g., LangChain) focus on tool use rather than classification ensembles. LabelFusion contributes a focused, production-minded implementation of a small learned combiner that operates on per-class signals from both model families.
 
+## Software design
+
+The design of `LabelFusion` is based on three core principles: modularity, composability, and reproducibility. This is achieved through a consistent object-oriented API that unifies disparate model types—traditional machine learning (ML) and Large Language Models (LLMs)—under a common interface. All classifiers inherit from the `BaseClassifier` abstract base class, which standardizes the `predict()` interface and the `ClassificationResult` data structure. The `BaseLLMClassifier` further extends `AsyncBaseClassifier` to manage the latency of API calls.
+
+Within the LLM module, the `PromptEngineer` dynamically constructs context-aware instructions and classification guidelines based on the label schema and training examples, ensuring the LLM produces semantically aligned per-class scores. The ML module, exemplified by the `RoBERTaClassifier`, extracts the 768-dimensional `[CLS]` token embeddings, which serve as a crucial input signal for the fusion component.
+
+The core of the fusion module is the Multi-Layer Perceptron (`FusionMLP`), implemented as a `torch.nn.Module`. The `FusionMLP` accepts a concatenated input vector combining the ML embeddings and the LLM’s per-class scores ($768 + K$ dimensions). Training employs a differential learning rate strategy: the ML backbone is fine-tuned with a low rate ($10^{-5}$), while the `FusionMLP` head is trained with a higher rate ($10^{-3}$) for rapid adaptation. The `AutoFusionClassifier` abstracts this entire orchestration behind a single `fit()` interface, prioritizing usability and reproducibility while retaining access to lower-level components.
+
+
+## Research Impact Statement
+
+LabelFusion implements a learned fusion architecture for text classification that combines a supervised transformer-based classifier (e.g., RoBERTa) with one or more Large Language Models (LLMs such as OpenAI GPT, Google Gemini, or DeepSeek). The core design follows a two-stage ensemble approach: the transformer backbone produces embedding- and logit-level signals, while the LLM component generates per-class scores via prompt-based classification. These heterogeneous signals are concatenated and passed to a compact fusion multi-layer perceptron (FusionMLP) that learns how to combine both sources into a single prediction. A key component of the design is the integrated prompt engineering module for the LLM classifiers. Rather than relying on static prompts, LabelFusion includes a prompt warehouse that dynamically constructs task-specific instructions based on the provided label schema and training examples. This mechanism generates context-aware role descriptions and classification guidelines, ensuring that the LLM produces consistent and semantically aligned per-class scores for downstream fusion. The software is organized into three clearly separated components: an ML classifier module, LLM classifier modules, and a fusion module. A central design decision is the high-level AutoFusionClassifier, which abstracts orchestration of the full pipeline—including data splitting, automated prompt generation, optional caching of LLM predictions, and fusion model training—behind a single fit() interface. This design prioritizes usability and reproducibility while retaining access to lower-level components for custom workflows and experimentation.
+
 ## Functionality and Design
 
 LabelFusion consists of three layers:
@@ -116,7 +129,9 @@ Beyond the core fusion methodology, LabelFusion includes features for practical 
 - **Results Management**: Built-in `ResultsManager` tracks experiments, stores predictions, and computes metrics automatically. Supports comparison across runs and configuration tracking.
 - **Batch Processing**: Efficient batched scoring of texts with configurable batch sizes for both ML and LLM components.
 
-## Impact and Use Cases
+## Research Impact
+
+Classifying texts into predefined categories is challenging without prior domain knowledge. LabelFusion helps researchers craft effective prompts by distilling domain knowledge from large language models (LLMs), which can substantially improve classification accuracy. Because data labeling is costly, LabelFusion provides a practical starting point for assessing the feasibility of text classification. It is especially useful in settings where traditional machine-learning methods struggle due to limited training data, as demonstrated in the following section.
 
 ### Empirical Performance
 
@@ -158,7 +173,7 @@ Evaluation on the AG News dataset [@zhang2015character] (4-class topic classific
 |---------------|----------|----------|----------|-----------|--------|
 | 20% (1168)    | **Fusion** | 72.0% | 0.752 | 0.769 | 0.745 |
 | 20% (1168)    | RoBERTa    | 67.3% | 0.534 | 0.465 | 0.643 |
-| 20% (1168)    | OpenAI     | 88.6% | 0.928 | 0.951 | 0.923 |
+| 20% (1168)    | OpenAI     | 87.6% | 0.928 | 0.951 | 0.923 |
 | 40% (2336)    | **Fusion** | 83.6% | 0.886 | 0.893 | 0.889 |
 | 40% (2336)    | RoBERTa    | 82.0% | 0.836 | 0.858 | 0.850 |
 | 40% (2336)    | OpenAI     | 87.9% | 0.931 | 0.952 | 0.917 |
@@ -228,6 +243,14 @@ The approach enables pragmatic cost control (e.g., the fusion layer learns when 
 ## Acknowledgements
 
 We thank contributors and users who reported issues and shared datasets. LabelFusion builds on the open‑source ecosystem, notably Hugging Face Transformers [@wolf2019huggingface], scikit‑learn [@pedregosa2011scikit], PyTorch [@paszke2019pytorch], and LLM provider SDKs. The work presented in this paper was conducted independently by the author Melchizedek Mashiku and is not affiliated with Tanaq Management Services LLC, Contracting Agency to the Division of Viral Diseases, Centers for Disease Control and Prevention, Chamblee, Georgia, USA. We acknowledge the use of the AG News and GoEmotions benchmark datasets for evaluation.
+
+# AI usage disclosure
+
+Generative artificial intelligence was used during the development of this project in accordance with the JOSS AI Usage Policy. Claude Sonnet 4.5 (Anthropic) was used to assist with code generation, code refactoring, test scaffolding, and copy-editing of software-related materials and documentation. Any AI-assisted outputs were reviewed, edited, and validated by the human authors, who made all core design, architectural, and methodological decisions.
+
+The manuscript itself was written entirely by hand by the authors and was not generated or drafted using AI tools. The authors take full responsibility for the accuracy, originality, licensing, and ethical and legal compliance of all submitted materials.
+
+No generative AI tools were used for conversational interactions with editors or reviewers.
 
 ## Appendix A: Task Formalization
 
