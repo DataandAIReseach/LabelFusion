@@ -543,10 +543,21 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         from pathlib import Path
         import hashlib
         import json
+        import sys
+        
+        # Always print to stderr to avoid buffering issues
+        def dbg(msg):
+            print(msg, file=sys.stderr, flush=True)
+        
+        dbg("\n" + "="*80)
+        dbg("DEBUG: has_test_cache_for_dataset CALLED")
+        dbg("="*80)
 
+        verbose = True  # Force debug output
         cache_dir = getattr(self, 'cache_dir', 'cache')
         p = Path(cache_dir)
         if not p.exists():
+            dbg(f"Cache dir {cache_dir} does not exist")
             return False
 
         # Compute stable 8-char hash for DataFrame using ONLY text column (consistent with _initialize_batch_cache_file)
@@ -560,26 +571,48 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             csv_bytes = text_series.to_csv(index=False).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
 
+        dbg(f"Looking for dataset hash: {dataset_hash}")
+
         discovered = self.discover_cached_predictions(cache_dir)
         if not discovered:
+            dbg("No discovered caches")
             return False
 
-        candidates = discovered.get('test_predictions', []) or []
+        # Check both validation and test cache files
+        candidates = discovered.get('validation_predictions', []) + discovered.get('test_predictions', [])
+        dbg(f"Found {len(candidates)} candidate cache files")
+        dbg(f"Dataset hash: {dataset_hash}")
+        for c in candidates[:3]:
+            dbg(f"Candidate: {c}")
+        
         for file_path in candidates:
             try:
                 fname = Path(file_path).name
+                dbg(f"Checking file: {fname}")
+                dbg(f"  Does '{fname}' end with '_{dataset_hash}.json'? {fname.endswith(f'_{dataset_hash}.json')}")
+                
                 if fname.endswith(f"_{dataset_hash}.json"):
+                    dbg(f"✓ MATCH by filename: {fname}")
                     return True
 
                 with open(file_path, 'r') as f:
                     data = json.load(f)
                 meta = data.get('metadata', {}) if isinstance(data, dict) else {}
-                if meta.get('dataset_hash') == dataset_hash:
+                meta_hash = meta.get('dataset_hash')
+                dbg(f"  Metadata hash: {meta_hash}, Looking for: {dataset_hash}, Match: {meta_hash == dataset_hash}")
+                
+                if meta_hash == dataset_hash:
+                    dbg(f"✓ MATCH by metadata hash: {file_path}")
                     return True
+                else:
+                    dbg(f"✗ No match - metadata hash mismatch")
 
-            except Exception:
+            except Exception as e:
+                dbg(f"Error checking {file_path}: {e}")
                 continue
 
+        dbg(f"No matching cache found after checking {len(candidates)} files")
+        dbg("="*80)
         return False
 
 
@@ -602,8 +635,17 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         cache_file_path = self._initialize_batch_cache_file(df, mode=mode)
 
         # Build list of indices for which we need to run inference
-        if self.has_test_cache_for_dataset(df):
+        has_cache = self.has_test_cache_for_dataset(df)
+        if self.verbose:
+            print(f" DEBUG: has_test_cache_for_dataset returned: {has_cache}")
+            if self._prediction_cache and hasattr(self._prediction_cache, 'predictions_cache'):
+                print(f" DEBUG: _prediction_cache has {len(self._prediction_cache.predictions_cache)} predictions")
+            else:
+                print(f" DEBUG: _prediction_cache is None or has no predictions_cache attribute")
+        
+        if has_cache:
             uncached_positions: List[int] = []
+            cached_count = 0
             for pos, (_, row) in enumerate(df.iterrows()):
                 text = row.get(text_column, "")
                 try:
@@ -612,11 +654,17 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                         pred = cached.get('prediction') if isinstance(cached, dict) else None
                         if isinstance(pred, list):
                             predictions[pos] = pred
+                            cached_count += 1
                             continue
-                except Exception:
+                except Exception as e:
                     # On any cache error, treat as uncached and continue
+                    if self.verbose:
+                        print(f" DEBUG: Cache check failed for sample {pos}: {e}")
                     pass
                 uncached_positions.append(pos)
+
+            if self.verbose:
+                print(f" DEBUG: Found {cached_count} cached predictions, {len(uncached_positions)} need processing")
 
             if len(uncached_positions) == 0:
                 # All samples cached — return formatted cached predictions
@@ -631,8 +679,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             total_batches = (len(df) + self.batch_size - 1) // self.batch_size
         
         if self.verbose:
-            self.logger.info(f"Processing {len(df)} samples in {total_batches} batches of size {self.batch_size}")
-            print(f"Processing in {total_batches} batches...")
+            self.logger.info(f"Processing {len(df_uncached)} samples in {total_batches} batches of size {self.batch_size}")
+            print(f"Processing {len(df_uncached)} samples in {total_batches} batches...")
         
         # Use tqdm for progress bar if verbose mode is enabled
         batch_iterator = range(0, len(df_uncached), self.batch_size)

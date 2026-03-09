@@ -94,19 +94,23 @@ class OpenAIClassifier(BaseLLMClassifier):
         if not p.exists():
             return False
 
-        # Compute stable 8-char hash for DataFrame
+        # Compute stable 8-char hash for DataFrame using ONLY text column (consistent with _initialize_batch_cache_file)
         try:
-            hashed = pd.util.hash_pandas_object(df, index=True).values
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
             dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
         except Exception:
-            csv_bytes = df.to_csv(index=True).encode('utf-8')
+            # Fallback: hash text column as CSV
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
 
         discovered = self.discover_cached_predictions(cache_dir)
         if not discovered:
             return False
 
-        candidates = discovered.get('test_predictions', []) or []
+        # Check both validation and test cache files
+        candidates = discovered.get('validation_predictions', []) + discovered.get('test_predictions', [])
         for file_path in candidates:
             try:
                 fname = Path(file_path).name
@@ -147,8 +151,9 @@ class OpenAIClassifier(BaseLLMClassifier):
         Returns:
             ClassificationResult with predictions, metrics, and saved files info
         """
-        # Set mode to 'test' when predicting
-        self.mode = 'test'
+        # Set mode to 'test' only if not already set
+        if not self.mode:
+            self.mode = 'test'
         
         # Store test_df reference for results saving
         if test_df is not None:
