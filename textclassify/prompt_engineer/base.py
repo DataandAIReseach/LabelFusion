@@ -109,61 +109,87 @@ class PromptEngineer:
         Returns:
             List[Prompt]: List of engineered prompts for each test text
         """
-        if not isinstance(test_df, pd.DataFrame) or not isinstance(train_df, pd.DataFrame):
-            raise ValueError("test_df and train_df must be pandas DataFrames")
+        if not isinstance(test_df, pd.DataFrame):
+            raise ValueError("test_df must be a pandas DataFrame")
+        if train_df is not None and not isinstance(train_df, pd.DataFrame):
+            raise ValueError("train_df must be a pandas DataFrame or None")
+        
+        # Detect zero-shot mode
+        is_zero_shot = (
+            train_df is None or 
+            self.few_shot_mode == 0 or 
+            self.few_shot_mode == "zero_shot"
+        )
         
         # Initialize base prompt with shared components
         init_p = Prompt()
         
-        # Generate role prompt
-        role_prompt_str = await self.llm_generator.generate_content(
-            self.fill_role_prompt_creator_prompt(
-                train_df=train_df,
-                sample_size=sample_size,
-                custom_prompt=custom_prompts.get('role') if custom_prompts else None,
-                custom_role_prompt=custom_role_prompt,
-                include_role=False
-            )
-        )
-
-        init_p.add_part("role_prompt", role_prompt_str)
-        
-        # Generate context keywords
-        context_keywords = await self.llm_generator.generate_content(
-            self.generate_context_keywords(
-                train_df=train_df,
-                sample_size=sample_size,
-                custom_prompt=custom_prompts.get('keywords') if custom_prompts else None,
-                include_role=True
-            )
-        )
-        
-        # Use custom context if provided, otherwise generate context
-        if custom_context:
-            context = custom_context
+        # Generate or use neutral prompts based on mode
+        if is_zero_shot:
+            # Zero-shot: Use simplified neutral prompts
+            classification_type = "multi-label" if self.multi_label else "multi-class"
+            role_prompt_str = f"You are a model performing a {classification_type} text classification task."
+            init_p.add_part("role_prompt", role_prompt_str)
+            
+            # Neutral context for zero-shot
+            context = "No additional context is provided because this is a zero-shot classification task."
+            init_p.add_part("context", context)
+            
+            # Neutral procedure with label definitions
+            label_list = ", ".join(self.label_columns)
+            procedure_prompt = f"You will classify text into the following labels: {label_list}.\n\n"
+            procedure_prompt += "Each label uses a binary scheme:\n"
+            procedure_prompt += "0 = label absent\n"
+            procedure_prompt += "1 = label present"
+            init_p.add_part("procedure_prompt", procedure_prompt)
         else:
-            context = await self.llm_generator.generate_content(
-                self.fill_context_prompt(
+            # Few-shot: Generate prompts via LLM as before
+            role_prompt_str = await self.llm_generator.generate_content(
+                self.fill_role_prompt_creator_prompt(
                     train_df=train_df,
                     sample_size=sample_size,
-                    custom_prompt=custom_prompts.get('context') if custom_prompts else None,
-                    include_role=False,
-                    keywords_content=context_keywords
+                    custom_prompt=custom_prompts.get('role') if custom_prompts else None,
+                    custom_role_prompt=custom_role_prompt,
+                    include_role=False
                 )
             )
-        init_p.add_part("context", context)
-
-        procedure_prompt = await self.llm_generator.generate_content(
-            self.fill_procedure_prompt_creator_prompt(
+            init_p.add_part("role_prompt", role_prompt_str)
+            
+            # Generate context keywords
+            context_keywords = await self.llm_generator.generate_content(
+                self.generate_context_keywords(
                     train_df=train_df,
                     sample_size=sample_size,
-                    custom_prompt=custom_prompts.get('procedure') if custom_prompts else None,
-                    include_role=False,
-                    procedure_additions=procedure_additions
+                    custom_prompt=custom_prompts.get('keywords') if custom_prompts else None,
+                    include_role=True
+                )
             )
-        )
+            
+            # Use custom context if provided, otherwise generate context
+            if custom_context:
+                context = custom_context
+            else:
+                context = await self.llm_generator.generate_content(
+                    self.fill_context_prompt(
+                        train_df=train_df,
+                        sample_size=sample_size,
+                        custom_prompt=custom_prompts.get('context') if custom_prompts else None,
+                        include_role=False,
+                        keywords_content=context_keywords
+                    )
+                )
+            init_p.add_part("context", context)
 
-        init_p.add_part("procedure_prompt", procedure_prompt)
+            procedure_prompt = await self.llm_generator.generate_content(
+                self.fill_procedure_prompt_creator_prompt(
+                        train_df=train_df,
+                        sample_size=sample_size,
+                        custom_prompt=custom_prompts.get('procedure') if custom_prompts else None,
+                        include_role=False,
+                        procedure_additions=procedure_additions
+                )
+            )
+            init_p.add_part("procedure_prompt", procedure_prompt)
 
         # Generate prompts for each test text
         prompts = []
@@ -171,26 +197,30 @@ class PromptEngineer:
             p = Prompt()
             p.fuse(copy.deepcopy(init_p))
             
-            # Add procedure
-                  
-            # Add train data components
-            train_data_intro_prompt = self.fill_train_data_intro_prompt(
+            # Add train data components based on mode
+            if is_zero_shot:
+                # Zero-shot: Omit training data intro (not needed)
+                # Add neutral placeholder for training data
+                train_data = "No training data are provided because the model is operating in zero-shot mode."
+                p.add_part("train_data_prompt", train_data)
+            else:
+                # Few-shot: Add training data intro and examples
+                train_data_intro_prompt = self.fill_train_data_intro_prompt(
+                        train_df=train_df,
+                        sample_size=sample_size,
+                        custom_prompt=custom_prompts.get('train_intro') if custom_prompts else None,
+                        include_role=False
+                )
+                p.add_part("train_data_intro_prompt", train_data_intro_prompt)
+
+                train_data = self.fill_train_data_prompt(
                     train_df=train_df,
-                    sample_size=sample_size,
-                    custom_prompt=custom_prompts.get('train_intro') if custom_prompts else None,
+                    custom_role_prompt=custom_prompts.get('train_data') if custom_prompts else None,
                     include_role=False
-            )
-
-            p.add_part("train_data_intro_prompt", train_data_intro_prompt)
-
-            train_data = self.fill_train_data_prompt(
-                train_df=train_df,  # Add train_df parameter
-                custom_role_prompt=custom_prompts.get('train_data') if custom_prompts else None,
-                include_role=False
-            )
-            p.add_part("train_data_prompt", train_data)
+                )
+                p.add_part("train_data_prompt", train_data)
             
-            # Add answer format
+            # Add answer format (same for both zero-shot and few-shot)
             answer_format = self.fill_answer_format_prompt(
                 row=row,
                 custom_prompt=custom_prompts.get('answer_format') if custom_prompts else None,
