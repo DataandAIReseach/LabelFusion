@@ -8,6 +8,7 @@ anyio==4.9.0
 asttokens==3.0.0
 asyncio-throttle==1.0.2
 attrs==25.3.0
+beautifulsoup4==4.12.3
 black==25.1.0
 cachetools==5.5.2
 certifi==2025.8.3
@@ -59,6 +60,7 @@ joblib==1.5.1
 jupyter_client==8.6.3
 jupyter_core==5.8.1
 kiwisolver==1.4.9
+lxml==5.1.0
 MarkupSafe==3.0.2
 matplotlib==3.10.6
 matplotlib-inline==0.1.7

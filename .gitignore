@@ -16,6 +16,7 @@ models/
 # Data directories (keep structure but ignore large files)
 /docu/
 /data/
+/literature/
 
 # Environment variables
 .env
