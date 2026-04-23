@@ -15,7 +15,8 @@ import datetime
 from ..core.base import AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType
 from ..core.exceptions import PredictionError, ValidationError, APIError
-from ..prompt_engineer.base import PromptEngineer
+from ..prompt_pipeline.prompt_engineer import PromptEngineer
+from ..prompt_pipeline.default import DefaultPromptPipeline
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
 from ..utils.results_manager import ResultsManager, ModelResultsManager
@@ -98,17 +99,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             self.logger.info(f"Multi-label: {self.multi_label}")
             self.logger.info(f"Few-shot mode: {self.few_shot_mode}")
         
-        # Initialize prompt engineer with configuration
-        self.prompt_engineer = PromptEngineer(
-            text_column=self.text_column,
-            label_columns=self.label_columns,
-            multi_label=self.multi_label,
-            few_shot_mode=self.few_shot_mode,
-            model_name=self.config.parameters["model"],  # Pass model from config.parameters
-            provider=self.provider  # Pass provider for correct instance handling
-        )
-        
-        # Initialize LLM generator
+        # Initialize LLM generator first (needed by DefaultPromptPipeline)
         key_manager = APIKeyManager()
         
         # Get appropriate API key based on provider
@@ -129,6 +120,23 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             provider=self.provider,
             model_name=self.config.parameters["model"],
             api_key=api_key
+        )
+
+        # Initialize prompt pipeline — detects language at runtime and translates warehouse if needed
+        self._prompt_pipeline = DefaultPromptPipeline(generator=self.llm_generator)
+
+        # Initialize prompt engineer with the default English warehouse
+        # To get a translated warehouse at prediction time, call:
+        #   warehouse = self._prompt_pipeline.get_warehouse(text)
+        #   self.prompt_engineer.warehouse = warehouse
+        self.prompt_engineer = PromptEngineer(
+            text_column=self.text_column,
+            label_columns=self.label_columns,
+            multi_label=self.multi_label,
+            warehouse=self._prompt_pipeline._warehouse,
+            few_shot_mode=self.few_shot_mode,
+            model_name=self.config.parameters["model"],
+            provider=self.provider
         )
         
         if self.verbose:
