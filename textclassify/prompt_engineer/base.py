@@ -93,7 +93,7 @@ class PromptEngineer:
         """Engineer prompts for test data using training examples.
         
         Args:    OpenAI alternative (commented out)
-    classifier = OpenAIClassifier(
+        classifier = OpenAIClassifier(
         config=config,
         text_column='text',
         label_columns=label_columns  # Use the dummy column names as labels
