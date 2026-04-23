@@ -1,16 +1,17 @@
 import random
+import logging
 import pandas as pd
 from typing import List, Optional, Dict, Any
 from .prompt_warehouse import PromptWarehouse
 from .prompt_collection import PromptCollection
 from .base import PromptPipeline
+from .nearest_neighbour_sampler import NearestNeighbourSampler
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
 from .prompt import Prompt
 import copy
-import logging
-from tqdm import tqdm
-import time
+
+logger = logging.getLogger(__name__)
 
 
 class PromptEngineer:
@@ -24,7 +25,8 @@ class PromptEngineer:
         pipeline: PromptPipeline,
         few_shot_mode="few_shot",
         provider: str = "openai",
-        model_name: str = "gpt-4"
+        model_name: str = "gpt-4",
+        sampler: Optional[NearestNeighbourSampler] = None,
     ):
         """Initialize PromptEngineer.
 
@@ -36,11 +38,16 @@ class PromptEngineer:
             few_shot_mode: Mode for few-shot learning (default: "few_shot") - can be string or int
             provider: LLM provider name (default: "openai")
             model_name: Name of the model to use
+            sampler: Optional NearestNeighbourSampler — if provided, uses semantic similarity
+                     for few-shot example selection instead of random sampling.
+                     fit() will be called once in engineer_prompts() before the test loop.
         """
         self.text_column = text_column
         self.label_columns = label_columns
         self.multi_label = multi_label
         self._pipeline = pipeline
+        self._sampler = sampler  # injected — PromptEngineer does not create this
+
         # Default to English warehouse at init time
         # Will be updated at engineer_prompts() time based on actual train_df language
         self.warehouse = pipeline._warehouse
@@ -71,15 +78,10 @@ class PromptEngineer:
         )
 
         self.role_prompt = None
-        self.data: Optional[pd.DataFrame] = None
+        self.data = None
 
     def set_few_shot_mode(self, mode):
-        """Set the few-shot mode for training examples.
-
-        Args:
-            mode: Can be a string ("zero_shot", "one_shot", "few_shot", "full_coverage")
-                  or an integer specifying exact number of examples
-        """
+        """Set the few-shot mode for training examples."""
         if isinstance(mode, str):
             assert mode in ("zero_shot", "one_shot", "few_shot", "full_coverage")
             self.few_shot_mode = mode
@@ -108,7 +110,7 @@ class PromptEngineer:
             custom_prompts: Optional dict of custom prompts
             custom_role_prompt: Optional custom role prompt
             custom_context: Optional pre-existing context to use instead of generating one
-            procedure_additions: Optional additional content for procedure prompt (e.g., theory, background)
+            procedure_additions: Optional additional content for procedure prompt
 
         Returns:
             List[Prompt]: List of engineered prompts for each test text
@@ -116,10 +118,18 @@ class PromptEngineer:
         if not isinstance(test_df, pd.DataFrame) or not isinstance(train_df, pd.DataFrame):
             raise ValueError("test_df and train_df must be pandas DataFrames")
 
-        # Detect language from train_df and swap warehouse if needed.
-        # We sample from train_df here because that's where the example prompts come from.
+        # 1. Detect language from train_df and swap warehouse if needed
         first_text = train_df[self.text_column].iloc[0]
         self.warehouse = self._pipeline.get_warehouse(first_text)
+
+        # 2. Fit sampler once on full train_df — ownership of fit() lifecycle is here
+        if self._sampler is not None:
+            self._sampler.fit(train_df, self.text_column)
+            logger.info(f"NearestNeighbourSampler fitted on {len(train_df)} training samples")
+
+        # 3. Sample once for shared prompt parts (role, context, procedure)
+        #    These are the same for all test rows so we sample once here
+        sampled_df = train_df.sample(n=min(sample_size, len(train_df)), random_state=42)
 
         # Initialize base prompt with shared components
         init_p = Prompt()
@@ -127,8 +137,7 @@ class PromptEngineer:
         # Generate role prompt
         role_prompt_str = await self.llm_generator.generate_content(
             self.fill_role_prompt_creator_prompt(
-                train_df=train_df,
-                sample_size=sample_size,
+                train_df=sampled_df,
                 custom_prompt=custom_prompts.get('role') if custom_prompts else None,
                 custom_role_prompt=custom_role_prompt,
                 include_role=False
@@ -139,8 +148,7 @@ class PromptEngineer:
         # Generate context keywords
         context_keywords = await self.llm_generator.generate_content(
             self.generate_context_keywords(
-                train_df=train_df,
-                sample_size=sample_size,
+                train_df=sampled_df,
                 custom_prompt=custom_prompts.get('keywords') if custom_prompts else None,
                 include_role=True
             )
@@ -152,8 +160,7 @@ class PromptEngineer:
         else:
             context = await self.llm_generator.generate_content(
                 self.fill_context_prompt(
-                    train_df=train_df,
-                    sample_size=sample_size,
+                    train_df=sampled_df,
                     custom_prompt=custom_prompts.get('context') if custom_prompts else None,
                     include_role=False,
                     keywords_content=context_keywords
@@ -163,8 +170,7 @@ class PromptEngineer:
 
         procedure_prompt = await self.llm_generator.generate_content(
             self.fill_procedure_prompt_creator_prompt(
-                train_df=train_df,
-                sample_size=sample_size,
+                train_df=sampled_df,
                 custom_prompt=custom_prompts.get('procedure') if custom_prompts else None,
                 include_role=False,
                 procedure_additions=procedure_additions
@@ -172,22 +178,25 @@ class PromptEngineer:
         )
         init_p.add_part("procedure_prompt", procedure_prompt)
 
-        # Generate prompts for each test text
+        train_data_intro = self.fill_train_data_intro_prompt(
+            train_df=sampled_df,
+            custom_prompt=custom_prompts.get('train_intro') if custom_prompts else None,
+            include_role=False
+        )
+
+        # 4. Generate prompts for each test text
+        #    fill_train_data_prompt is called per row — sampler.sample() happens here
         prompts = []
         for _, row in test_df.iterrows():
             p = Prompt()
             p.fuse(copy.deepcopy(init_p))
 
-            train_data_intro_prompt = self.fill_train_data_intro_prompt(
-                train_df=train_df,
-                sample_size=sample_size,
-                custom_prompt=custom_prompts.get('train_intro') if custom_prompts else None,
-                include_role=False
-            )
-            p.add_part("train_data_intro_prompt", train_data_intro_prompt)
+            p.add_part("train_data_intro_prompt", train_data_intro)
 
+            # fill_train_data_prompt queries the sampler per test row
             train_data = self.fill_train_data_prompt(
                 train_df=train_df,
+                query_text=row[self.text_column],
                 custom_role_prompt=custom_prompts.get('train_data') if custom_prompts else None,
                 include_role=False
             )
@@ -216,20 +225,13 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("Data must be set before generating context keywords")
 
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)), random_state=42)
+        examples = "\n\n".join(
+            f"Text {idx + 1}: {row[self.text_column]}\n"
+            f"Labels: {', '.join(f'{col}: {row[col]}' for col in self.label_columns)}"
+            for idx, (_, row) in enumerate(train_df.iterrows())
+        )
 
-        formatted_data = []
-        for idx, row in sampled_data.iterrows():
-            text = row[self.text_column]
-            labels = [f"{col}: {row[col]}" for col in self.label_columns]
-            formatted_data.append(
-                f"Text {idx + 1}: {text}\n"
-                f"Labels: {', '.join(labels)}"
-            )
-
-        examples = "\n\n".join(formatted_data)
         prompts = []
-
         if include_role:
             role_prompt = custom_role_prompt or self.warehouse.context_brainstorm_role_prompt.format(
                 labels=", ".join(self.label_columns)
@@ -265,28 +267,27 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("No data available for role prompt creation")
 
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
-        examples = []
-        for _, row in sampled_data.iterrows():
-            text = row[self.text_column]
-            labels = {col: row[col] for col in self.label_columns}
-            examples.append({'text': text, 'labels': labels})
+        examples = [
+            {'text': row[self.text_column], 'labels': {col: row[col] for col in self.label_columns}}
+            for _, row in train_df.iterrows()
+        ]
 
         prompt_template = custom_prompt or self.warehouse.role_prompt_creator_prompt
 
-        formatted_examples = "\n".join([
+        formatted_examples = "\n".join(
             f"Text: {ex['text']}\nLabels: {' | '.join(str(ex['labels'][col]) for col in self.label_columns)}"
             for ex in examples
-        ])
+        )
 
         multilabel_info = ""
         if include_multilabel_info:
             classification_type = "multi-label" if self.multi_label else "single-label"
             multilabel_info = f"\n\nClassification Type: This is a {classification_type} classification task."
-            if self.multi_label:
-                multilabel_info += " Multiple labels can be assigned to each text."
-            else:
-                multilabel_info += " Only one label should be assigned to each text."
+            multilabel_info += (
+                " Multiple labels can be assigned to each text."
+                if self.multi_label else
+                " Only one label should be assigned to each text."
+            )
 
         try:
             if include_multilabel_info and "{multilabel_info}" in prompt_template:
@@ -305,8 +306,7 @@ class PromptEngineer:
             return f"{custom_role_prompt}\n\n{prompt_text}"
         elif include_role and self.role_prompt:
             return f"{self.role_prompt}\n\n{prompt_text}"
-        else:
-            return prompt_text
+        return prompt_text
 
     def fill_context_prompt(
         self,
@@ -321,17 +321,10 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("No data available for context brainstorming")
 
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
-        examples = []
-        for _, row in sampled_data.iterrows():
-            text = row[self.text_column]
-            labels = {col: row[col] for col in self.label_columns}
-            examples.append({'text': text, 'labels': labels})
-
-        formatted_examples = "\n".join([
-            f"Text: {ex['text']}\nLabels: {' | '.join(str(ex['labels'][col]) for col in self.label_columns)}"
-            for ex in examples
-        ])
+        formatted_examples = "\n".join(
+            f"Text: {row[self.text_column]}\nLabels: {' | '.join(str(row[col]) for col in self.label_columns)}"
+            for _, row in train_df.iterrows()
+        )
 
         if custom_prompt and keywords_content:
             prompt_template = custom_prompt.format(keywords=keywords_content)
@@ -348,8 +341,7 @@ class PromptEngineer:
             return f"{custom_role_prompt}\n\n{prompt_text}"
         elif include_role and self.role_prompt:
             return f"{self.role_prompt}\n\n{prompt_text}"
-        else:
-            return prompt_text
+        return prompt_text
 
     def fill_procedure_prompt_creator_prompt(
         self,
@@ -365,17 +357,10 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("No data available for procedure prompt creation")
 
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
-        examples = []
-        for _, row in sampled_data.iterrows():
-            text = row[self.text_column]
-            labels = {col: row[col] for col in self.label_columns}
-            examples.append({'text': text, 'labels': labels})
-
-        formatted_examples = "\n".join([
-            f"Text: {ex['text']}\nLabels: {' | '.join(str(ex['labels'][col]) for col in self.label_columns)}"
-            for ex in examples
-        ])
+        formatted_examples = "\n".join(
+            f"Text: {row[self.text_column]}\nLabels: {' | '.join(str(row[col]) for col in self.label_columns)}"
+            for _, row in train_df.iterrows()
+        )
 
         if custom_prompt:
             prompt_template = custom_prompt
@@ -393,14 +378,16 @@ class PromptEngineer:
             raise ValueError(f"Prompt template contains unknown placeholder: {e}")
 
         if procedure_additions:
-            prompt_text = f"{prompt_text}\n\nAdditional Context/Theory:\n{procedure_additions}\n\nIncorporate this additional information into your procedure prompt where appropriate."
+            prompt_text = (
+                f"{prompt_text}\n\nAdditional Context/Theory:\n{procedure_additions}\n\n"
+                f"Incorporate this additional information into your procedure prompt where appropriate."
+            )
 
         if include_role and custom_role_prompt:
             return f"{custom_role_prompt}\n\n{prompt_text}"
         elif include_role and self.role_prompt:
             return f"{self.role_prompt}\n\n{prompt_text}"
-        else:
-            return prompt_text
+        return prompt_text
 
     def fill_train_data_intro_prompt(
         self,
@@ -415,15 +402,10 @@ class PromptEngineer:
         if train_df is None:
             raise ValueError("No data available for training data intro")
 
-        sampled_data = train_df.sample(n=min(sample_size, len(train_df)))
-
-        formatted_examples = []
-        for idx, row in sampled_data.iterrows():
-            text = row[self.text_column]
-            label_values = '|'.join(str(row[col]) for col in self.label_columns)
-            formatted_examples.append(f"Text {idx + 1}:\n{text}\n{label_values}")
-
-        examples_text = "\n\n".join(formatted_examples)
+        formatted_examples = "\n\n".join(
+            f"Text {idx + 1}:\n{row[self.text_column]}\n{'|'.join(str(row[col]) for col in self.label_columns)}"
+            for idx, (_, row) in enumerate(train_df.iterrows())
+        )
 
         if custom_prompt and procedure_content:
             prompt_template = custom_prompt.format(procedure=procedure_content)
@@ -432,7 +414,7 @@ class PromptEngineer:
 
         try:
             prompt_text = prompt_template.format(
-                examples=examples_text,
+                examples=formatted_examples,
                 labels=", ".join(self.label_columns)
             )
         except KeyError as e:
@@ -442,13 +424,11 @@ class PromptEngineer:
             return f"{custom_role_prompt}\n\n{prompt_text}"
         elif include_role and self.role_prompt:
             return f"{self.role_prompt}\n\n{prompt_text}"
-        else:
-            return prompt_text
+        return prompt_text
 
     def _create_output_format(self, multi_label: bool) -> str:
         """Create binary vector format based on classification type."""
         num_labels = len(self.label_columns)
-
         if multi_label:
             idx = random.randint(0, num_labels - 1)
             return ' | '.join('1' if i == idx else '0' for i in range(num_labels))
@@ -474,31 +454,38 @@ class PromptEngineer:
             else self.warehouse.answer_format_prompt_single
         )
 
-        output_format = self._create_output_format(self.multi_label)
-
         prompt_text = prompt_template.format(
             paragraph=row[self.text_column],
-            output_format=output_format,
+            output_format=self._create_output_format(self.multi_label),
             labels=' | '.join(self.label_columns)
         )
 
         if not include_role:
             return prompt_text
-
         if custom_role_prompt:
             return f"{custom_role_prompt}\n\n{prompt_text}"
         elif self.role_prompt:
             return f"{self.role_prompt}\n\n{prompt_text}"
-
         return prompt_text
 
     def fill_train_data_prompt(
         self,
         train_df: pd.DataFrame,
+        query_text: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
         include_role: bool = True
     ) -> str:
-        """Generate a training data prompt directly from train_df."""
+        """Generate a training data prompt.
+
+        If a NearestNeighbourSampler is injected and query_text is provided,
+        selects semantically similar examples. Otherwise falls back to random sampling.
+
+        Args:
+            train_df: Full training DataFrame (used for random fallback)
+            query_text: The test text to find nearest neighbours for
+            custom_role_prompt: Optional custom role prompt
+            include_role: Whether to include the role prompt
+        """
         if train_df is None or train_df.empty:
             raise ValueError("No data available for training data")
 
@@ -515,15 +502,17 @@ class PromptEngineer:
         if num_examples == 0:
             return ""
 
-        sampled_data = train_df.sample(n=min(num_examples, len(train_df)))
+        # Query sampler if available — fit() was already called in engineer_prompts()
+        if self._sampler is not None and query_text is not None:
+            sampled_data = self._sampler.sample(query_text=query_text, k=num_examples)
+        else:
+            sampled_data = train_df.sample(n=min(num_examples, len(train_df)))
 
         prompt_lines = ["Training Data Examples:"]
         for idx, row in sampled_data.iterrows():
-            text = row[self.text_column]
-            label_values = ' | '.join(str(row[col]) for col in self.label_columns)
             prompt_lines.append(f"Example {idx + 1}:")
-            prompt_lines.append(f"Text: {text}")
-            prompt_lines.append(f"Ratings: {label_values}")
+            prompt_lines.append(f"Text: {row[self.text_column]}")
+            prompt_lines.append(f"Ratings: {' | '.join(str(row[col]) for col in self.label_columns)}")
             prompt_lines.append("")
 
         prompt_text = "\n".join(prompt_lines).strip()
@@ -532,22 +521,20 @@ class PromptEngineer:
             return f"{custom_role_prompt}\n\n{prompt_text}"
         elif include_role and self.role_prompt:
             return f"{self.role_prompt}\n\n{prompt_text}"
-        else:
-            return prompt_text
+        return prompt_text
 
     def build_prompt(self, text: str) -> str:
         """Build a simple classification prompt for a single text."""
         labels_str = ", ".join(self.label_columns)
-
         if self.multi_label:
             return (
                 f"Classify the following text into one or more of these categories: {labels_str}\n\n"
                 f"Text: {text}\n\n"
-                f"Please respond with the relevant category names separated by commas, or \"none\" if no categories apply."
+                f"Please respond with the relevant category names separated by commas, "
+                f"or \"none\" if no categories apply."
             )
-        else:
-            return (
-                f"Classify the following text into one of these categories: {labels_str}\n\n"
-                f"Text: {text}\n\n"
-                f"Please respond with only the most relevant category name."
-            )
+        return (
+            f"Classify the following text into one of these categories: {labels_str}\n\n"
+            f"Text: {text}\n\n"
+            f"Please respond with only the most relevant category name."
+        )

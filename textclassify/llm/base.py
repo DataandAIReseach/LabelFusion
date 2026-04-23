@@ -17,6 +17,7 @@ from ..core.types import ClassificationResult, ClassificationType, ModelType
 from ..core.exceptions import PredictionError, ValidationError, APIError
 from ..prompt_pipeline.prompt_engineer import PromptEngineer
 from ..prompt_pipeline.default import DefaultPromptPipeline
+from ..prompt_pipeline.nearest_neighbour_sampler import NearestNeighbourSampler
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
 from ..utils.results_manager import ResultsManager, ModelResultsManager
@@ -40,7 +41,9 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         auto_save_results: bool = True,
         # Cache management parameters
         auto_use_cache: bool = True,
-        cache_dir: str = "cache"
+        cache_dir: str = "cache",
+        use_nearest_neighbours: bool = False,
+        embedding_model: str = "all-MiniLM-L6-v2"
     ):
         """Initialize the LLM classifier.
         
@@ -125,7 +128,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Initialize prompt pipeline — detects language at runtime and translates warehouse if needed
         self._prompt_pipeline = DefaultPromptPipeline(generator=self.llm_generator)
 
-        # Initialize prompt engineer with the pipeline
+        # Create sampler if requested — injected into PromptEngineer
+        # fit() is called later inside engineer_prompts() once train_df is available
+        sampler = NearestNeighbourSampler(model_name=embedding_model) if use_nearest_neighbours else None
+
+        # Initialize prompt engineer with the pipeline and optional sampler
         # Language detection and warehouse translation happen inside engineer_prompts()
         # at runtime, based on the actual train_df text
         self.prompt_engineer = PromptEngineer(
@@ -135,7 +142,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             pipeline=self._prompt_pipeline,
             few_shot_mode=self.few_shot_mode,
             model_name=self.config.parameters["model"],
-            provider=self.provider
+            provider=self.provider,
+            sampler=sampler,
         )
         
         if self.verbose:
