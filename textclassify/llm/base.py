@@ -125,15 +125,14 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Initialize prompt pipeline — detects language at runtime and translates warehouse if needed
         self._prompt_pipeline = DefaultPromptPipeline(generator=self.llm_generator)
 
-        # Initialize prompt engineer with the default English warehouse
-        # To get a translated warehouse at prediction time, call:
-        #   warehouse = self._prompt_pipeline.get_warehouse(text)
-        #   self.prompt_engineer.warehouse = warehouse
+        # Initialize prompt engineer with the pipeline
+        # Language detection and warehouse translation happen inside engineer_prompts()
+        # at runtime, based on the actual train_df text
         self.prompt_engineer = PromptEngineer(
             text_column=self.text_column,
             label_columns=self.label_columns,
             multi_label=self.multi_label,
-            warehouse=self._prompt_pipeline._warehouse,
+            pipeline=self._prompt_pipeline,
             few_shot_mode=self.few_shot_mode,
             model_name=self.config.parameters["model"],
             provider=self.provider

@@ -3,6 +3,7 @@ import pandas as pd
 from typing import List, Optional, Dict, Any
 from .prompt_warehouse import PromptWarehouse
 from .prompt_collection import PromptCollection
+from .base import PromptPipeline
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
 from .prompt import Prompt
@@ -20,7 +21,7 @@ class PromptEngineer:
         text_column: str,
         label_columns: List[str],
         multi_label: bool,
-        warehouse: PromptWarehouse,
+        pipeline: PromptPipeline,
         few_shot_mode="few_shot",
         provider: str = "openai",
         model_name: str = "gpt-4"
@@ -31,7 +32,7 @@ class PromptEngineer:
             text_column: Name of the column containing text
             label_columns: Names of the columns containing labels
             multi_label: Whether this is a multi-label (True) or single-label (False) classification
-            warehouse: PromptWarehouse instance (possibly translated) — provided by PromptPipeline
+            pipeline: PromptPipeline instance — detects language and provides translated warehouse
             few_shot_mode: Mode for few-shot learning (default: "few_shot") - can be string or int
             provider: LLM provider name (default: "openai")
             model_name: Name of the model to use
@@ -39,7 +40,10 @@ class PromptEngineer:
         self.text_column = text_column
         self.label_columns = label_columns
         self.multi_label = multi_label
-        self.warehouse = warehouse
+        self._pipeline = pipeline
+        # Default to English warehouse at init time
+        # Will be updated at engineer_prompts() time based on actual train_df language
+        self.warehouse = pipeline._warehouse
 
         # Validate and set few_shot_mode
         if isinstance(few_shot_mode, str):
@@ -111,6 +115,11 @@ class PromptEngineer:
         """
         if not isinstance(test_df, pd.DataFrame) or not isinstance(train_df, pd.DataFrame):
             raise ValueError("test_df and train_df must be pandas DataFrames")
+
+        # Detect language from train_df and swap warehouse if needed.
+        # We sample from train_df here because that's where the example prompts come from.
+        first_text = train_df[self.text_column].iloc[0]
+        self.warehouse = self._pipeline.get_warehouse(first_text)
 
         # Initialize base prompt with shared components
         init_p = Prompt()

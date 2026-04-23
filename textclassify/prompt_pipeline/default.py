@@ -27,4 +27,3 @@ class DefaultPromptPipeline(PromptPipeline):
         if lang == 'english':
             return self._warehouse
         return self._translator.translate(self._warehouse, lang)
- 
