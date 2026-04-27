@@ -10,13 +10,13 @@ class PromptTranslator:
         self._generator = generator
         self._cache = {}
 
-    def translate(self, warehouse: PromptWarehouse, lang: str) -> PromptWarehouse:
+    async def translate(self, warehouse: PromptWarehouse, lang: str) -> PromptWarehouse:
         translated = PromptWarehouse()
         for attr, value in self._get_prompts(warehouse).items():
-            setattr(translated, attr, self._translate_prompt(value, lang))
+            setattr(translated, attr, await self._translate_prompt(value, lang))
         return translated
 
-    def _translate_prompt(self, text: str, lang: str) -> str:
+    async def _translate_prompt(self, text: str, lang: str) -> str:
         cache_key = f"{lang}:{hash(text)}"
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -31,7 +31,7 @@ IMPORTANT:
 Text to translate:
 {text}"""
 
-        result = asyncio.run(self._generator.generate_content(prompt))
+        result = await self._generator.generate_content(prompt)
         self._cache[cache_key] = result
         return result
 

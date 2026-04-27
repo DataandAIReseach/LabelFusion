@@ -332,7 +332,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             self._setup_prompt_configuration(context, label_definitions)
             
             if self.verbose:
-                self.logger.info("Prompt configuration completed")
+                self.logger.info("Prompt configuration completed" )
                 print("Prompt configuration ready")
             
             # Step 3: Prompt engineering

@@ -26,7 +26,11 @@ class OpenAIClassifier(BaseLLMClassifier):
         experiment_name: Optional[str] = None,
         auto_save_results: bool = True,
         # Cache management parameters
-        auto_use_cache: bool = True
+        auto_use_cache: bool = True,
+        # Nearest-neighbour sampling parameters
+        use_nearest_neighbours: bool = False,              # UK spelling
+        embedding_model: str = "all-MiniLM-L6-v2",
+        use_nearest_neighbors: Optional[bool] = None       # US alias
     ):
         """Initialize OpenAI classifier.
         
@@ -41,8 +45,15 @@ class OpenAIClassifier(BaseLLMClassifier):
             output_dir: Base directory for saving results (default: "outputs")
             experiment_name: Name for this experiment (default: auto-generated)
             auto_save_results: Whether to automatically save results (default: True)
-            auto_use_cache: Whether to automatically check and reuse cached predictions (default: False)
+            auto_use_cache: Whether to automatically check and reuse cached predictions (default: True)
+            use_nearest_neighbours: Enable nearest-neighbour few-shot sampling
+            embedding_model: Embedding model used by nearest-neighbour sampler
+            use_nearest_neighbors: US spelling alias for use_nearest_neighbours
         """
+        # Normalize US/UK spelling
+        if use_nearest_neighbors is not None:
+            use_nearest_neighbours = use_nearest_neighbors
+
         super().__init__(
             config=config,
             text_column=text_column,
@@ -55,7 +66,8 @@ class OpenAIClassifier(BaseLLMClassifier):
             auto_save_results=auto_save_results,
             auto_use_cache=auto_use_cache,
             cache_dir=cache_dir,
-            
+            use_nearest_neighbours=use_nearest_neighbours,
+            embedding_model=embedding_model,
         )
         
         # Handle legacy caching parameter

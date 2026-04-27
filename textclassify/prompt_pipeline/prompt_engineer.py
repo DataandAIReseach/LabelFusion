@@ -120,7 +120,7 @@ class PromptEngineer:
 
         # 1. Detect language from train_df and swap warehouse if needed
         first_text = train_df[self.text_column].iloc[0]
-        self.warehouse = self._pipeline.get_warehouse(first_text)
+        self.warehouse = await self._pipeline.get_warehouse(first_text)
 
         # 2. Fit sampler once on full train_df — ownership of fit() lifecycle is here
         if self._sampler is not None:
@@ -128,7 +128,6 @@ class PromptEngineer:
             logger.info(f"NearestNeighbourSampler fitted on {len(train_df)} training samples")
 
         # 3. Sample once for shared prompt parts (role, context, procedure)
-        #    These are the same for all test rows so we sample once here
         sampled_df = train_df.sample(n=min(sample_size, len(train_df)), random_state=42)
 
         # Initialize base prompt with shared components
@@ -185,7 +184,6 @@ class PromptEngineer:
         )
 
         # 4. Generate prompts for each test text
-        #    fill_train_data_prompt is called per row — sampler.sample() happens here
         prompts = []
         for _, row in test_df.iterrows():
             p = Prompt()
@@ -193,7 +191,6 @@ class PromptEngineer:
 
             p.add_part("train_data_intro_prompt", train_data_intro)
 
-            # fill_train_data_prompt queries the sampler per test row
             train_data = self.fill_train_data_prompt(
                 train_df=train_df,
                 query_text=row[self.text_column],
