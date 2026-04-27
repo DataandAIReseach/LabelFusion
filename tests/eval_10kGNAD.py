@@ -101,6 +101,7 @@ def create_llm_model(
         auto_save_results=True,
         output_dir=output_dir,
         experiment_name=experiment_name,
+        use_nearest_neighbours=True,  # For simplicity, we won't use nearest neighbors in this test
     )
 
 
@@ -187,10 +188,10 @@ if __name__ == "__main__":
     )
     output_dir = os.getenv("OUTPUT_DIR", "outputs/10kgnad_openai")
     cache_dir  = os.getenv("CACHE_DIR", "cache/10kgnad_openai")
-    model_name = os.getenv("MODEL_NAME", "gpt-5-nano")
+    model_name = os.getenv("MODEL_NAME", "gpt-5-mini")
 
     try:
-        few_shot = int(os.getenv("FEW_SHOT", "20"))
+        few_shot = int(os.getenv("FEW_SHOT", "5"))
     except Exception:
         few_shot = 20
 

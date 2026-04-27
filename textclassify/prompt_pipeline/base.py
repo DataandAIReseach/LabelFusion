@@ -6,7 +6,7 @@ class PromptPipeline(ABC):
     """Abstract base class for prompt pipelines."""
 
     @abstractmethod
-    def get_warehouse(self, text: str) -> PromptWarehouse:
+    async def get_warehouse(self, text: str) -> PromptWarehouse:
         """
         Return a ready-to-use PromptWarehouse for the given text.
 
