@@ -548,6 +548,22 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # few_shot_mode and multi_label are already set in constructor
         label_type = getattr(self.config, 'label_type', 'single')
         self.prompt_engineer.multi_label = (label_type == "multiple")
+
+    def _normalize_text_for_cache(self, text: Any) -> str:
+        """Normalize text before hashing so semantically identical text maps to one key."""
+        if text is None:
+            return ""
+        try:
+            if pd.isna(text):
+                return ""
+        except Exception:
+            pass
+        return re.sub(r"\s+", " ", str(text)).strip()
+
+    def _make_text_hash(self, text: Any) -> str:
+        """Create a stable content hash for cache lookups."""
+        normalized_text = self._normalize_text_for_cache(text)
+        return hashlib.sha256(normalized_text.encode("utf-8")).hexdigest()
     
     def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
         """Return True if a test cache file matching the given DataFrame exists, else False.
@@ -782,7 +798,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                                 prediction = pred_entry.get('prediction', [])
                                 response_text = pred_entry.get('response_text', '')
                                 prompt = pred_entry.get('prompt', '')
-                                
+
                                 # Use add_prediction_direct to avoid triggering auto-save
                                 self._prediction_cache.add_prediction_direct(
                                     text=text,
@@ -851,8 +867,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             # Add batch predictions
             for idx, (_, row) in enumerate(batch_df.iterrows()):
                 if idx < len(batch_predictions):
+                    text_value = row.get(text_column, '')
                     prediction_entry = {
-                        'text': row.get(text_column, ''),
+                        'text': text_value,
+                        'text_hash': self._make_text_hash(text_value),
                         'prediction': batch_predictions[idx],
                         'batch_num': batch_num
                     }
@@ -901,87 +919,131 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         """
         if self.verbose:
             self.logger.debug(f"Processing batch with {len(batch_df)} texts")
-        
+
         texts = batch_df[text_column].tolist()
-        
+
         # Check if prompts are already engineered
         if 'engineered_prompt' in batch_df.columns:
             prompts = batch_df['engineered_prompt'].tolist()
         else:
             prompts = [self.prompt_engineer.build_prompt(text) for text in texts]
-        
+
         if self.verbose:
-            self.logger.debug(f"Generated {len(prompts)} prompts for LLM calls")
+            self.logger.debug(f"Prepared {len(prompts)} prompts for LLM calls")
+
+        # Reuse cached predictions immediately and only call the LLM once per unique text.
+        predictions: List[Optional[List[int]]] = [None] * len(texts)
+        pending_by_hash: Dict[str, List[int]] = {}
+        pending_prompts: Dict[str, str] = {}
+        pending_meta: Dict[str, Dict[str, Any]] = {}
+
+        for idx, text in enumerate(texts):
+            text_hash = self._make_text_hash(text)
+
+            cached_prediction = None
+            if hasattr(self, '_prediction_cache') and self._prediction_cache:
+                try:
+                    if self._prediction_cache.has_prediction(text):
+                        cached = self._prediction_cache.get_prediction(text)
+                        if isinstance(cached, dict):
+                            cached_prediction = cached.get('prediction')
+                except Exception:
+                    cached_prediction = None
+
+            if isinstance(cached_prediction, list):
+                predictions[idx] = cached_prediction
+                continue
+
+            pending_by_hash.setdefault(text_hash, []).append(idx)
+            pending_prompts.setdefault(text_hash, prompts[idx] if idx < len(prompts) else self.prompt_engineer.build_prompt(text))
+
+            row_meta: Dict[str, Any] = {}
+            for id_key in ('id', 'ID', 'Id', 'index', 'row_id'):
+                if id_key in batch_df.columns:
+                    try:
+                        row_meta['id'] = batch_df.iloc[idx][id_key]
+                        break
+                    except Exception:
+                        pass
+            pending_meta.setdefault(text_hash, row_meta)
+
+        if not pending_by_hash:
+            return [p if p is not None else self._handle_error(ValueError("Missing prediction")) for p in predictions]
+
+        unique_hashes = list(pending_by_hash.keys())
+        unique_prompts = [pending_prompts[text_hash] for text_hash in unique_hashes]
 
         responses = await asyncio.gather(
-            *[self._call_llm(prompt) for prompt in prompts],
+            *[self._call_llm(prompt) for prompt in unique_prompts],
             return_exceptions=True
         )
-        
+
         successful_responses = sum(1 for r in responses if not isinstance(r, Exception))
         failed_responses = len(responses) - successful_responses
-        
+
         if self.verbose and failed_responses > 0:
             self.logger.warning(f"WARNING: {failed_responses} out of {len(responses)} LLM calls failed")
-        
-        # Parse responses and retry if needed for multi-label with wrong length
-        predictions = []
+
         max_retries = 3
-        
-        for i, r in enumerate(responses):
-            if isinstance(r, Exception):
-                predictions.append(self._handle_error(r))
+        unique_predictions: Dict[str, List[int]] = {}
+
+        for i, text_hash in enumerate(unique_hashes):
+            response = responses[i]
+
+            if isinstance(response, Exception):
+                unique_predictions[text_hash] = self._handle_error(response)
                 continue
-            
-            # Try parsing with retries for multi-label binary format issues
+
             prediction = None
             for attempt in range(max_retries):
-                prediction = self._parse_prediction_response(r)
-                
-                # Check if we got the right number of labels (only for multi-label)
+                prediction = self._parse_prediction_response(response)
+
                 if self.multi_label and len(prediction) == len(self.classes_):
-                    break  # Success!
-                elif not self.multi_label:
-                    break  # For single-label, we don't need to retry
+                    break
+                if not self.multi_label:
+                    break
+
+                if attempt < max_retries - 1:
+                    if self.verbose:
+                        self.logger.warning(
+                            f"Retry {attempt + 1}/{max_retries}: Wrong label count ({len(prediction)} != {len(self.classes_)}), retrying LLM call..."
+                        )
+                    response = await self._call_llm(unique_prompts[i])
+                    if isinstance(response, Exception):
+                        prediction = self._handle_error(response)
+                        break
                 else:
-                    # Wrong number of labels in multi-label - retry
-                    if attempt < max_retries - 1:
-                        if self.verbose:
-                            self.logger.warning(f"Retry {attempt + 1}/{max_retries}: Wrong label count ({len(prediction)} != {len(self.classes_)}), retrying LLM call...")
-                        # Call LLM again
-                        r = await self._call_llm(prompts[i])
-                        if isinstance(r, Exception):
-                            prediction = self._handle_error(r)
-                            break
-                    else:
-                        if self.verbose:
-                            self.logger.warning(f"After {max_retries} retries, still wrong label count. Using best-effort prediction.")
-            
-            predictions.append(prediction)
+                    if self.verbose:
+                        self.logger.warning("After %d retries, still wrong label count. Using best-effort prediction.", max_retries)
+
+            unique_predictions[text_hash] = prediction if prediction is not None else self._handle_error(ValueError("Could not parse prediction"))
+
+        # Expand unique predictions back to the batch order.
+        for text_hash, row_indices in pending_by_hash.items():
+            pred = unique_predictions.get(text_hash)
+            if pred is None:
+                pred = self._handle_error(ValueError("Missing prediction"))
+            for idx in row_indices:
+                predictions[idx] = pred
 
         # If incremental cache is enabled, store the raw responses + parsed predictions
         try:
             if hasattr(self, '_prediction_cache') and self._prediction_cache:
-                for idx, pred in enumerate(predictions):
-                    # Determine success and response text
-                    resp = responses[idx]
+                for text_hash, row_indices in pending_by_hash.items():
+                    pred = unique_predictions.get(text_hash)
+                    if pred is None:
+                        continue
+
+                    idx = row_indices[0]
+                    resp = responses[unique_hashes.index(text_hash)]
                     success = not isinstance(resp, Exception)
                     response_text = resp if success else ''
-                    prompt = prompts[idx] if idx < len(prompts) else ''
-                    text_val = batch_df.iloc[idx].get(self.text_column, '')
-
-                    # Attempt to lift an identifier from the DataFrame row if present
-                    meta = {}
-                    for id_key in ('id', 'ID', 'Id', 'index', 'row_id'):
-                        if id_key in batch_df.columns:
-                            try:
-                                meta['id'] = batch_df.iloc[idx][id_key]
-                                break
-                            except Exception:
-                                pass
+                    prompt = pending_prompts.get(text_hash, '')
+                    text_val = texts[idx]
+                    meta = dict(pending_meta.get(text_hash, {}))
+                    meta['text_hash'] = text_hash
 
                     try:
-                        # store_prediction expects binary vector as prediction
                         self._prediction_cache.store_prediction(
                             text_val,
                             pred,
@@ -992,15 +1054,13 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                             metadata=meta or None
                         )
                     except Exception:
-                        # non-fatal: continue without failing the batch
                         if self.verbose:
                             self.logger.debug("Could not store prediction to cache for a sample")
         except Exception:
-            # If anything goes wrong with caching, do not fail predictions
             if self.verbose:
                 self.logger.debug("Prediction caching encountered an error; continuing without persisting this batch")
 
-        return predictions
+        return [p if p is not None else self._handle_error(ValueError("Missing prediction")) for p in predictions]
 
     def _parse_prediction_response(self, response: str) -> List[int]:
         """Parse the LLM response for predictions.
