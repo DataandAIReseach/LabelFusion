@@ -1,18 +1,19 @@
-"""10kGNAD OpenAIClassifier runner.
+"""10kGNAD Fusion Runner.
 
-Loads train.csv + test.csv from 10kGNAD, predicts labels for test texts,
-and writes predictions to OUTPUT_DIR.
+Loads train.csv + test.csv from 10kGNAD, trains a FusionEnsemble 
+with RoBERTa transformer and OpenAI LLM models, and evaluates predictions.
 
 Environment variables:
   - DATA_DIR: 10kGNAD folder (default: Dataset_Descriptives/data/10kGNAD)
-  - OUTPUT_DIR: output folder (default: outputs/10kgnad_openai)
-  - FEW_SHOT: number of few-shot examples (default: 20)
-  - MODEL_NAME: OpenAI model name (default: gpt-5-nano)
-  - CACHE_DIR: cache folder for LLM calls (default: cache/10kgnad_openai)
+  - OUTPUT_DIR: output folder (default: outputs/10kgnad_fusion)
+  - FEW_SHOT: number of few-shot examples for LLM (default: 5)
+  - MODEL_NAME: OpenAI model name (default: gpt-5-mini)
+  - CACHE_DIR: cache folder for LLM calls (default: cache/10kgnad_fusion)
 """
 
 import os
 import sys
+import glob
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
@@ -21,8 +22,10 @@ import pandas as pd
 project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
+from textclassify.ensemble.fusion import FusionEnsemble
 from textclassify.llm.openai_classifier import OpenAIClassifier
-from textclassify.core.types import ModelConfig, ModelType
+from textclassify.ml.roberta_classifier import RoBERTaClassifier
+from textclassify.core.types import ModelConfig, EnsembleConfig, ModelType
 
 
 def load_datasets(data_dir: str):
@@ -105,6 +108,70 @@ def create_llm_model(
     )
 
 
+def create_ml_model(
+    label_columns: list,
+    output_dir: str,
+    experiment_name: str,
+    auto_save_path: str = None,
+):
+    ml_config = ModelConfig(
+        model_name='benjamin/roberta-base-wechsel-german',
+        model_type=ModelType.TRADITIONAL_ML,
+        parameters={
+            'model_name': 'benjamin/roberta-base-wechsel-german',
+            'max_length': 256,
+            'learning_rate': 2e-5,
+            'num_epochs': 2,
+            'batch_size': 32
+        }
+    )
+    return RoBERTaClassifier(
+        config=ml_config,
+        text_column='text',
+        label_columns=label_columns,
+        multi_label=False,
+        auto_save_path=auto_save_path,
+        auto_save_results=True,
+        output_dir=output_dir,
+        experiment_name=f"{experiment_name}_german_roberta"
+    )
+
+
+def create_fusion_ensemble(
+    ml_model,
+    llm_model,
+    output_dir: str,
+    experiment_name: str,
+    cache_dir: str = 'cache',
+):
+    fusion_config = EnsembleConfig(
+        ensemble_method='fusion',
+        models=[ml_model, llm_model],
+        parameters={
+            'fusion_hidden_dims': [64, 32],
+            'ml_lr': 1e-5,
+            'fusion_lr': 5e-4,
+            'num_epochs': 10,
+            'batch_size': 8,
+            'classification_type': 'multi_class',
+            'output_dir': output_dir,
+            'experiment_name': experiment_name,
+            'val_llm_cache_path': os.path.join(cache_dir, 'val'),
+            'test_llm_cache_path': os.path.join(cache_dir, 'test')
+        }
+    )
+    fusion = FusionEnsemble(
+        fusion_config,
+        output_dir=output_dir,
+        experiment_name=experiment_name,
+        auto_save_results=True,
+        save_intermediate_llm_predictions=False
+    )
+    fusion.add_ml_model(ml_model)
+    fusion.add_llm_model(llm_model)
+    return fusion
+
+
 def _extract_pred_series(result):
     # Works with common result container styles.
     if hasattr(result, "predictions"):
@@ -145,7 +212,27 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
     )
     print(f"Classes detected: {label_columns}")
 
-    experiment_name = f"10kgnad_openai_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    experiment_name = f"10kgnad_fusion_german_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    # Try to discover a cached RoBERTa model in the `cache/` folder.
+    # Looks for files starting with `10kgnad_fusion_german_roberta_model_...` and loads the newest one if available.
+    cache_base_pattern = os.path.join('cache', '10kgnad_fusion_german_roberta_model_*')
+    cached_files = sorted(glob.glob(cache_base_pattern), key=os.path.getctime, reverse=True)
+    ml_model = None
+    if cached_files:
+        latest_cache = cached_files[0]
+        print(f"Found candidate cached ML model: {latest_cache} -> attempting to load")
+        # Create model instance (no auto_save_path required to load)
+        ml_model = create_ml_model(label_columns, output_dir, experiment_name, auto_save_path=None)
+        try:
+            ml_model.load_model(latest_cache)
+            print(f"✅ Loaded RoBERTa model from cache: {latest_cache}")
+        except Exception as e:
+            print(f"⚠️ Failed to load cached RoBERTa model ({latest_cache}): {e}")
+            print("Will train a new RoBERTa model instead.")
+            ml_model = create_ml_model(label_columns, output_dir, experiment_name, auto_save_path=None)
+    else:
+        ml_model = create_ml_model(label_columns, output_dir, experiment_name, auto_save_path=None)
 
     llm_model = create_llm_model(
         label_columns=label_columns,
@@ -156,10 +243,16 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
         model_name=model_name,
     )
 
-    print(f"Train size: {len(df_train_enc)} | Test size: {len(df_test_enc)}")
-    print("Predicting test labels with OpenAIClassifier...")
+    fusion = create_fusion_ensemble(ml_model, llm_model, output_dir, experiment_name, cache_dir)
 
-    result = llm_model.predict(train_df=df_train_enc, test_df=df_test_enc)
+    print(f"Train size: {len(df_train_enc)} | Test size: {len(df_test_enc)}")
+    print("Training FusionEnsemble with RoBERTa transformer and OpenAI LLM...")
+
+    # For 10kGNAD, we use the encoded training data for fusion training
+    fusion.fit(df_train_enc, df_test_enc)
+
+    print("Predicting test labels with FusionEnsemble...")
+    result = fusion.predict(df_test_enc, train_df=df_train_enc)
     pred_series = _extract_pred_series(result)
 
     if len(pred_series) != len(df_test):
@@ -172,13 +265,13 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
     out_df = df_test.copy()
     out_df["pred_label"] = pred_series.values
 
-    out_file = os.path.join(output_dir, f"{experiment_name}_predictions.csv")
+    out_file = os.path.join(output_dir, f"{experiment_name}_fusion_predictions.csv")
     out_df.to_csv(out_file, index=False)
-    print(f"Saved predictions: {out_file}")
+    print(f"Saved fusion predictions: {out_file}")
 
     if "label" in out_df.columns and out_df["label"].notna().any():
         acc = (out_df["label"].astype(str) == out_df["pred_label"].astype(str)).mean()
-        print(f"Test accuracy: {acc:.4f}")
+        print(f"Test accuracy (fusion): {acc:.4f}")
 
 
 if __name__ == "__main__":
@@ -186,8 +279,8 @@ if __name__ == "__main__":
         "DATA_DIR",
         "/home/michaelschlee/ownCloud/GIT/LabelFusion/Dataset_Descriptives/data/10kGNAD",
     )
-    output_dir = os.getenv("OUTPUT_DIR", "outputs/10kgnad_openai")
-    cache_dir  = os.getenv("CACHE_DIR", "cache/10kgnad_openai")
+    output_dir = os.getenv("OUTPUT_DIR", "outputs/10kgnad_fusion")
+    cache_dir  = os.getenv("CACHE_DIR", "cache/10kgnad_fusion")
     model_name = os.getenv("MODEL_NAME", "gpt-5-mini")
 
     try:
