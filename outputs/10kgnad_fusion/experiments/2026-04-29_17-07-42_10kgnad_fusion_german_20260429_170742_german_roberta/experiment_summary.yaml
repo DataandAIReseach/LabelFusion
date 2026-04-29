@@ -1,0 +1,110 @@
+created_at: '2026-04-29T17:15:17.226455'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq010
+    platform: Linux-4.18.0-553.109.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2026-04-29_17-07-42_10kgnad_fusion_german_20260429_170742_german_roberta
+  git_commit: 3daad5063656e0cbc0cc45ce751ce584f8fa1599
+  model_name: ''
+  model_type: ''
+  timestamp: '2026-04-29T17:07:42.722483'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/roberta_classifier_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/validation_predictions_bffedf8d5e7e.csv
+  - predictions/validation_predictions_bffedf8d5e7e.json
+test_results: null
+training_results:
+  classes:
+  - Etat
+  - Inland
+  - International
+  - Kultur
+  - Panorama
+  - Sport
+  - Web
+  - Wirtschaft
+  - Wissenschaft
+  device: cuda
+  model_name: benjamin/roberta-base-wechsel-german
+  num_labels: 9
+  training_samples: 9245
+  validation_predictions:
+    metrics:
+      accuracy: 0.8939688715953308
+      classification_report:
+        Etat:
+          f1-score: 0.8636363636363636
+          precision: 0.8769230769230769
+          recall: 0.8507462686567164
+          support: 67.0
+        Inland:
+          f1-score: 0.8426395939086294
+          precision: 0.8736842105263158
+          recall: 0.8137254901960784
+          support: 102.0
+        International:
+          f1-score: 0.8873720136518771
+          precision: 0.9154929577464789
+          recall: 0.8609271523178808
+          support: 151.0
+        Kultur:
+          f1-score: 0.822429906542056
+          precision: 0.8301886792452831
+          recall: 0.8148148148148148
+          support: 54.0
+        Panorama:
+          f1-score: 0.8439306358381503
+          precision: 0.8202247191011236
+          recall: 0.8690476190476191
+          support: 168.0
+        Sport:
+          f1-score: 0.9874476987447699
+          precision: 0.9915966386554622
+          recall: 0.9833333333333333
+          support: 120.0
+        Web:
+          f1-score: 0.9673590504451038
+          precision: 0.9644970414201184
+          recall: 0.9702380952380952
+          support: 168.0
+        Wirtschaft:
+          f1-score: 0.8819444444444444
+          precision: 0.8639455782312925
+          recall: 0.900709219858156
+          support: 141.0
+        Wissenschaft:
+          f1-score: 0.8717948717948718
+          precision: 0.85
+          recall: 0.8947368421052632
+          support: 57.0
+        accuracy: 0.8939688715953308
+        macro avg:
+          f1-score: 0.8853949532229185
+          precision: 0.8873947668721279
+          recall: 0.8842532039519952
+          support: 1028.0
+        weighted avg:
+          f1-score: 0.8940215267129906
+          precision: 0.8949712450032397
+          recall: 0.8939688715953308
+          support: 1028.0
+      f1_weighted: 0.8940215267129906
+      precision_weighted: 0.8949712450032397
+      recall_weighted: 0.8939688715953308
+    num_samples: 1028
+    saved_files:
+      csv: outputs/10kgnad_fusion/experiments/2026-04-29_17-07-42_10kgnad_fusion_german_20260429_170742_german_roberta/predictions/validation_predictions_bffedf8d5e7e.csv
+      json: outputs/10kgnad_fusion/experiments/2026-04-29_17-07-42_10kgnad_fusion_german_20260429_170742_german_roberta/predictions/validation_predictions_bffedf8d5e7e.json
+      metrics: outputs/10kgnad_fusion/experiments/2026-04-29_17-07-42_10kgnad_fusion_german_20260429_170742_german_roberta/metrics/roberta_classifier_validation_metrics.yaml
+  validation_samples: 1028

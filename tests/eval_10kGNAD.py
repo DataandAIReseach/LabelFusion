@@ -202,15 +202,21 @@ def _extract_pred_series(result):
 def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cache_dir: str):
     os.makedirs(output_dir, exist_ok=True)
 
-    df_train, df_test = load_datasets(data_dir)
+    raw_train_df, raw_test_df = load_datasets(data_dir)
 
     # One-hot encode string labels into binary columns per class
     # e.g. "Web" → Web=1, Sport=0, Inland=0, ...
     # Classes are determined from training data only
     df_train_enc, df_test_enc, label_columns = one_hot_encode(
-        df_train, df_test, label_col="label"
+        raw_train_df, raw_test_df, label_col="label"
     )
     print(f"Classes detected: {label_columns}")
+
+    val_size = max(1, int(len(df_train_enc) * 0.1))
+    val_df = df_train_enc.sample(n=val_size, random_state=42)
+    train_df = df_train_enc.drop(val_df.index).reset_index(drop=True)
+    val_df = val_df.reset_index(drop=True)
+    test_df = df_test_enc
 
     experiment_name = f"10kgnad_fusion_german_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
@@ -245,24 +251,24 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
 
     fusion = create_fusion_ensemble(ml_model, llm_model, output_dir, experiment_name, cache_dir)
 
-    print(f"Train size: {len(df_train_enc)} | Test size: {len(df_test_enc)}")
+    print(f"Train size: {len(train_df)} | Val size: {len(val_df)} | Test size: {len(test_df)}")
     print("Training FusionEnsemble with RoBERTa transformer and OpenAI LLM...")
 
     # For 10kGNAD, we use the encoded training data for fusion training
-    fusion.fit(df_train_enc, df_test_enc)
+    fusion.fit(train_df, val_df)
 
     print("Predicting test labels with FusionEnsemble...")
-    result = fusion.predict(df_test_enc, train_df=df_train_enc)
+    result = fusion.predict(test_df, train_df=train_df)
     pred_series = _extract_pred_series(result)
 
-    if len(pred_series) != len(df_test):
+    if len(pred_series) != len(raw_test_df):
         raise RuntimeError(
-            f"Prediction length mismatch: got {len(pred_series)}, expected {len(df_test)}"
+            f"Prediction length mismatch: got {len(pred_series)}, expected {len(raw_test_df)}"
         )
 
     # pred_series contains predicted class names (e.g. "Web", "Sport")
     # compare against original string labels for accuracy
-    out_df = df_test.copy()
+    out_df = raw_test_df.copy()
     out_df["pred_label"] = pred_series.values
 
     out_file = os.path.join(output_dir, f"{experiment_name}_fusion_predictions.csv")
@@ -277,7 +283,8 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
 if __name__ == "__main__":
     data_dir = os.getenv(
         "DATA_DIR",
-        "/home/michaelschlee/ownCloud/GIT/LabelFusion/Dataset_Descriptives/data/10kGNAD",
+        
+        "/scratch1/users/u19147/LabelFusion/Dataset_Descriptives/data/10kGNAD",
     )
     output_dir = os.getenv("OUTPUT_DIR", "outputs/10kgnad_fusion")
     cache_dir  = os.getenv("CACHE_DIR", "cache/10kgnad_fusion")
