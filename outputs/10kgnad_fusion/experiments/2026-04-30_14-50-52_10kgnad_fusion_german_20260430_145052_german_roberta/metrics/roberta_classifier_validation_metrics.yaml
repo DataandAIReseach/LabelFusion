@@ -1,0 +1,68 @@
+metadata:
+  dataset_name: validation
+  experiment_id: 2026-04-30_14-50-52_10kgnad_fusion_german_20260430_145052_german_roberta
+  git_commit: 5549cf6c6b74e03fb30806ddb9969e1bd3fd51be
+  model_name: roberta_classifier
+  timestamp: '2026-04-30T14:51:11.026677'
+metrics:
+  accuracy: 0.8820346320346321
+  classification_report:
+    Etat:
+      f1-score: 0.875
+      precision: 0.9423076923076923
+      recall: 0.8166666666666667
+      support: 60.0
+    Inland:
+      f1-score: 0.8484848484848485
+      precision: 0.8433734939759037
+      recall: 0.8536585365853658
+      support: 82.0
+    International:
+      f1-score: 0.9014084507042254
+      precision: 0.9142857142857143
+      recall: 0.8888888888888888
+      support: 144.0
+    Kultur:
+      f1-score: 0.7450980392156863
+      precision: 0.7169811320754716
+      recall: 0.7755102040816326
+      support: 49.0
+    Panorama:
+      f1-score: 0.8273615635179153
+      precision: 0.8141025641025641
+      recall: 0.8410596026490066
+      support: 151.0
+    Sport:
+      f1-score: 0.957345971563981
+      precision: 0.9901960784313726
+      recall: 0.926605504587156
+      support: 109.0
+    Web:
+      f1-score: 0.9381818181818182
+      precision: 0.9280575539568345
+      recall: 0.9485294117647058
+      support: 136.0
+    Wirtschaft:
+      f1-score: 0.9064748201438849
+      precision: 0.9
+      recall: 0.9130434782608695
+      support: 138.0
+    Wissenschaft:
+      f1-score: 0.8245614035087719
+      precision: 0.7966101694915254
+      recall: 0.8545454545454545
+      support: 55.0
+    accuracy: 0.8820346320346321
+    macro avg:
+      f1-score: 0.869324101702348
+      precision: 0.8717682665141198
+      recall: 0.8687230831144163
+      support: 924.0
+    weighted avg:
+      f1-score: 0.8828006656233547
+      precision: 0.8848209445476156
+      recall: 0.8820346320346321
+      support: 924.0
+  f1_weighted: 0.8828006656233547
+  precision_weighted: 0.8848209445476156
+  recall_weighted: 0.8820346320346321

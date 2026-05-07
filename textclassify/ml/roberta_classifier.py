@@ -124,7 +124,8 @@ class RoBERTaClassifier(BaseMLClassifier):
         auto_save_path: Optional[str] = None,
         auto_save_results: bool = True,
         output_dir: str = "outputs",
-        experiment_name: Optional[str] = None
+        experiment_name: Optional[str] = None,
+        cache_dir: str = "cache"
     ):
         """Initialize RoBERTa classifier.
         
@@ -138,6 +139,7 @@ class RoBERTaClassifier(BaseMLClassifier):
             auto_save_results: Whether to automatically save training/prediction results
             output_dir: Base directory for saving results
             experiment_name: Name for the experiment (for results organization)
+            cache_dir: Directory for caching models (default: "cache")
         """
         if not TRANSFORMERS_AVAILABLE:
             raise ImportError(
@@ -146,6 +148,9 @@ class RoBERTaClassifier(BaseMLClassifier):
             )
         
         super().__init__(config)
+        
+        # Cache directory
+        self.cache_dir = cache_dir
         
         # DataFrame interface parameters
         self.text_column = text_column
@@ -413,8 +418,8 @@ class RoBERTaClassifier(BaseMLClassifier):
             hashed = pd.util.hash_pandas_object(text_series, index=False).values
             dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
             
-            # Create cache path: cache/roberta_{hash}
-            cache_dir = Path("cache")
+            # Create cache path using configurable cache directory
+            cache_dir = Path(self.cache_dir)
             save_path = str(cache_dir / f"roberta_{dataset_hash}")
         
         self.save_model(save_path)

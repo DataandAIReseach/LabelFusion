@@ -159,8 +159,8 @@ class OpenAIClassifier(BaseLLMClassifier):
         Returns:
             ClassificationResult with predictions, metrics, and saved files info
         """
-        # Set mode to 'test' when predicting
-        self.mode = 'test'
+        # Keep externally configured mode (e.g., train/val/test) intact.
+        # BaseLLMClassifier will still default to "test" if mode is unset.
         
         # Store test_df reference for results saving
         if test_df is not None:
@@ -177,7 +177,7 @@ class OpenAIClassifier(BaseLLMClassifier):
         
         #  EXPLICIT RESULTS SAVING (like RoBERTa)
         if self.results_manager:
-            dataset_type = getattr(self, '_current_dataset_type', 'test')
+            dataset_type = getattr(self, '_current_dataset_type', None) or self.mode or 'test'
             current_df = getattr(self, '_current_test_df', None)
             
             if current_df is not None:
@@ -190,7 +190,7 @@ class OpenAIClassifier(BaseLLMClassifier):
                     # 2. Save metrics YAML (if available)
                     if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
                         metrics_file = self.results_manager.save_metrics(
-                            result.metadata['metrics'], "test", "openai_classifier"
+                            result.metadata['metrics'], dataset_type, "openai_classifier"
                         )
                         saved_files["metrics"] = metrics_file
                     
