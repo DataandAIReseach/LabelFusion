@@ -490,6 +490,25 @@ class FusionEnsemble(BaseEnsemble):
                 
             except Exception as e:
                 print(f"Warning: Could not save validation results: {e}")
+            # Additionally, save validation predictions to a deterministic cache file
+            try:
+                # Compute a dataset hash for the validation set
+                val_hash = self._create_dataset_hash(val_df)
+                val_cache_dir = Path('cache')
+                val_cache_dir.mkdir(parents=True, exist_ok=True)
+                val_cache_file = val_cache_dir / f"val_{val_hash}.json"
+                import json
+                val_payload = {
+                    "predictions": fusion_val_result.predictions,
+                    "experiment_name": getattr(self, 'experiment_name', None),
+                    "validation_size": len(val_df),
+                    "ml_train_hash": getattr(self, 'ml_train_hash', None)
+                }
+                with open(val_cache_file, 'w') as vf:
+                    json.dump(val_payload, vf, indent=2)
+                print(f"Saved validation predictions to cache: {val_cache_file}")
+            except Exception as e:
+                print(f"Warning: Could not write validation cache file: {e}")
         
         # Cache training data for later LLM predictions
         self.train_df_cache = train_df.copy()

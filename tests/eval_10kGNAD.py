@@ -8,12 +8,14 @@ Environment variables:
   - OUTPUT_DIR: output folder (default: outputs/10kgnad_fusion)
   - FEW_SHOT: number of few-shot examples for LLM (default: 5)
   - MODEL_NAME: OpenAI model name (default: gpt-5-mini)
-  - CACHE_DIR: cache folder for LLM calls (default: cache/10kgnad_fusion)
+  - CACHE_DIR: cache folder for LLM calls (default: cache/10kGNAD)
 """
 
 import os
 import sys
 import glob
+import json
+import hashlib
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
@@ -113,6 +115,7 @@ def create_ml_model(
     output_dir: str,
     experiment_name: str,
     auto_save_path: str = None,
+    cache_dir: str = "cache",
 ):
     ml_config = ModelConfig(
         model_name='benjamin/roberta-base-wechsel-german',
@@ -133,7 +136,8 @@ def create_ml_model(
         auto_save_path=auto_save_path,
         auto_save_results=True,
         output_dir=output_dir,
-        experiment_name=f"{experiment_name}_german_roberta"
+        experiment_name=f"{experiment_name}_german_roberta",
+        cache_dir=cache_dir
     )
 
 
@@ -222,23 +226,23 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
 
     # Try to discover a cached RoBERTa model in the `cache/` folder.
     # Looks for files starting with `10kgnad_fusion_german_roberta_model_...` and loads the newest one if available.
-    cache_base_pattern = os.path.join('cache', '10kgnad_fusion_german_roberta_model_*')
+    cache_base_pattern = os.path.join(cache_dir, 'roberta_*')
     cached_files = sorted(glob.glob(cache_base_pattern), key=os.path.getctime, reverse=True)
     ml_model = None
     if cached_files:
         latest_cache = cached_files[0]
         print(f"Found candidate cached ML model: {latest_cache} -> attempting to load")
         # Create model instance (no auto_save_path required to load)
-        ml_model = create_ml_model(label_columns, output_dir, experiment_name, auto_save_path=None)
+        ml_model = create_ml_model(label_columns, output_dir, experiment_name, auto_save_path=None, cache_dir=cache_dir)
         try:
             ml_model.load_model(latest_cache)
             print(f"✅ Loaded RoBERTa model from cache: {latest_cache}")
         except Exception as e:
             print(f"⚠️ Failed to load cached RoBERTa model ({latest_cache}): {e}")
             print("Will train a new RoBERTa model instead.")
-            ml_model = create_ml_model(label_columns, output_dir, experiment_name, auto_save_path=None)
+            ml_model = create_ml_model(label_columns, output_dir, experiment_name, auto_save_path=None, cache_dir=cache_dir)
     else:
-        ml_model = create_ml_model(label_columns, output_dir, experiment_name, auto_save_path=None)
+        ml_model = create_ml_model(label_columns, output_dir, experiment_name, auto_save_path=None, cache_dir=cache_dir)
 
     llm_model = create_llm_model(
         label_columns=label_columns,
@@ -254,8 +258,28 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
     print(f"Train size: {len(train_df)} | Val size: {len(val_df)} | Test size: {len(test_df)}")
     print("Training FusionEnsemble with RoBERTa transformer and OpenAI LLM...")
 
+    # Compute dataset hash for consistent prediction file naming
+    text_series = train_df['text'] if 'text' in train_df.columns else train_df.iloc[:, 0]
+    hashed = pd.util.hash_pandas_object(text_series, index=False).values
+    dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+
     # For 10kGNAD, we use the encoded training data for fusion training
     fusion.fit(train_df, val_df)
+
+    # Save validation predictions to cache directory
+    print("Predicting validation labels with FusionEnsemble...")
+    val_result = fusion.predict(val_df, train_df=train_df)
+    val_pred_series = _extract_pred_series(val_result)
+    val_pred_data = {
+        "predictions": val_pred_series.tolist(),
+        "experiment_name": experiment_name,
+        "val_size": len(val_df),
+    }
+    val_cache_file = os.path.join(cache_dir, f"val_{dataset_hash}.json")
+    os.makedirs(cache_dir, exist_ok=True)
+    with open(val_cache_file, 'w') as f:
+        json.dump(val_pred_data, f, indent=2)
+    print(f"Saved validation predictions: {val_cache_file}")
 
     print("Predicting test labels with FusionEnsemble...")
     result = fusion.predict(test_df, train_df=train_df)
@@ -275,6 +299,17 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
     out_df.to_csv(out_file, index=False)
     print(f"Saved fusion predictions: {out_file}")
 
+    # Also save test predictions to cache directory
+    test_pred_data = {
+        "predictions": pred_series.tolist(),
+        "experiment_name": experiment_name,
+        "test_size": len(raw_test_df),
+    }
+    test_cache_file = os.path.join(cache_dir, f"test_{dataset_hash}.json")
+    with open(test_cache_file, 'w') as f:
+        json.dump(test_pred_data, f, indent=2)
+    print(f"Saved test predictions to cache: {test_cache_file}")
+
     if "label" in out_df.columns and out_df["label"].notna().any():
         acc = (out_df["label"].astype(str) == out_df["pred_label"].astype(str)).mean()
         print(f"Test accuracy (fusion): {acc:.4f}")
@@ -287,7 +322,7 @@ if __name__ == "__main__":
         "/scratch1/users/u19147/LabelFusion/Dataset_Descriptives/data/10kGNAD",
     )
     output_dir = os.getenv("OUTPUT_DIR", "outputs/10kgnad_fusion")
-    cache_dir  = os.getenv("CACHE_DIR", "cache/10kgnad_fusion")
+    cache_dir  = os.getenv("CACHE_DIR", "cache/10kGNAD")
     model_name = os.getenv("MODEL_NAME", "gpt-5-mini")
 
     try:

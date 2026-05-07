@@ -204,7 +204,99 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             context=context,
             label_definitions=label_definitions
         ))
+    
+    def predict_val(
+        self,
+        train_df: Optional[pd.DataFrame] = None,
+        val_df: Optional[pd.DataFrame] = None,
+        texts: Optional[List[str]] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
+    ) -> ClassificationResult:
+        """Synchronous helper to predict on a validation dataset.
 
+        This is a thin wrapper that sets the model mode to "val" and delegates
+        to :meth:`predict_async`.
+        """
+        # Allow passing texts directly
+        if texts is not None and val_df is None:
+            val_df = pd.DataFrame({self.text_column: texts})
+
+        if val_df is None:
+            raise ValidationError("Either val_df or texts must be provided for predict_val")
+
+        # Ensure mode and delegate
+        self.set_mode("val")
+        return asyncio.run(self.predict_async(
+            test_df=val_df,
+            train_df=train_df,
+            context=context,
+            label_definitions=label_definitions
+        ))
+
+    async def predict_val_async(
+        self,
+        val_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
+    ) -> ClassificationResult:
+        """Asynchronous helper to predict on a validation dataset."""
+        if val_df is None:
+            raise ValidationError("val_df must be provided for predict_val_async")
+
+        self.set_mode("val")
+        return await self.predict_async(
+            test_df=val_df,
+            train_df=train_df,
+            context=context,
+            label_definitions=label_definitions
+        )
+
+    def predict_test(
+        self,
+        train_df: Optional[pd.DataFrame] = None,
+        test_df: Optional[pd.DataFrame] = None,
+        texts: Optional[List[str]] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
+    ) -> ClassificationResult:
+        """Synchronous helper to predict on a test dataset (alias of `predict`)."""
+        # Allow passing texts directly
+        if texts is not None and test_df is None:
+            test_df = pd.DataFrame({self.text_column: texts})
+
+        if test_df is None:
+            raise ValidationError("Either test_df or texts must be provided for predict_test")
+
+        self.set_mode("test")
+        return asyncio.run(self.predict_async(
+            test_df=test_df,
+            train_df=train_df,
+            context=context,
+            label_definitions=label_definitions
+        ))
+
+    async def predict_test_async(
+        self,
+        test_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
+    ) -> ClassificationResult:
+        """Asynchronous helper to predict on a test dataset (alias of `predict_async`)."""
+        if test_df is None:
+            raise ValidationError("test_df must be provided for predict_test_async")
+
+        self.set_mode("test")
+        return await self.predict_async(
+            test_df=test_df,
+            train_df=train_df,
+            context=context,
+            label_definitions=label_definitions
+        )
+
+    # ========================================================================
     async def predict_async(
         self,
         test_df: pd.DataFrame,
