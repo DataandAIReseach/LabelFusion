@@ -160,8 +160,8 @@ def create_fusion_ensemble(
             'classification_type': 'multi_class',
             'output_dir': output_dir,
             'experiment_name': experiment_name,
-            'val_llm_cache_path': os.path.join(cache_dir, 'val'),
-            'test_llm_cache_path': os.path.join(cache_dir, 'test')
+            'val_llm_cache_path': cache_dir,
+            'test_llm_cache_path': cache_dir
         }
     )
     fusion = FusionEnsemble(
