@@ -51,12 +51,10 @@ flowchart LR
     T["Input Text"] --> ML["ML Backbone<br/>(RoBERTa)"]
     T --> LLM["LLM Component<br/>(OpenAI / Gemini / DeepSeek)"]
 
-    ML --> MLC["Calibration<br/>(temperature scaling)"]
     LLM --> CACHE[("LLM Cache<br/>(hash-based)")]
-    CACHE --> LLMC["Calibration<br/>(per-class scores)"]
 
-    MLC -->|"logits"| FUSE["FusionMLP<br/>(learned combiner)"]
-    LLMC -->|"scores"| FUSE
+    ML -->|"logits"| FUSE["FusionMLP<br/>(learned combiner)"]
+    CACHE -->|"per-class scores"| FUSE
 
     FUSE --> OUT["Predicted Labels<br/>+ Probabilities"]
 
@@ -64,17 +62,16 @@ flowchart LR
     classDef llm fill:#ede9fe,stroke:#6d28d9,color:#4c1d95;
     classDef fuse fill:#dcfce7,stroke:#15803d,color:#14532d;
     classDef io fill:#fef3c7,stroke:#b45309,color:#7c2d12;
-    class ML,MLC ml;
-    class LLM,LLMC,CACHE llm;
+    class ML ml;
+    class LLM,CACHE llm;
     class FUSE fuse;
     class T,OUT io;
 ```
 
 1. **ML Backbone** (RoBERTa): Generates logits from input text
 2. **LLM Component**: Produces per-class scores via prompting (cached for efficiency)
-3. **Calibration**: Both ML and LLM signals are calibrated for better probability estimates
-4. **FusionMLP**: Small neural network concatenates and learns to combine the signals
-5. **Training**: ML backbone uses small learning rate, fusion MLP uses higher rate for fast adaptation
+3. **FusionMLP**: Small neural network concatenates and learns to combine the signals
+4. **Training**: ML backbone uses small learning rate, fusion MLP uses higher rate for fast adaptation
 
 ## Features
 
