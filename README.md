@@ -10,6 +10,14 @@ A Python package for advanced text classification that combines Large Language M
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C.svg?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Transformers](https://img.shields.io/badge/🤗%20Transformers-4.30+-FFD21E.svg)](https://huggingface.co/docs/transformers)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/)
+[![Maintenance](https://img.shields.io/badge/maintained-yes-green.svg)](https://github.com/)
+[![Accuracy: AG News](https://img.shields.io/badge/AG%20News-92.4%25-success.svg)](#)
+[![Accuracy: Reuters](https://img.shields.io/badge/Reuters--21578-92.3%25-success.svg)](#)
+[![LLM Providers](https://img.shields.io/badge/LLMs-OpenAI%20%7C%20Gemini%20%7C%20DeepSeek-blueviolet.svg)](#)
 
 ## Key Innovation: AutoFusion
 
