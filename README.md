@@ -44,7 +44,37 @@ predictions = classifier.predict(test_texts)
 - **Cost-Aware**: Intelligent caching and efficient resource usage
 - **One-Line Setup**: No complex configuration needed
 
-## Features
+## Fusion Architecture
+
+```mermaid
+flowchart LR
+    T["Input Text"] --> ML["ML Backbone<br/>(RoBERTa)"]
+    T --> LLM["LLM Component<br/>(OpenAI / Gemini / DeepSeek)"]
+
+    ML --> MLC["Calibration<br/>(temperature scaling)"]
+    LLM --> CACHE[("LLM Cache<br/>(hash-based)")]
+    CACHE --> LLMC["Calibration<br/>(per-class scores)"]
+
+    MLC -->|"logits"| FUSE["FusionMLP<br/>(learned combiner)"]
+    LLMC -->|"scores"| FUSE
+
+    FUSE --> OUT["Predicted Labels<br/>+ Probabilities"]
+
+    classDef ml fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
+    classDef llm fill:#ede9fe,stroke:#6d28d9,color:#4c1d95;
+    classDef fuse fill:#dcfce7,stroke:#15803d,color:#14532d;
+    classDef io fill:#fef3c7,stroke:#b45309,color:#7c2d12;
+    class ML,MLC ml;
+    class LLM,LLMC,CACHE llm;
+    class FUSE fuse;
+    class T,OUT io;
+```
+
+1. **ML Backbone** (RoBERTa): Generates logits from input text
+2. **LLM Component**: Produces per-class scores via prompting (cached for efficiency)
+3. **Calibration**: Both ML and LLM signals are calibrated for better probability estimates
+4. **FusionMLP**: Small neural network concatenates and learns to combine the signals
+5. **Training**: ML backbone uses small learning rate, fusion MLP uses higher rate for fast adaptation
 
 ## Features
 
@@ -504,37 +534,7 @@ Comprehensive evaluation scripts in `tests/evaluation/`:
 
 ## How It Works
 
-### Fusion Architecture
-
-```mermaid
-flowchart LR
-    T["Input Text"] --> ML["ML Backbone<br/>(RoBERTa)"]
-    T --> LLM["LLM Component<br/>(OpenAI / Gemini / DeepSeek)"]
-
-    ML --> MLC["Calibration<br/>(temperature scaling)"]
-    LLM --> CACHE[("LLM Cache<br/>(hash-based)")]
-    CACHE --> LLMC["Calibration<br/>(per-class scores)"]
-
-    MLC -->|"logits"| FUSE["FusionMLP<br/>(learned combiner)"]
-    LLMC -->|"scores"| FUSE
-
-    FUSE --> OUT["Predicted Labels<br/>+ Probabilities"]
-
-    classDef ml fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a;
-    classDef llm fill:#ede9fe,stroke:#6d28d9,color:#4c1d95;
-    classDef fuse fill:#dcfce7,stroke:#15803d,color:#14532d;
-    classDef io fill:#fef3c7,stroke:#b45309,color:#7c2d12;
-    class ML,MLC ml;
-    class LLM,LLMC,CACHE llm;
-    class FUSE fuse;
-    class T,OUT io;
-```
-
-1. **ML Backbone** (RoBERTa): Generates logits from input text
-2. **LLM Component**: Produces per-class scores via prompting (cached for efficiency)
-3. **Calibration**: Both ML and LLM signals are calibrated for better probability estimates
-4. **FusionMLP**: Small neural network concatenates and learns to combine the signals
-5. **Training**: ML backbone uses small learning rate, fusion MLP uses higher rate for fast adaptation
+See the [Fusion Architecture](#fusion-architecture) diagram near the top of this README for the end-to-end data flow.
 
 ### Why Fusion Works
 
