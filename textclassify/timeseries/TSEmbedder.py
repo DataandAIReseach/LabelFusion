@@ -4,7 +4,7 @@ import torch.nn as nn
 from transformers import TimesFm2_5Config, TimesFm2_5Model
 
 
-class TimesFMEmbedder(nn.Module):
+class TSEmbedder(nn.Module):
     """
     Wraps TimesFm2_5Model to extract patch-level or sequence-level embeddings
     instead of producing forecasts.
@@ -138,7 +138,7 @@ class TimesFMEmbedder(nn.Module):
 # Quick smoke-test
 # ----------------------------------------------------------------------
 if __name__ == "__main__":
-    embedder = TimesFMEmbedder(
+    embedder = TSEmbedder(
         pretrained_model_name_or_path="google/timesfm-2.5-200m-transformers",
         pooling="mean",
         device_map="auto",
