@@ -261,6 +261,21 @@ class OpenAIClassifier(BaseLLMClassifier):
         
         return result
 
+    def fit(
+        self,
+        train_df: pd.DataFrame,
+        val_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None,
+    ):
+        """Precompute zero-shot predictions for train and optional val splits."""
+        return super().fit(
+            train_df=train_df,
+            val_df=val_df,
+            context=context,
+            label_definitions=label_definitions,
+        )
+
     async def _call_llm(self, prompt: str) -> str:
         """Call OpenAI API with the given prompt using the service layer.
         
