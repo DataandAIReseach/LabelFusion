@@ -258,7 +258,7 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
     val_df = val_df.reset_index(drop=True)
     test_df = df_test_enc
 
-    experiment_name = f"10kgnad_fusion_german_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    experiment_name = f"FNSPID_fusion_eng_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     # Try to discover a cached RoBERTa model in the `cache/` folder.
     # Looks for files starting with `10kgnad_fusion_german_roberta_model_...` and loads the newest one if available.
@@ -354,11 +354,10 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
 if __name__ == "__main__":
     data_dir = os.getenv(
         "DATA_DIR",
-        
-        "/scratch1/users/u19147/LabelFusion/Dataset_Descriptives/data/10kGNAD",
+        str(project_root / "Dataset_Descriptives" / "data" / "FNSPID"),
     )
-    output_dir = os.getenv("OUTPUT_DIR", "outputs/10kgnad_fusion")
-    cache_dir  = os.getenv("CACHE_DIR", "cache/10kGNAD")
+    output_dir = os.getenv("OUTPUT_DIR", "outputs/fnspid_fusion")
+    cache_dir  = os.getenv("CACHE_DIR", "cache/FNSPID")
     model_name = os.getenv("MODEL_NAME", "gpt-5-mini")
 
     try:
