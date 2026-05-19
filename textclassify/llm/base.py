@@ -204,6 +204,51 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             context=context,
             label_definitions=label_definitions
         ))
+
+    def fit(
+        self,
+        train_df: pd.DataFrame,
+        val_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, ClassificationResult]:
+        """Precompute and cache zero-shot predictions for train and validation data.
+
+        This does not train the LLM itself. It only runs inference once for the
+        provided splits so downstream fusion models can reuse the cached outputs.
+
+        Returns:
+            A dictionary containing the prediction results for the processed splits.
+        """
+        if not isinstance(train_df, pd.DataFrame):
+            raise ValidationError("train_df must be provided as a pandas DataFrame")
+        if train_df.empty:
+            raise ValidationError("train_df is empty")
+        if val_df is not None and (not isinstance(val_df, pd.DataFrame) or val_df.empty):
+            raise ValidationError("val_df must be a non-empty pandas DataFrame when provided")
+
+        previous_mode = self.mode
+        results: Dict[str, ClassificationResult] = {}
+
+        try:
+            self.set_mode("train")
+            results["train"] = self.predict(
+                test_df=train_df,
+                context=context,
+                label_definitions=label_definitions,
+            )
+
+            if val_df is not None:
+                self.set_mode("val")
+                results["val"] = self.predict(
+                    test_df=val_df,
+                    context=context,
+                    label_definitions=label_definitions,
+                )
+
+            return results
+        finally:
+            self.mode = previous_mode
     
     def predict_val(
         self,
