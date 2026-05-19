@@ -296,6 +296,14 @@ class FusionEnsemble(BaseEnsemble):
         # Set up classes from ML model
         self.classes_ = self.ml_model.classes_
         self.num_labels = len(self.classes_)
+
+        # Precompute zero-shot LLM predictions for train/val so fusion can reuse them.
+        llm_fit_results = None
+        if self.llm_model is not None and hasattr(self.llm_model, 'fit'):
+            try:
+                llm_fit_results = self.llm_model.fit(train_df=train_df, val_df=val_df)
+            except Exception as e:
+                print(f"Warning: Could not precompute zero-shot LLM caches: {e}")
         
         # Step 2: Get ML predictions on validation set with hashes
         print("Getting ML predictions on validation set...")
@@ -313,10 +321,14 @@ class FusionEnsemble(BaseEnsemble):
         # Step 3: Get LLM predictions on validation set
         llm_val_predictions = self._get_or_generate_llm_predictions(
             df=val_df,
-            train_df=train_df,
+            train_df=None,
             cache_path=self.val_llm_cache_path,
             mode="val",
-            provided_predictions=val_llm_predictions
+            provided_predictions=(
+                llm_fit_results.get('val').predictions
+                if isinstance(llm_fit_results, dict) and llm_fit_results.get('val') is not None
+                else val_llm_predictions
+            )
         )
         
         # Attach hashes to LLM predictions
@@ -968,7 +980,6 @@ class FusionEnsemble(BaseEnsemble):
         self.llm_model.set_mode(mode)
 
         llm_result = self.llm_model.predict(
-            train_df=train_df,
             test_df=df
         )
         return llm_result.predictions
@@ -2186,7 +2197,7 @@ class FusionEnsemble(BaseEnsemble):
             
             llm_test_predictions = self._get_or_generate_llm_predictions(
                 df=test_df,
-                train_df=llm_train_df if llm_train_df is not None else test_df,
+                train_df=None,
                 cache_path=self.test_llm_cache_path,
                 mode="test",
                 provided_predictions=test_llm_predictions
@@ -2331,7 +2342,7 @@ class FusionEnsemble(BaseEnsemble):
         
         llm_test_predictions = self._get_or_generate_llm_predictions(
             df=test_df,
-            train_df=llm_train_df if llm_train_df is not None else test_df,
+            train_df=None,
             cache_path=self.test_llm_cache_path,
             mode="test",
             provided_predictions=test_llm_predictions
