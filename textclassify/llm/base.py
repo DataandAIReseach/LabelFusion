@@ -211,44 +211,64 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         val_df: Optional[pd.DataFrame] = None,
         context: Optional[str] = None,
         label_definitions: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, ClassificationResult]:
-        """Precompute and cache zero-shot predictions for train and validation data.
-
-        This does not train the LLM itself. It only runs inference once for the
-        provided splits so downstream fusion models can reuse the cached outputs.
-
-        Returns:
-            A dictionary containing the prediction results for the processed splits.
+    ) -> None:
         """
-        if not isinstance(train_df, pd.DataFrame):
-            raise ValidationError("train_df must be provided as a pandas DataFrame")
-        if train_df.empty:
-            raise ValidationError("train_df is empty")
-        if val_df is not None and (not isinstance(val_df, pd.DataFrame) or val_df.empty):
-            raise ValidationError("val_df must be a non-empty pandas DataFrame when provided")
-
-        previous_mode = self.mode
-        results: Dict[str, ClassificationResult] = {}
-
-        try:
-            self.set_mode("train")
-            results["train"] = self.predict(
-                test_df=train_df,
+        Pre-compute and cache Zero-Shot predictions for train (and optionally val) splits.
+        Must be called before training the FusionMLP.
+        
+        This method runs the LLM in Zero-Shot mode (no examples) on the training and
+        validation datasets, then caches the results. During FusionMLP training, these
+        cached predictions are loaded as input features, avoiding expensive re-computation.
+        
+        Args:
+            train_df: Training data to predict and cache
+            val_df: Optional validation data to predict and cache
+            context: Optional context for classification
+            label_definitions: Optional label definitions
+            
+        Example:
+            >>> llm = OpenAIClassifier(config, label_columns=commodities)
+            >>> llm.fit(train_df, val_df)  # Pre-compute and cache
+            >>> # Later during training:
+            >>> result = llm.predict(test_df=batch)  # Uses cache automatically
+        """
+        if self.verbose:
+            self.logger.info("=" * 70)
+            self.logger.info("FITTING LLM CLASSIFIER (Zero-Shot Pre-Caching)")
+            self.logger.info("=" * 70)
+            self.logger.info(f"Train samples: {len(train_df)}")
+            if val_df is not None:
+                self.logger.info(f"Val samples: {len(val_df)}")
+        
+        # Predict and cache train split
+        self._current_dataset_type = "train"
+        if self.verbose:
+            self.logger.info("\n[1/2] Processing TRAIN split (Zero-Shot)...")
+        
+        self.predict(
+            train_df=None,  # Zero-shot: no few-shot examples
+            test_df=train_df,
+            context=context,
+            label_definitions=label_definitions,
+        )
+        
+        # Predict and cache val split if provided
+        if val_df is not None:
+            self._current_dataset_type = "val"
+            if self.verbose:
+                self.logger.info("\n[2/2] Processing VAL split (Zero-Shot)...")
+            
+            self.predict(
+                train_df=None,  # Zero-shot: no few-shot examples
+                test_df=val_df,
                 context=context,
                 label_definitions=label_definitions,
             )
-
-            if val_df is not None:
-                self.set_mode("val")
-                results["val"] = self.predict(
-                    test_df=val_df,
-                    context=context,
-                    label_definitions=label_definitions,
-                )
-
-            return results
-        finally:
-            self.mode = previous_mode
+        
+        if self.verbose:
+            self.logger.info("\n" + "=" * 70)
+            self.logger.info("✓ LLM FIT COMPLETE - Predictions cached and ready for training")
+            self.logger.info("=" * 70)
     
     def predict_val(
         self,
