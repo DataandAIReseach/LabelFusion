@@ -136,6 +136,77 @@ class OpenAIClassifier(BaseLLMClassifier):
 
         return False
     
+    def fit(
+        self,
+        train_df: pd.DataFrame,
+        val_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None,
+    ) -> None:
+        """
+        Pre-compute and cache Zero-Shot predictions for train (and optionally val) splits.
+        Must be called before training the FusionMLP.
+        
+        This override adds OpenAI-specific results saving logic on top of the base
+        class caching behavior.
+        
+        Args:
+            train_df: Training data to predict and cache
+            val_df: Optional validation data to predict and cache
+            context: Optional context for classification
+            label_definitions: Optional label definitions
+            
+        Example:
+            >>> llm = OpenAIClassifier(config, label_columns=commodities)
+            >>> llm.fit(train_df, val_df)  # Pre-compute and cache
+            >>> # Later during training:
+            >>> result = llm.predict(test_df=batch)  # Uses cache automatically
+        """
+        # Set mode to train
+        self.mode = 'train'
+        self._current_dataset_type = 'train'
+        self._current_test_df = train_df
+        
+        if getattr(self, 'verbose', True):
+            print(f"\n{'='*70}")
+            print(f"FITTING OPENAI CLASSIFIER (Zero-Shot Pre-Caching)")
+            print(f"{'='*70}")
+            print(f"Train samples: {len(train_df)}")
+            if val_df is not None:
+                print(f"Val samples: {len(val_df)}")
+        
+        # Predict train (zero-shot)
+        if getattr(self, 'verbose', True):
+            print(f"\n[1/2] Processing TRAIN split (Zero-Shot)...")
+        
+        self.predict(
+            train_df=None,  # Zero-shot: no examples
+            test_df=train_df,
+            context=context,
+            label_definitions=label_definitions,
+        )
+        
+        # Predict val if provided
+        if val_df is not None:
+            self.mode = 'val'
+            self._current_dataset_type = 'val'
+            self._current_test_df = val_df
+            
+            if getattr(self, 'verbose', True):
+                print(f"\n[2/2] Processing VAL split (Zero-Shot)...")
+            
+            self.predict(
+                train_df=None,  # Zero-shot: no examples
+                test_df=val_df,
+                context=context,
+                label_definitions=label_definitions,
+            )
+        
+        if getattr(self, 'verbose', True):
+            print(f"\n{'='*70}")
+            print(f"✓ OPENAI FIT COMPLETE - Predictions cached and ready for training")
+            print(f"{'='*70}\n")
+    
     def predict(
         self,
         train_df: Optional[pd.DataFrame] = None,
@@ -261,20 +332,6 @@ class OpenAIClassifier(BaseLLMClassifier):
         
         return result
 
-    def fit(
-        self,
-        train_df: pd.DataFrame,
-        val_df: Optional[pd.DataFrame] = None,
-        context: Optional[str] = None,
-        label_definitions: Optional[Dict[str, str]] = None,
-    ):
-        """Precompute zero-shot predictions for train and optional val splits."""
-        return super().fit(
-            train_df=train_df,
-            val_df=val_df,
-            context=context,
-            label_definitions=label_definitions,
-        )
 
     async def _call_llm(self, prompt: str) -> str:
         """Call OpenAI API with the given prompt using the service layer.
