@@ -603,9 +603,8 @@ class FusionEnsemble(BaseEnsemble):
             few_shot_df = df
             print("Warning: No training data available for few-shot examples, using target data")
         
-        print(f"Getting LLM predictions for {len(df)} samples...")
+        print(f"Getting LLM predictions for {len(df)} samples (zero-shot)...")
         llm_result = self.llm_model.predict(
-            train_df=few_shot_df,
             test_df=df
         )
         
@@ -1065,7 +1064,6 @@ class FusionEnsemble(BaseEnsemble):
                 # Call predict with the batch DataFrame
                 # The LLM will generate fresh predictions since cache is cleared
                 batch_result = self.llm_model.predict(
-                    train_df=train_df,
                     test_df=batch_df
                 )
                 batch_predictions = batch_result.predictions

@@ -299,7 +299,15 @@ def run_once(data_dir: str, output_dir: str, few_shot: int, model_name: str, cac
     hashed = pd.util.hash_pandas_object(text_series, index=False).values
     dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
 
-    # For 10kGNAD, we use the encoded training data for fusion training
+    # Precompute zero-shot LLM predictions for train and val (will be cached).
+    try:
+        if hasattr(llm_model, 'fit'):
+            print("Precomputing zero-shot LLM predictions for train and val (cache)...")
+            llm_model.fit(train_df=train_df, val_df=val_df)
+    except Exception as e:
+        print(f"Warning: LLM precache failed: {e}")
+
+    # For FNSPID, we use the encoded training data for fusion training
     fusion.fit(train_df, val_df)
 
     # Save validation predictions to cache directory
