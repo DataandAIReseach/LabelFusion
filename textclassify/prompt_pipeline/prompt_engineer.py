@@ -115,8 +115,11 @@ class PromptEngineer:
         Returns:
             List[Prompt]: List of engineered prompts for each test text
         """
-        if not isinstance(test_df, pd.DataFrame) or not isinstance(train_df, pd.DataFrame):
-            raise ValueError("test_df and train_df must be pandas DataFrames")
+        if not isinstance(test_df, pd.DataFrame):
+            raise ValueError("test_df must be a pandas DataFrame")
+        
+        if train_df is not None and not isinstance(train_df, pd.DataFrame):
+            raise ValueError("train_df must be a pandas DataFrame when provided")
 
         # 1. Detect language from train_df and swap warehouse if needed
         first_text = train_df[self.text_column].iloc[0]
