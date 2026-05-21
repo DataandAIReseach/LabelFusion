@@ -242,6 +242,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         
         # Predict and cache train split
         self._current_dataset_type = "train"
+        # Ensure global mode is set so prompt engineering does zero-shot for train
+        try:
+            self.set_mode("train")
+        except Exception:
+            pass
         if self.verbose:
             self.logger.info("\n[1/2] Processing TRAIN split (Zero-Shot)...")
         
@@ -257,7 +262,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             self._current_dataset_type = "val"
             if self.verbose:
                 self.logger.info("\n[2/2] Processing VAL split (Zero-Shot)...")
-            
+            # Ensure prompt-engineering/predict sees val mode
+            try:
+                self.set_mode("val")
+            except Exception:
+                pass
+
             self.predict(
                 train_df=None,  # Zero-shot: no few-shot examples
                 test_df=val_df,

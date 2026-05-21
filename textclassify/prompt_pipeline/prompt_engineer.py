@@ -27,6 +27,7 @@ class PromptEngineer:
         provider: str = "openai",
         model_name: str = "gpt-4",
         sampler: Optional[NearestNeighbourSampler] = None,
+        mode: Optional[str] = None,
     ):
         """Initialize PromptEngineer.
 
@@ -79,6 +80,14 @@ class PromptEngineer:
 
         self.role_prompt = None
         self.data = None
+        # mode controls prompt engineering behavior: 'train'|'val'|'test'
+        self.mode = mode
+
+    def set_mode(self, mode: str) -> None:
+        """Set the prompt engineering mode: 'train', 'val', or 'test'."""
+        if mode not in ("train", "val", "test"):
+            raise ValueError("mode must be one of 'train', 'val', or 'test'")
+        self.mode = mode
 
     def set_few_shot_mode(self, mode):
         """Set the few-shot mode for training examples."""
@@ -94,12 +103,15 @@ class PromptEngineer:
     async def engineer_prompts(
         self,
         test_df: pd.DataFrame,
-        train_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame],
         sample_size: int = 20,
         custom_prompts: Optional[Dict[str, str]] = None,
         custom_role_prompt: Optional[str] = None,
         custom_context: Optional[str] = None,
-        procedure_additions: Optional[str] = None
+        procedure_additions: Optional[str] = None,
+        mode: str = 'test',
+        role_df: Optional[pd.DataFrame] = None,
+        target_df: Optional[pd.DataFrame] = None,
     ) -> List[Prompt]:
         """Engineer prompts for test data using training examples.
 
@@ -115,23 +127,37 @@ class PromptEngineer:
         Returns:
             List[Prompt]: List of engineered prompts for each test text
         """
-        if not isinstance(test_df, pd.DataFrame):
-            raise ValueError("test_df must be a pandas DataFrame")
-        
+        # role_df: source to create role/context prompts from (defaults to test_df)
+        role_source = role_df if role_df is not None else test_df
+
+        # Determine effective mode for this call (instance-level default if not provided)
+        local_mode = mode if mode is not None else self.mode
+        if local_mode not in ("train", "val", "test"):
+            raise ValueError("mode must be one of 'train', 'val', or 'test'")
+
+        if not isinstance(role_source, pd.DataFrame):
+            raise ValueError("test_df/role_df must be a pandas DataFrame")
+
         if train_df is not None and not isinstance(train_df, pd.DataFrame):
             raise ValueError("train_df must be a pandas DataFrame when provided")
 
-        # 1. Detect language from train_df and swap warehouse if needed
-        first_text = train_df[self.text_column].iloc[0]
+        # 1. Detect language from role_source and swap warehouse if needed
+        first_text = role_source[self.text_column].iloc[0]
         self.warehouse = await self._pipeline.get_warehouse(first_text)
 
-        # 2. Fit sampler once on full train_df — ownership of fit() lifecycle is here
-        if self._sampler is not None:
+        # 2. Fit sampler once on full train_df only when generating test-time few-shot prompts
+        if local_mode == 'test' and self._sampler is not None and train_df is not None and not train_df.empty:
             self._sampler.fit(train_df, self.text_column)
             logger.info(f"NearestNeighbourSampler fitted on {len(train_df)} training samples")
 
         # 3. Sample once for shared prompt parts (role, context, procedure)
-        sampled_df = train_df.sample(n=min(sample_size, len(train_df)), random_state=42)
+        # - When mode=='test' and train_df is available, sample training examples for few-shot
+        # - When mode in ('train','val') we do zero-shot: do not sample training examples; instead
+        #   use the role_source (usually the real test set) to build role/context prompts
+        if local_mode == 'test' and train_df is not None and not train_df.empty:
+            sampled_df = train_df.sample(n=min(sample_size, len(train_df)), random_state=42)
+        else:
+            sampled_df = role_source.sample(n=min(sample_size, len(role_source)), random_state=42)
 
         # Initialize base prompt with shared components
         init_p = Prompt()
@@ -186,16 +212,20 @@ class PromptEngineer:
             include_role=False
         )
 
-        # 4. Generate prompts for each test text
+        # Determine the dataset to generate prompts for (target_df); defaults to test_df
+        effective_target = target_df if target_df is not None else test_df
+
+        # 4. Generate prompts for each target text
         prompts = []
-        for _, row in test_df.iterrows():
+        for _, row in effective_target.iterrows():
             p = Prompt()
             p.fuse(copy.deepcopy(init_p))
 
             p.add_part("train_data_intro_prompt", train_data_intro)
 
+            # For train/val prediction modes we want zero-shot (no training examples in prompt)
             train_data = self.fill_train_data_prompt(
-                train_df=train_df,
+                train_df=train_df if local_mode == 'test' else None,
                 query_text=row[self.text_column],
                 custom_role_prompt=custom_prompts.get('train_data') if custom_prompts else None,
                 include_role=False
@@ -215,21 +245,22 @@ class PromptEngineer:
 
     def generate_context_keywords(
         self,
-        train_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame],
         sample_size: int = 20,
         custom_prompt: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
         include_role: bool = True
     ) -> str:
         """Generate a prompt to extract keywords from context brainstorming."""
-        if train_df is None:
-            raise ValueError("Data must be set before generating context keywords")
-
-        examples = "\n\n".join(
-            f"Text {idx + 1}: {row[self.text_column]}\n"
-            f"Labels: {', '.join(f'{col}: {row[col]}' for col in self.label_columns)}"
-            for idx, (_, row) in enumerate(train_df.iterrows())
-        )
+        # Allow train_df to be None/empty — fall back to empty example set or test-based sampling
+        if train_df is None or train_df.empty:
+            examples = ""
+        else:
+            examples = "\n\n".join(
+                f"Text {idx + 1}: {row[self.text_column]}\n"
+                f"Labels: {', '.join(f'{col}: {row[col]}' for col in self.label_columns)}"
+                for idx, (_, row) in enumerate(train_df.iterrows())
+            )
 
         prompts = []
         if include_role:
@@ -256,7 +287,7 @@ class PromptEngineer:
 
     def fill_role_prompt_creator_prompt(
         self,
-        train_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame],
         sample_size: int = 20,
         custom_prompt: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
@@ -264,13 +295,14 @@ class PromptEngineer:
         include_multilabel_info: bool = True
     ) -> str:
         """Fill a role prompt creator prompt using sampled data with text-label pairs."""
-        if train_df is None:
-            raise ValueError("No data available for role prompt creation")
-
-        examples = [
-            {'text': row[self.text_column], 'labels': {col: row[col] for col in self.label_columns}}
-            for _, row in train_df.iterrows()
-        ]
+        # Allow missing/empty train_df — use empty examples in that case
+        if train_df is None or train_df.empty:
+            examples = []
+        else:
+            examples = [
+                {'text': row[self.text_column], 'labels': {col: row[col] for col in self.label_columns}}
+                for _, row in train_df.iterrows()
+            ]
 
         prompt_template = custom_prompt or self.warehouse.role_prompt_creator_prompt
 
@@ -310,7 +342,7 @@ class PromptEngineer:
 
     def fill_context_prompt(
         self,
-        train_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame],
         sample_size: int = 20,
         custom_prompt: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
@@ -318,13 +350,14 @@ class PromptEngineer:
         keywords_content: Optional[str] = None
     ) -> str:
         """Fill a context brainstorming prompt using sampled data."""
-        if train_df is None:
-            raise ValueError("No data available for context brainstorming")
-
-        formatted_examples = "\n".join(
-            f"Text: {row[self.text_column]}\nLabels: {' | '.join(str(row[col]) for col in self.label_columns)}"
-            for _, row in train_df.iterrows()
-        )
+        # Allow missing/empty train_df — fall back to empty examples
+        if train_df is None or train_df.empty:
+            formatted_examples = ""
+        else:
+            formatted_examples = "\n".join(
+                f"Text: {row[self.text_column]}\nLabels: {' | '.join(str(row[col]) for col in self.label_columns)}"
+                for _, row in train_df.iterrows()
+            )
 
         if custom_prompt and keywords_content:
             prompt_template = custom_prompt.format(keywords=keywords_content)
@@ -345,7 +378,7 @@ class PromptEngineer:
 
     def fill_procedure_prompt_creator_prompt(
         self,
-        train_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame],
         sample_size: int = 20,
         custom_prompt: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
@@ -354,13 +387,14 @@ class PromptEngineer:
         procedure_additions: Optional[str] = None
     ) -> str:
         """Fill a procedure prompt creator prompt using sampled data."""
-        if train_df is None:
-            raise ValueError("No data available for procedure prompt creation")
-
-        formatted_examples = "\n".join(
-            f"Text: {row[self.text_column]}\nLabels: {' | '.join(str(row[col]) for col in self.label_columns)}"
-            for _, row in train_df.iterrows()
-        )
+        # Allow missing/empty train_df
+        if train_df is None or train_df.empty:
+            formatted_examples = ""
+        else:
+            formatted_examples = "\n".join(
+                f"Text: {row[self.text_column]}\nLabels: {' | '.join(str(row[col]) for col in self.label_columns)}"
+                for _, row in train_df.iterrows()
+            )
 
         if custom_prompt:
             prompt_template = custom_prompt
@@ -391,7 +425,7 @@ class PromptEngineer:
 
     def fill_train_data_intro_prompt(
         self,
-        train_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame],
         sample_size: int = 20,
         custom_prompt: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
@@ -399,13 +433,13 @@ class PromptEngineer:
         procedure_content: Optional[str] = None
     ) -> str:
         """Fill a training data introduction prompt using sampled data."""
-        if train_df is None:
-            raise ValueError("No data available for training data intro")
-
-        formatted_examples = "\n\n".join(
-            f"Text {idx + 1}:\n{row[self.text_column]}\n{'|'.join(str(row[col]) for col in self.label_columns)}"
-            for idx, (_, row) in enumerate(train_df.iterrows())
-        )
+        if train_df is None or train_df.empty:
+            formatted_examples = ""
+        else:
+            formatted_examples = "\n\n".join(
+                f"Text {idx + 1}:\n{row[self.text_column]}\n{'|'.join(str(row[col]) for col in self.label_columns)}"
+                for idx, (_, row) in enumerate(train_df.iterrows())
+            )
 
         if custom_prompt and procedure_content:
             prompt_template = custom_prompt.format(procedure=procedure_content)
@@ -470,7 +504,7 @@ class PromptEngineer:
 
     def fill_train_data_prompt(
         self,
-        train_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame],
         query_text: Optional[str] = None,
         custom_role_prompt: Optional[str] = None,
         include_role: bool = True
@@ -486,8 +520,9 @@ class PromptEngineer:
             custom_role_prompt: Optional custom role prompt
             include_role: Whether to include the role prompt
         """
+        # If no train data is available, return empty training-data prompt
         if train_df is None or train_df.empty:
-            raise ValueError("No data available for training data")
+            return ""
 
         if isinstance(self.few_shot_mode, int):
             num_examples = self.few_shot_mode

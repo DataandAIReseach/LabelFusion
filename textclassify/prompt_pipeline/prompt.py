@@ -40,36 +40,16 @@ class Prompt:
         rendered_parts = []
         for part in self.parts:
             try:
-                rendered = part["content"].format(**combined_vars)
+                rendered = part["content"].format_map(_SafeFormatDict(combined_vars))
             except (KeyError, ValueError) as e:
-                # If format fails, it might be due to unescaped braces in the content
-                # Try to escape braces that are not part of variable placeholders
-                content = part["content"]
-                # First, protect actual variables by replacing them temporarily
-                import re
-                variables_found = re.findall(r'\{(\w+)\}', content)
-                temp_content = content
-                for i, var in enumerate(variables_found):
-                    if var in combined_vars:
-                        temp_content = temp_content.replace(f'{{{var}}}', f'__PLACEHOLDER_{i}__')
-                
-                # Escape remaining braces
-                temp_content = temp_content.replace('{', '{{').replace('}', '}}')
-                
-                # Restore placeholders
-                for i, var in enumerate(variables_found):
-                    if var in combined_vars:
-                        temp_content = temp_content.replace(f'__PLACEHOLDER_{i}__', f'{{{var}}}')
-                
-                # Try rendering again
-                try:
-                    rendered = temp_content.format(**combined_vars)
-                except (KeyError, ValueError) as e2:
-                    raise ValueError(f"Failed to render prompt even after escaping: {e2}")
+                raise ValueError(f"Failed to render prompt: {e}")
             rendered_parts.append(rendered)
 
         return "\n\n".join(rendered_parts).strip()
 
+class _SafeFormatDict(dict):
+    def __missing__(self, key: str) -> str:
+        return "{" + key + "}"
     def __str__(self):
         return self.render()
 
