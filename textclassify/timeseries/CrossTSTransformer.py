@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from typing import Dict
 
-from TSEmbeddingFuser import TSEmbeddingFuser
+from .TSEmbeddingFuser import TSEmbeddingFuser
 
 
 class CrossTSTransformer(nn.Module):

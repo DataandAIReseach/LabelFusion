@@ -1,3 +1,10 @@
+import torch
+import torch.nn as nn
+from typing import Dict, List, Optional
+
+from .TSEmbedder import TSEmbedder
+
+
 class TSEmbeddingFuser(nn.Module):
     """
     Embeds multiple named time series independently with TSEmbedder
