@@ -9,35 +9,38 @@ class CrossTSTransformer(nn.Module):
     """
     Applies cross-series attention on top of TSEmbeddingFuser.
 
-    Each commodity embedding is treated as a token. Multi-head attention
-    lets every series attend to all others, capturing market interactions
-    (e.g. gold ↔ silver, crude ↔ fuel). A final linear projection
-    compresses the result into a single fixed-size representation.
+    NEW ARCHITECTURE:
+        The fuser now receives pre-computed embeddings instead of raw series.
+        This transformer works with the embeddings dict format.
+
+    Each stock embedding is treated as a token. Multi-head attention
+    lets every series attend to all others, capturing market interactions.
 
     Architecture:
-        59 × (B, 1280)          per-series embeddings from TSEmbeddingFuser
+        N × (B, 1280)          per-series embeddings from TSEmbeddingFuser
             ↓ stack as sequence
-        (B, 59, 1280)           series as tokens
+        (B, N, 1280)           series as tokens
             ↓ TransformerEncoder (cross-series attention)
-        (B, 59, 1280)           interaction-aware embeddings
+        (B, N, 1280)           interaction-aware embeddings
             ↓ mean pool over series
         (B, 1280)
             ↓ Linear projection
         (B, output_dim)         final representation
 
     Args:
-        stacked_embedder (TSEmbeddingFuser): Pre-built embedder.
-        output_dim (int): Final output dimensionality. Default 256.
-        num_heads (int): Number of attention heads. Must divide hidden_size.
-            Default 8 (1280 / 8 = 160 per head).
-        num_layers (int): Number of TransformerEncoder layers. Default 2.
-        dropout (float): Dropout in attention and feedforward. Default 0.1.
-        feedforward_dim (int): Inner dim of the transformer FFN. Default 2048.
+        series_names: List of series names (must match fuser)
+        hidden_size: Embedding dimension (default: 1280)
+        output_dim: Final output dimensionality (default: 256)
+        num_heads: Number of attention heads (default: 8)
+        num_layers: Number of TransformerEncoder layers (default: 2)
+        dropout: Dropout in attention and feedforward (default: 0.1)
+        feedforward_dim: Inner dim of transformer FFN (default: 2048)
     """
 
     def __init__(
         self,
-        stacked_embedder: TSEmbeddingFuser,
+        series_names: list[str],
+        hidden_size: int = 1280,
         output_dim: int = 256,
         num_heads: int = 8,
         num_layers: int = 2,
@@ -46,9 +49,9 @@ class CrossTSTransformer(nn.Module):
     ):
         super().__init__()
 
-        self.stacked_embedder = stacked_embedder
-        self.hidden_size = stacked_embedder.hidden_size      # 1280
-        self.n_series = len(stacked_embedder.series_names)
+        self.series_names = list(series_names)
+        self.hidden_size = hidden_size
+        self.n_series = len(series_names)
         self.output_dim = output_dim
 
         # Learnable positional embedding — one per series slot
@@ -76,50 +79,51 @@ class CrossTSTransformer(nn.Module):
 
     @property
     def device(self) -> torch.device:
-        return self.stacked_embedder.device
+        return next(self.parameters()).device
 
     def forward(
         self,
-        series_dict: Dict[str, list],
+        embeddings_dict: Dict[str, torch.Tensor],
     ) -> Dict[str, torch.Tensor]:
         """
         Args:
-            series_dict: dict {series_name: list of B 1-D time series}.
-                         Same format as TSEmbeddingFuser.forward().
+            embeddings_dict: dict {series_name: (B, hidden_size)}
+                            Pre-computed embeddings from TSEmbedder
 
         Returns:
             dict with keys:
                 "output"        – (B, output_dim)  final compressed representation
                 "pooled"        – (B, hidden_size) mean-pooled before projection
                 "attended"      – (B, n_series, hidden_size) post-attention tokens
-                "per_series"    – {name: (B, hidden_size)} raw embeddings
+                "per_series"    – {name: (B, hidden_size)} input embeddings
         """
-        # 1. Get per-series embeddings from the stacked embedder
-        stacked_out = self.stacked_embedder(series_dict)
-        per_series = stacked_out["per_series"]   # {name: (B, 1280)}
-
-        # 2. Stack into sequence: (B, n_series, hidden_size)
+        # 1. Stack embeddings into sequence: (B, n_series, hidden_size)
         tokens = torch.stack(
-            [per_series[name] for name in self.stacked_embedder.series_names],
+            [embeddings_dict[name] for name in self.series_names],
             dim=1,
         )  # (B, N, 1280)
 
-        # 3. Add positional embeddings (one per series slot)
+        # 2. Add positional embeddings (one per series slot)
         positions = torch.arange(self.n_series, device=tokens.device)
         tokens = tokens + self.pos_embedding(positions).unsqueeze(0)  # (B, N, 1280)
 
-        # 4. Cross-series attention
+        # 3. Cross-series attention
         attended = self.transformer(tokens)      # (B, N, 1280)
 
-        # 5. Mean pool over series dimension → single vector
+        # 4. Mean pool over series dimension → single vector
         pooled = attended.mean(dim=1)            # (B, 1280)
 
-        # 6. Project to output_dim
+        # 5. Project to output_dim
         output = self.projection(pooled)         # (B, output_dim)
 
         return {
             "output": output,
             "pooled": pooled,
             "attended": attended,
-            "per_series": per_series,
+            "per_series": embeddings_dict.copy(),
         }
+
+
+# ----------------------------------------------------------------------
+# Example usage
+# ----------------------------------------------------------------------

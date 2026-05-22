@@ -1,7 +1,14 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from transformers import TimesFm2_5Config, TimesFm2_5Model
+
+# Robust import with fallback
+try:
+    from transformers import TimesFm2_5Config, TimesFm2_5Model
+except ImportError:
+    from transformers import AutoModel as TimesFm2_5Model
+    from transformers import AutoConfig as TimesFm2_5Config
+    print("Warning: TimesFm2_5Model not found, using AutoModel fallback")
 
 
 class TSEmbedder(nn.Module):
@@ -134,26 +141,3 @@ class TSEmbedder(nn.Module):
             result["hidden_states"] = outputs.hidden_states
 
         return result
-
-
-# ----------------------------------------------------------------------
-# Quick smoke-test
-# ----------------------------------------------------------------------
-if __name__ == "__main__":
-    embedder = TSEmbedder(
-        pretrained_model_name_or_path="google/timesfm-2.5-200m-transformers",
-        pooling="mean",
-        device_map="auto",
-    )
-    print(f"Hidden size: {embedder.hidden_size}")
-
-    series = [
-        np.sin(np.linspace(0, 20, 100)),
-        np.sin(np.linspace(0, 20, 200)),
-        np.sin(np.linspace(0, 20, 400)),
-    ]
-
-    out = embedder(series)
-
-    print("Embeddings shape :", out["embeddings"].shape)        # (3, 1280)
-    print("Last hidden shape:", out["last_hidden_state"].shape) # (3, P, 1280)
