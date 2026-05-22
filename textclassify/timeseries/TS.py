@@ -198,30 +198,3 @@ class TS:
         loaded = len(self.data)
         total = len(self.stock_symbols)
         return f"TS(stocks={total}, loaded={loaded}, data_dir='{self.data_dir}')"
-
-
-# ----------------------------------------------------------------------
-# Quick test
-# ----------------------------------------------------------------------
-if __name__ == "__main__":
-    # Example usage with FNSPID dataset
-    stocks = ["AAPL", "AMD", "BRK", "DIS", "GOOG", "MSFT", "NVDA", "TSLA", "WMT", "XOM"]
-    
-    # This would work if you have the actual data
-    # ts = TS(
-    #     data_dir="./data/stock_prices",
-    #     stock_symbols=stocks,
-    #     price_column="Close"
-    # )
-    # ts.load_all()
-    # 
-    # # Get series for a single date
-    # series = ts.get_series_for_date("2023-06-15", window_days=100)
-    # print(f"AAPL series shape: {series['AAPL'].shape}")
-    # 
-    # # Get batch for multiple dates
-    # dates = ["2023-01-15", "2023-02-20", "2023-03-10"]
-    # batch = ts.get_series_batch(dates, window_days=100)
-    # print(f"Batch size: {len(batch['AAPL'])}")
-    
-    print("TS class defined - see docstrings for usage examples")
