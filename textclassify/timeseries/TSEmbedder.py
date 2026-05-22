@@ -38,6 +38,7 @@ class TSEmbedder(nn.Module):
         self.model.eval()
 
         self.hidden_size: int = self.model.config.hidden_size
+        self.patch_length: int = getattr(self.model.config, "patch_length", 32)
 
     # ------------------------------------------------------------------
     # helpers
@@ -62,9 +63,10 @@ class TSEmbedder(nn.Module):
         """
         tensors = [self._to_tensor(ts) for ts in time_series]
         max_len = max(t.shape[0] for t in tensors)
+        pad_len = ((max_len + self.patch_length - 1) // self.patch_length) * self.patch_length
 
-        padded = torch.zeros(len(tensors), max_len)
-        mask = torch.ones(len(tensors), max_len, dtype=torch.long)  # 1 = padded
+        padded = torch.zeros(len(tensors), pad_len)
+        mask = torch.ones(len(tensors), pad_len, dtype=torch.long)  # 1 = padded
 
         for i, t in enumerate(tensors):
             length = t.shape[0]

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import copy
 from typing import Dict, List, Optional
 
 from .TSEmbedder import TSEmbedder
@@ -7,13 +8,13 @@ from .TSEmbedder import TSEmbedder
 
 class TSEmbeddingFuser(nn.Module):
     """
-    Embeds multiple named time series independently with TSEmbedder
-    and concatenates their embeddings into one big flat vector per sample.
+    Embeds each named time series with its own TSEmbedder instance
+    and concatenates the resulting embeddings into one flat vector per sample.
 
     Args:
         series_names (list[str]): Ordered list of channel/series names.
-        embedder (TSEmbedder | None): A pre-built embedder to reuse.
-            If None, a new one is created from the remaining kwargs.
+        embedder (TSEmbedder | None): A template embedder to clone once per series.
+            If None, a new one is created from the remaining kwargs and cloned.
         pretrained_model_name_or_path (str): Passed to TSEmbedder if
             no embedder is provided.
         pooling (str): "mean" or "last". "none" is not supported here
@@ -51,12 +52,21 @@ class TSEmbeddingFuser(nn.Module):
             device_map=device_map,
         )
 
+        # Create one independent embedder per series.
+        self.embedders = nn.ModuleDict(
+            {
+                name: copy.deepcopy(self.embedder)
+                for name in self.series_names
+            }
+        )
+
         self.hidden_size = self.embedder.hidden_size
         self.stacked_size = len(self.series_names) * self.hidden_size
 
     @property
     def device(self) -> torch.device:
-        return self.embedder.device
+        first_series = self.series_names[0]
+        return self.embedders[first_series].device
 
     def _validate_input(self, series_dict: Dict[str, list], batch_size: int):
         missing = [n for n in self.series_names if n not in series_dict]
@@ -89,7 +99,7 @@ class TSEmbeddingFuser(nn.Module):
 
         per_series: Dict[str, torch.Tensor] = {}
         for name in self.series_names:
-            per_series[name] = self.embedder(series_dict[name])["embeddings"]
+            per_series[name] = self.embedders[name](series_dict[name])["embeddings"]
 
         stacked = torch.cat(
             [per_series[name] for name in self.series_names],
