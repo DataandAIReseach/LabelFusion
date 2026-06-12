@@ -52,3 +52,5 @@ __pycache__/
 # Egg-info artifacts
 textclassify.egg-info/
 
+/old/
+
