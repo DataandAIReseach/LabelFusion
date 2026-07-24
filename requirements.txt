@@ -96,6 +96,7 @@ nvidia-nvjitlink-cu12==12.6.85
 nvidia-nvtx-cu12==12.6.77
 openai==1.97.0
 openpyxl==3.1.5
+optuna==4.9.0
 packaging==26.0
 pandas==2.3.3
 pandas-datareader==0.10.0
