@@ -116,13 +116,15 @@ class TSEmbedder(nn.Module):
         # Use caller-supplied mask only if provided; otherwise use the inferred one.
         mask = past_values_padding if past_values_padding is not None else auto_mask
 
-        with torch.no_grad():
-            outputs = self.model(
-                past_values=padded,
-                past_values_padding=mask,
-                output_hidden_states=output_hidden_states,
-                return_dict=True,
-            )
+        # No hardcoded no_grad here: this module may be fine-tuned, so gradient
+        # tracking is controlled by the caller (wrap in torch.no_grad() for
+        # frozen/inference use, leave it enabled for training).
+        outputs = self.model(
+            past_values=padded,
+            past_values_padding=mask,
+            output_hidden_states=output_hidden_states,
+            return_dict=True,
+        )
 
         last_hidden: torch.Tensor = outputs.last_hidden_state  # (B, P, H)
 

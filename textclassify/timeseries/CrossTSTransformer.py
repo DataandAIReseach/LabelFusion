@@ -54,6 +54,10 @@ class CrossTSTransformer(nn.Module):
         self.n_series = len(series_names)
         self.output_dim = output_dim
 
+        # Validates embeddings_dict (keys/shapes) and provides the
+        # per_series pass-through consumed below before attention.
+        self.fuser = TSEmbeddingFuser(series_names=self.series_names, hidden_size=self.hidden_size)
+
         # Learnable positional embedding — one per series slot
         self.pos_embedding = nn.Embedding(self.n_series, self.hidden_size)
 
@@ -97,23 +101,28 @@ class CrossTSTransformer(nn.Module):
                 "attended"      – (B, n_series, hidden_size) post-attention tokens
                 "per_series"    – {name: (B, hidden_size)} input embeddings
         """
-        # 1. Stack embeddings into sequence: (B, n_series, hidden_size)
-        tokens = torch.stack(
-            [embeddings_dict[name] for name in self.series_names],
-            dim=1,
-        )  # (B, N, 1280)
+        # 1. Validate input and fuse it into the flat stacked vector via
+        #    TSEmbeddingFuser: (B, n_series, hidden_size) -> (B, n_series * hidden_size).
+        fused = self.fuser(embeddings_dict)
+        stacked = fused["stacked"]  # (B, N * hidden_size)
 
-        # 2. Add positional embeddings (one per series slot)
+        # 2. Unstack back into a token sequence for attention: (B, n_series, hidden_size).
+        #    Safe because TSEmbeddingFuser concatenates along dim=1 in series_names
+        #    order, so this exactly reverses that concatenation.
+        batch_size = stacked.shape[0]
+        tokens = stacked.view(batch_size, self.n_series, self.hidden_size)  # (B, N, 1280)
+
+        # 3. Add positional embeddings (one per series slot)
         positions = torch.arange(self.n_series, device=tokens.device)
         tokens = tokens + self.pos_embedding(positions).unsqueeze(0)  # (B, N, 1280)
 
-        # 3. Cross-series attention
+        # 4. Cross-series attention
         attended = self.transformer(tokens)      # (B, N, 1280)
 
-        # 4. Mean pool over series dimension → single vector
+        # 5. Mean pool over series dimension → single vector
         pooled = attended.mean(dim=1)            # (B, 1280)
 
-        # 5. Project to output_dim
+        # 6. Project to output_dim
         output = self.projection(pooled)         # (B, output_dim)
 
         return {

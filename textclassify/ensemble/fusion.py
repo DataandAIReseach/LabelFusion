@@ -16,6 +16,30 @@ from ..utils.results_manager import ResultsManager, ModelResultsManager
 from .base import BaseEnsemble
 
 
+class _FusionDatasetWithDates(torch.utils.data.Dataset):
+    """Like TensorDataset, but carries raw date strings alongside the tensors.
+
+    TensorDataset only accepts tensors, but the TS branch needs the raw date
+    string per row (not a precomputed embedding) so that _get_ts_embeddings_for_training
+    can compute fresh, gradient-tracked embeddings for each mini-batch during
+    fine-tuning, instead of reusing a stale precomputed tensor.
+    """
+
+    def __init__(self, ml_tensor: torch.Tensor, llm_tensor: torch.Tensor,
+                 dates: List[str], labels_tensor: torch.Tensor):
+        assert len(dates) == ml_tensor.shape[0] == llm_tensor.shape[0] == labels_tensor.shape[0]
+        self.ml_tensor = ml_tensor
+        self.llm_tensor = llm_tensor
+        self.dates = dates
+        self.labels_tensor = labels_tensor
+
+    def __len__(self) -> int:
+        return len(self.dates)
+
+    def __getitem__(self, idx: int):
+        return self.ml_tensor[idx], self.llm_tensor[idx], self.dates[idx], self.labels_tensor[idx]
+
+
 class FusionMLP(nn.Module):
     """Trainable MLP for fusing ML and LLM predictions."""
     
@@ -53,51 +77,67 @@ class FusionMLP(nn.Module):
 class FusionWrapper(nn.Module):
     """Wrapper that combines ML model with frozen LLM scores via Fusion MLP."""
     
-    def __init__(self, ml_model, num_labels: int, task: str = "multiclass", 
-                 hidden_dims: List[int] = [64, 32], embedding_dim: int = 768):
+    def __init__(self, ml_model, num_labels: int, task: str = "multiclass",
+                 hidden_dims: List[int] = [64, 32], embedding_dim: int = 768,
+                 ts_output_dim: int = 0):
         """Initialize Fusion Wrapper.
-        
+
         Args:
             ml_model: Pre-trained ML model (e.g., RoBERTa)
             num_labels: Number of output labels
             task: "multiclass" or "multilabel"
             hidden_dims: Hidden dimensions for fusion MLP
             embedding_dim: Dimension of ML embeddings (default 768 for RoBERTa)
+            ts_output_dim: Dimension of the timeseries branch embedding
+                           (e.g. CrossTSTransformer.output_dim). 0 disables it.
         """
         super().__init__()
         self.ml_model = ml_model
         self.num_labels = num_labels
         self.task = task
         self.embedding_dim = embedding_dim
-        
-        # Fusion MLP takes ML embeddings + LLM scores
-        fusion_input_dim = embedding_dim + num_labels  # ML embeddings (768) + LLM scores
+        self.ts_output_dim = ts_output_dim
+
+        # Fusion MLP takes ML embeddings + LLM scores (+ optional TS embedding)
+        fusion_input_dim = embedding_dim + num_labels + ts_output_dim
         self.fusion_mlp = FusionMLP(fusion_input_dim, num_labels, hidden_dims)
-        
+
         # Device management
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.to(self.device)
-    
-    def forward(self, ml_embeddings: torch.Tensor, llm_predictions: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """Forward pass combining ML embeddings and LLM predictions.
-        
+
+    def forward(self, ml_embeddings: torch.Tensor, llm_predictions: torch.Tensor,
+                ts_embeddings: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
+        """Forward pass combining ML embeddings, LLM predictions, and optional TS embedding.
+
         Args:
             ml_embeddings: Pre-computed ML embeddings (768-dim for RoBERTa)
             llm_predictions: Pre-computed LLM predictions/scores
-            
+            ts_embeddings: Optional timeseries branch embedding (e.g. CrossTSTransformer
+                           output). NOT detached, unlike ml_embeddings/llm_predictions --
+                           the TS branch (per-series TSEmbedders + CrossTSTransformer) is
+                           fine-tuned jointly with the fusion MLP, so gradients must be
+                           able to flow back into it. ML/LLM stay frozen/pre-computed
+                           features by design; only pass a ts_embeddings tensor that was
+                           computed with grad tracking enabled during training.
+
         Returns:
             Dict containing ML embeddings, LLM predictions, and fused logits
         """
-        # Ensure inputs are detached (no gradient flow to original models)
+        # ML/LLM branches stay frozen: no gradient flow back to RoBERTa or the LLM.
         ml_embeddings = ml_embeddings.detach()
         llm_predictions = llm_predictions.detach()
-        
-        # Concatenate ML embeddings and LLM predictions
-        fusion_input = torch.cat([ml_embeddings, llm_predictions], dim=1)
-        
+
+        # Concatenate ML embeddings, LLM predictions, and optional TS embedding.
+        # ts_embeddings is intentionally NOT detached -- see docstring above.
+        fusion_parts = [ml_embeddings, llm_predictions]
+        if ts_embeddings is not None:
+            fusion_parts.append(ts_embeddings)
+        fusion_input = torch.cat(fusion_parts, dim=1)
+
         # Generate fused predictions through MLP
         fused_logits = self.fusion_mlp(fusion_input)
-        
+
         return {
             "ml_embeddings": ml_embeddings,
             "llm_predictions": llm_predictions,
@@ -148,6 +188,13 @@ class FusionEnsemble(BaseEnsemble):
         self.llm_scores_cache = {}
         self.calibrator = None
         self.test_performance = {}  # Store test set performance
+
+        # Timeseries branch components (optional, registered via add_ts_model)
+        self.ts_loader = None
+        self.ts_embedders = None  # Dict[str, TSEmbedder], one per series, fine-tuned
+        self.ts_transformer = None
+        self.ts_date_column = None
+        self.ts_window_days = 21
         
         # LLM prediction cache file paths from ensemble config
         self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', '')
@@ -205,8 +252,104 @@ class FusionEnsemble(BaseEnsemble):
         self.llm_model = llm_model
         self.models.append(llm_model)
         self.model_names.append("llm_model")
-    
-    def fit(self, train_df: pd.DataFrame, val_df: pd.DataFrame, 
+
+    def add_ts_model(self, ts_loader, ts_embedders, ts_transformer,
+                      date_column: str = "article_date", window_days: int = 21):
+        """Register the timeseries branch (TS loader + per-series TSEmbedders + CrossTSTransformer).
+
+        Each series gets its own TSEmbedder instance so it can be fine-tuned
+        independently during fusion training (they are NOT frozen/shared).
+
+        Args:
+            ts_loader: TS instance with price data already loaded (load_all() called)
+            ts_embedders: Dict[str, TSEmbedder] mapping each series name (must match
+                          ts_transformer.series_names) to its own TSEmbedder instance
+            ts_transformer: CrossTSTransformer instance that fuses the per-series
+                             embeddings into a single (B, output_dim) embedding
+            date_column: Name of the date column in train/val/test DataFrames used
+                         to look up price windows (default: "article_date")
+            window_days: Trailing window size passed to TS.get_series_batch
+        """
+        missing = [n for n in ts_transformer.series_names if n not in ts_embedders]
+        if missing:
+            raise EnsembleError(f"Missing TSEmbedder for series: {missing}", "FusionEnsemble")
+
+        # TSEmbedder defaults to CPU (device_map=None) and CrossTSTransformer is freshly
+        # initialized with no device placement -- move both onto FusionEnsemble's device
+        # (cuda if available) so the actual TimesFM/attention compute (and gradients
+        # during fine-tuning) run on GPU instead of silently staying on CPU.
+        ts_embedders = {name: embedder.to(self.device) for name, embedder in ts_embedders.items()}
+        ts_transformer = ts_transformer.to(self.device)
+
+        self.ts_loader = ts_loader
+        self.ts_embedders = ts_embedders
+        self.ts_transformer = ts_transformer
+        self.ts_date_column = date_column
+        self.ts_window_days = window_days
+        self.models.append(ts_transformer)
+        self.model_names.append("ts_model")
+        for name, embedder in ts_embedders.items():
+            self.models.append(embedder)
+            self.model_names.append(f"ts_embedder_{name}")
+
+    def _get_ts_embeddings(self, df: pd.DataFrame) -> Optional[torch.Tensor]:
+        """Compute fused TS branch embeddings for each row's date (frozen/no_grad).
+
+        Orchestrates TS.get_series_batch -> per-series TSEmbedder -> CrossTSTransformer,
+        aligned 1:1 with df row order. Returns None if no TS branch has been registered
+        via add_ts_model. Uses eval mode + no_grad -- for inference (val-set display,
+        test prediction) only. Training uses _get_ts_embeddings_for_training instead,
+        so the per-series embedders and CrossTSTransformer can actually be fine-tuned.
+        """
+        if self.ts_transformer is None:
+            return None
+
+        dates = df[self.ts_date_column].tolist()
+
+        was_training = self.ts_transformer.training
+        for embedder in self.ts_embedders.values():
+            embedder.eval()
+        self.ts_transformer.eval()
+
+        with torch.no_grad():
+            fused_output = self._run_ts_branch(dates)
+
+        if was_training:
+            for embedder in self.ts_embedders.values():
+                embedder.train()
+            self.ts_transformer.train()
+
+        return fused_output.detach().cpu()
+
+    def _get_ts_embeddings_for_training(self, dates: List[str]) -> torch.Tensor:
+        """Compute fused TS branch embeddings for a mini-batch, WITH gradients enabled.
+
+        Used inside _train_fusion_mlp_on_val so the per-series TSEmbedders and
+        CrossTSTransformer can be fine-tuned via backprop through the fusion loss.
+        """
+        return self._run_ts_branch(dates)
+
+    def _run_ts_branch(self, dates: List[str]) -> torch.Tensor:
+        """Shared orchestration: TS.get_series_batch -> per-series TSEmbedder -> CrossTSTransformer.
+
+        Gradient tracking follows the ambient context (wrap in torch.no_grad()
+        for frozen inference; leave enabled for training).
+        """
+        series_names = self.ts_transformer.series_names
+
+        series_batch = self.ts_loader.get_series_batch(
+            dates, window_days=self.ts_window_days, stocks=series_names
+        )
+
+        embeddings_dict = {}
+        for name in series_names:
+            out = self.ts_embedders[name](series_batch[name])
+            embeddings_dict[name] = out["embeddings"].to(self.device)
+
+        fused = self.ts_transformer(embeddings_dict)
+        return fused["output"]
+
+    def fit(self, train_df: pd.DataFrame, val_df: pd.DataFrame,
             val_llm_predictions: Optional[List[Union[str, List[str]]]] = None) -> Dict[str, Any]:
         """Train the fusion ensemble with train and validation DataFrames.
         
@@ -454,34 +597,43 @@ class FusionEnsemble(BaseEnsemble):
         task = "multilabel" if self.classification_type == ClassificationType.MULTI_LABEL else "multiclass"
         # Get embedding dimension from ML model (default 768 for RoBERTa)
         embedding_dim = getattr(self.ml_model, 'embedding_dim', 768)
+        ts_output_dim = self.ts_transformer.output_dim if self.ts_transformer is not None else 0
         self.fusion_wrapper = FusionWrapper(
             ml_model=self.ml_model,
             num_labels=self.num_labels,
             task=task,
             hidden_dims=self.fusion_hidden_dims,
-            embedding_dim=embedding_dim
+            embedding_dim=embedding_dim,
+            ts_output_dim=ts_output_dim
         )
-        
-        # Step 5: Train fusion MLP on validation set predictions
+
+        # Step 5: Train fusion MLP on validation set predictions. If a TS branch is
+        # registered, this also fine-tunes its per-series TSEmbedders + CrossTSTransformer
+        # (computed fresh from dates per mini-batch -- see _train_fusion_mlp_on_val).
         print("Training fusion MLP on validation predictions...")
         self._train_fusion_mlp_on_val(
-            val_df, 
-            ml_val_predictions_hashed, 
-            llm_val_predictions_hashed, 
-            text_column, 
+            val_df,
+            ml_val_predictions_hashed,
+            llm_val_predictions_hashed,
+            text_column,
             label_columns
         )
-        
+
+        # Step 5b: Compute TS branch embeddings for the validation set AFTER fine-tuning,
+        # so step 6 below reflects the just-trained weights instead of stale pre-training ones.
+        ts_val_embeddings = self._get_ts_embeddings(val_df)
+
         # Step 6: Generate and save fusion predictions on full validation set
         print("Generating fusion predictions on validation set...")
         val_true_labels = val_df[label_columns].values.tolist() if all(col in val_df.columns for col in label_columns) else None
-        
+
         # For _predict_with_fusion, we pass the hashed predictions as lists
         fusion_val_result = self._predict_with_fusion(
-            ml_val_predictions_hashed, 
-            llm_val_predictions_hashed, 
-            val_df[text_column].tolist(), 
-            val_true_labels
+            ml_val_predictions_hashed,
+            llm_val_predictions_hashed,
+            val_df[text_column].tolist(),
+            val_true_labels,
+            ts_embeddings=ts_val_embeddings
         )
         
         # Save fusion validation predictions to experiments directory
@@ -1795,10 +1947,15 @@ class FusionEnsemble(BaseEnsemble):
         """
         return self._train_fusion_mlp_on_val(val_df, ml_val_predictions, llm_val_predictions, text_column, label_columns)
 
-    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_predictions, llm_val_predictions, 
+    def _train_fusion_mlp_on_val(self, val_df: pd.DataFrame, ml_val_predictions, llm_val_predictions,
                                 text_column: str, label_columns: List[str]):
         """Train the fusion MLP using validation set predictions from both ML and LLM models.
-        
+
+        If a TS branch is registered, its per-series TSEmbedders and CrossTSTransformer
+        are fine-tuned jointly with the fusion MLP: TS embeddings are computed fresh
+        (with gradients) from raw dates on every mini-batch, not from a precomputed
+        cache, so backprop actually reaches those modules.
+
         Args:
             val_df: Validation DataFrame
             ml_val_predictions: ML predictions (list of dicts with hashes or raw predictions)
@@ -1843,115 +2000,163 @@ class FusionEnsemble(BaseEnsemble):
         fusion_val_ml_predictions = [ml_preds[i] for i in val_indices]
         fusion_train_llm_predictions = [llm_preds[i] for i in train_indices]
         fusion_val_llm_predictions = [llm_preds[i] for i in val_indices]
-        
+
+        has_ts = self.ts_transformer is not None
+
+        # Dates for the TS branch (aligned 1:1 with the ml/llm prediction slices above),
+        # used to compute fresh, gradient-tracked TS embeddings per mini-batch below.
+        fusion_train_ts_dates = fusion_train_df[self.ts_date_column].tolist() if has_ts else None
+        fusion_val_ts_dates = fusion_val_df[self.ts_date_column].tolist() if has_ts else None
+
         print(f"    Fusion training: {len(fusion_train_df)} samples")
         print(f"    Fusion validation: {len(fusion_val_df)} samples")
-        
+
         # Create data loaders using both ML and LLM predictions
         train_dataset = self._create_fusion_dataset(
-            fusion_train_df[text_column].tolist(), 
-            fusion_train_df[label_columns].values.tolist(), 
+            fusion_train_df[text_column].tolist(),
+            fusion_train_df[label_columns].values.tolist(),
             fusion_train_ml_predictions,
-            fusion_train_llm_predictions
+            fusion_train_llm_predictions,
+            ts_dates=fusion_train_ts_dates
         )
         val_dataset = self._create_fusion_dataset(
-            fusion_val_df[text_column].tolist(), 
-            fusion_val_df[label_columns].values.tolist(), 
+            fusion_val_df[text_column].tolist(),
+            fusion_val_df[label_columns].values.tolist(),
             fusion_val_ml_predictions,
-            fusion_val_llm_predictions
+            fusion_val_llm_predictions,
+            ts_dates=fusion_val_ts_dates
         )
-        
+
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
-        
-        # Freeze ML model parameters - only optimize the fusion MLP
+
+        # Freeze ML model parameters - only optimize the fusion MLP (+ TS branch, if registered)
         for param in self.fusion_wrapper.ml_model.model.parameters():
             param.requires_grad = False
-        
-        # Setup optimizer for fusion MLP only
+
+        # Setup optimizer: fusion MLP always; TS embedders + CrossTSTransformer too, so
+        # they get fine-tuned jointly with the fusion loss instead of staying frozen.
         fusion_params = list(self.fusion_wrapper.fusion_mlp.parameters())
+        if has_ts:
+            fusion_params += list(self.ts_transformer.parameters())
+            for embedder in self.ts_embedders.values():
+                fusion_params += list(embedder.parameters())
         optimizer = torch.optim.AdamW(fusion_params, lr=self.fusion_lr)
-        
+
         # Loss function
         if self.classification_type == ClassificationType.MULTI_CLASS:
             criterion = nn.CrossEntropyLoss()
         else:
             criterion = nn.BCEWithLogitsLoss()
-        
+
         # Training loop with validation monitoring
         self.fusion_wrapper.train()
+        if has_ts:
+            self.ts_transformer.train()
+            for embedder in self.ts_embedders.values():
+                embedder.train()
         best_val_loss = float('inf')
-        
+
         for epoch in range(self.num_epochs):
             # Training phase
             total_train_loss = 0
             for batch in train_loader:
-                ml_predictions, llm_predictions, labels = batch
+                if has_ts:
+                    ml_predictions, llm_predictions, dates_batch, labels = batch
+                    ts_predictions = self._get_ts_embeddings_for_training(list(dates_batch))
+                else:
+                    ml_predictions, llm_predictions, labels = batch
+                    ts_predictions = None
                 ml_predictions = ml_predictions.to(self.device)
                 llm_predictions = llm_predictions.to(self.device)
                 labels = labels.to(self.device)
-                
+
                 optimizer.zero_grad()
-                
-                outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
+
+                outputs = self.fusion_wrapper(ml_predictions, llm_predictions, ts_predictions)
                 fused_logits = outputs['fused_logits']
-                
+
                 if self.classification_type == ClassificationType.MULTI_CLASS:
                     labels = torch.argmax(labels, dim=1)
-                
+
                 loss = criterion(fused_logits, labels)
                 loss.backward()
                 optimizer.step()
-                
+
                 total_train_loss += loss.item()
-            
+
             # Validation phase
             self.fusion_wrapper.eval()
+            if has_ts:
+                self.ts_transformer.eval()
+                for embedder in self.ts_embedders.values():
+                    embedder.eval()
             total_val_loss = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    ml_predictions, llm_predictions, labels = batch
+                    if has_ts:
+                        ml_predictions, llm_predictions, dates_batch, labels = batch
+                        ts_predictions = self._get_ts_embeddings_for_training(list(dates_batch))
+                    else:
+                        ml_predictions, llm_predictions, labels = batch
+                        ts_predictions = None
                     ml_predictions = ml_predictions.to(self.device)
                     llm_predictions = llm_predictions.to(self.device)
                     labels = labels.to(self.device)
-                    
-                    outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
+
+                    outputs = self.fusion_wrapper(ml_predictions, llm_predictions, ts_predictions)
                     fused_logits = outputs['fused_logits']
-                    
+
                     if self.classification_type == ClassificationType.MULTI_CLASS:
                         labels = torch.argmax(labels, dim=1)
-                    
+
                     loss = criterion(fused_logits, labels)
                     total_val_loss += loss.item()
-            
+
             avg_train_loss = total_train_loss / len(train_loader)
             avg_val_loss = total_val_loss / len(val_loader)
-            
+
             print(f"   Epoch {epoch + 1}/{self.num_epochs} - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
-            
+
             # Save best model based on validation loss
             if avg_val_loss < best_val_loss:
                 best_val_loss = avg_val_loss
                 # Could save model state here if needed
-            
+
             self.fusion_wrapper.train()  # Back to training mode
+            if has_ts:
+                self.ts_transformer.train()
+                for embedder in self.ts_embedders.values():
+                    embedder.train()
     
-    def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]], 
-                              ml_predictions: List, llm_predictions: List):
+    def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]],
+                              ml_predictions: List, llm_predictions: List,
+                              ts_embeddings: Optional[torch.Tensor] = None,
+                              ts_dates: Optional[List[str]] = None):
         """Create dataset for fusion training using hash-based embedding/prediction matching.
-        
+
         This method uses text hashes to match embeddings and predictions with texts, making it
         robust against DataFrame reordering. Now uses ML embeddings instead of predictions.
-        
+
         Args:
             texts: List of text strings
             labels: List of label vectors
             ml_predictions: List of ML predictions (dict with 'text_hash', 'prediction', and 'embedding')
             llm_predictions: List of LLM predictions (dict with 'text_hash' and 'prediction')
-            
+            ts_embeddings: Optional (len(texts), ts_output_dim) precomputed, frozen TS branch
+                           embeddings, aligned 1:1 with texts order. Used for inference
+                           (val display / test predict), mutually exclusive with ts_dates.
+            ts_dates: Optional list of date strings, aligned 1:1 with texts order. Used
+                      during training so TS embeddings are computed fresh (with gradients)
+                      per mini-batch instead of a stale precomputed tensor. Mutually
+                      exclusive with ts_embeddings.
+
         Returns:
-            TensorDataset with matched embeddings and predictions
+            TensorDataset (or _FusionDatasetWithDates if ts_dates is given) with matched
+            embeddings and predictions
         """
+        if ts_embeddings is not None and ts_dates is not None:
+            raise EnsembleError("ts_embeddings and ts_dates are mutually exclusive", "FusionEnsemble")
         
         # Check if predictions have hash information (new format)
         ml_has_hashes = (len(ml_predictions) > 0 and 
@@ -2068,6 +2273,24 @@ class FusionEnsemble(BaseEnsemble):
         
         # Create tensor dataset
         labels_tensor = torch.FloatTensor(labels)
+
+        if ts_dates is not None:
+            if len(ts_dates) != len(texts):
+                raise EnsembleError(
+                    f"TS dates length ({len(ts_dates)}) doesn't match texts length ({len(texts)})",
+                    "FusionEnsemble"
+                )
+            return _FusionDatasetWithDates(ml_tensor, llm_tensor, ts_dates, labels_tensor)
+
+        if ts_embeddings is not None:
+            ts_tensor = ts_embeddings if isinstance(ts_embeddings, torch.Tensor) else torch.tensor(ts_embeddings, dtype=torch.float)
+            ts_tensor = ts_tensor.detach().cpu().float()
+            if ts_tensor.shape[0] != len(texts):
+                raise EnsembleError(
+                    f"TS embeddings length ({ts_tensor.shape[0]}) doesn't match texts length ({len(texts)})",
+                    "FusionEnsemble"
+                )
+            return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, ts_tensor, labels_tensor)
         return torch.utils.data.TensorDataset(ml_tensor, llm_tensor, labels_tensor)
     
     def _prediction_to_tensor(self, prediction) -> torch.Tensor:
@@ -2132,7 +2355,10 @@ class FusionEnsemble(BaseEnsemble):
         label_columns = self.ml_model.label_columns or [col for col in test_df.columns if col != text_column]
         
         texts = test_df[text_column].tolist()
-        
+
+        # Compute TS branch embeddings for the test set (if registered)
+        ts_test_embeddings = self._get_ts_embeddings(test_df)
+
         # Extract true labels from DataFrame if available
         extracted_labels = None
         if all(col in test_df.columns for col in label_columns):
@@ -2402,10 +2628,11 @@ class FusionEnsemble(BaseEnsemble):
         # Step 3: Use fusion MLP to combine predictions
         print("Generating fusion predictions...")
         result = self._predict_with_fusion(
-            ml_test_predictions_hashed, 
-            llm_test_predictions_hashed, 
-            texts, 
-            extracted_labels
+            ml_test_predictions_hashed,
+            llm_test_predictions_hashed,
+            texts,
+            extracted_labels,
+            ts_embeddings=ts_test_embeddings
         )
         
         # Save fusion predictions to cache
@@ -2442,15 +2669,18 @@ class FusionEnsemble(BaseEnsemble):
         
         return result
     
-    def _predict_with_fusion(self, ml_predictions, llm_predictions, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
+    def _predict_with_fusion(self, ml_predictions, llm_predictions, texts: List[str],
+                              true_labels: Optional[List[List[int]]] = None,
+                              ts_embeddings: Optional[torch.Tensor] = None) -> ClassificationResult:
         """Generate fusion predictions using trained MLP.
-        
+
         Args:
             ml_predictions: Either ClassificationResult (old format) or list of dicts with hashes (new format)
             llm_predictions: Either ClassificationResult (old format) or list of dicts with hashes (new format)
             texts: List of text strings
             true_labels: Optional true labels for metrics
-            
+            ts_embeddings: Optional (len(texts), ts_output_dim) tensor of TS branch embeddings
+
         Returns:
             ClassificationResult with fusion predictions
         """
@@ -2471,20 +2701,26 @@ class FusionEnsemble(BaseEnsemble):
         
         # Create dataset using both ML and LLM predictions (hash-based matching happens here)
         dummy_labels = [[0] * self.num_labels] * len(texts)
-        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_preds, llm_preds)
+        dataset = self._create_fusion_dataset(texts, dummy_labels, ml_preds, llm_preds, ts_embeddings=ts_embeddings)
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
-        
+
         # Generate predictions
         self.fusion_wrapper.eval()
         all_predictions = []
-        
+        has_ts = self.ts_transformer is not None
+
         with torch.no_grad():
             for batch in dataloader:
-                ml_predictions, llm_predictions, _ = batch
+                if has_ts:
+                    ml_predictions, llm_predictions, ts_predictions, _ = batch
+                    ts_predictions = ts_predictions.to(self.device)
+                else:
+                    ml_predictions, llm_predictions, _ = batch
+                    ts_predictions = None
                 ml_predictions = ml_predictions.to(self.device)
                 llm_predictions = llm_predictions.to(self.device)
-                
-                outputs = self.fusion_wrapper(ml_predictions, llm_predictions)
+
+                outputs = self.fusion_wrapper(ml_predictions, llm_predictions, ts_predictions)
                 fused_logits = outputs['fused_logits']
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
