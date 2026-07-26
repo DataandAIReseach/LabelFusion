@@ -1,64 +1,97 @@
 """
-Split the all-commodities article dataset into train/val/test (80/10/10).
-
-Loads the already-flattened articles CSV (see data_gen.ipynb / the JSON-to-CSV
-cell in eval_silver_gold_oil_gas.ipynb for how it was produced), splits it
-80/10/10, and reports the commodity-combination sanity check for the full
-dataset and each split, same convention as that notebook cell.
+Sample a small batch of articles, run an LLM classifier (OpenAI gpt-4o-mini)
+on all of them, then evaluate the predictions on a 20% held-out slice of that
+sample.
 """
 
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
+
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
 
-ARTICLES_DIR = Path(__file__).resolve().parent.parent / "data" / "articles"
+from textclassify import OpenAIClassifier
+from textclassify.core.types import ModelConfig, ModelType
+
+ARTICLES_DIR = REPO_ROOT / "data" / "articles"
 CSV_PATH = ARTICLES_DIR / "articles_all_commodities_baseline_seed7_20260722_190748.csv"
+OUTPUT_DIR = Path(__file__).resolve().parent / "outputs"
 
 ALL_COMMODITIES = ["gold", "silver", "oil", "gas"]
+TEXT_COLUMN = "text"
 RANDOM_STATE = 7
-TRAIN_FRAC = 0.8
-VAL_FRAC = 0.1
-TEST_FRAC = 0.1
+
+SAMPLE_SIZE = 200  # single batch (matches default batch_size) -- quick check that the batching fix works
+EVAL_FRAC = 0.2  # fraction of the sample held out for evaluation
+
+LLM_MODEL = "gpt-4o-mini"
 
 
-def print_combo_distribution(df: pd.DataFrame, name: str):
-    combo_counts = df.apply(
-        lambda r: "+".join(c for c in ALL_COMMODITIES if r[c] == 1), axis=1
-    ).value_counts()
-    print(f"\n{name} commodity combination distribution ({len(df)} rows):")
-    print(combo_counts)
+def load_sample_data():
+    print(f"Loading: {CSV_PATH}")
+    df = pd.read_csv(CSV_PATH)
+    df[TEXT_COLUMN] = df["headline"].fillna("") + " " + df["body"].fillna("")
+    print(f"Full dataset shape: {df.shape}")
 
-    n_commodities = df[ALL_COMMODITIES].sum(axis=1)
-    print(f"{name} articles by number of commodities: {n_commodities.value_counts().sort_index().to_dict()}")
+    sample_df = df.sample(n=SAMPLE_SIZE, random_state=RANDOM_STATE).reset_index(drop=True)
+    print(f"Sampled {len(sample_df)} rows")
+
+    eval_df, _rest = train_test_split(
+        sample_df, train_size=EVAL_FRAC, random_state=RANDOM_STATE
+    )
+    print(f"Eval slice: {len(eval_df)} rows ({EVAL_FRAC:.0%} of the sample)")
+
+    return sample_df, eval_df.index
+
+
+def build_llm_model() -> OpenAIClassifier:
+    llm_config = ModelConfig(
+        model_name=LLM_MODEL,
+        model_type=ModelType.LLM,
+        parameters={
+            "model": LLM_MODEL,
+            "temperature": 0.1,
+            "max_completion_tokens": 100,
+        },
+    )
+    return OpenAIClassifier(
+        config=llm_config,
+        text_column=TEXT_COLUMN,
+        label_columns=ALL_COMMODITIES,
+        multi_label=True,
+        output_dir=str(OUTPUT_DIR),
+        experiment_name="train_test_llm",
+        cache_dir=str(OUTPUT_DIR / "llm_cache"),
+    )
 
 
 def main():
-    print(f"Loading: {CSV_PATH}")
-    df = pd.read_csv(CSV_PATH)
-    print(f"Shape: {df.shape}")
+    sample_df, eval_index = load_sample_data()
 
-    print_combo_distribution(df, "Full dataset")
+    llm = build_llm_model()
 
-    # 80/10/10: split off the 80% train first, then split the remaining 20%
-    # evenly into val/test.
-    train_df, rest_df = train_test_split(
-        df, train_size=TRAIN_FRAC, random_state=RANDOM_STATE
-    )
-    val_df, test_df = train_test_split(
-        rest_df, train_size=VAL_FRAC / (VAL_FRAC + TEST_FRAC), random_state=RANDOM_STATE
-    )
+    print(f"\n=== Predicting on all {len(sample_df)} sampled articles ===")
+    result = llm.predict(test_df=sample_df)
 
-    print(f"\nSplit sizes -- train: {len(train_df)}  val: {len(val_df)}  test: {len(test_df)}")
+    print(f"\n=== Evaluating on the {EVAL_FRAC:.0%} held-out slice ({len(eval_index)} rows) ===")
+    eval_positions = [sample_df.index.get_loc(i) for i in eval_index]
 
-    for name, split_df in [("Train", train_df), ("Val", val_df), ("Test", test_df)]:
-        print_combo_distribution(split_df, name)
+    y_true = sample_df.loc[eval_index, ALL_COMMODITIES].values
+    y_pred = [[1 if c in result.predictions[pos] else 0 for c in ALL_COMMODITIES] for pos in eval_positions]
+    y_pred = pd.DataFrame(y_pred, columns=ALL_COMMODITIES).values
 
-    stem = CSV_PATH.stem
-    print()
-    for name, split_df in [("train", train_df), ("val", val_df), ("test", test_df)]:
-        out_path = ARTICLES_DIR / f"{stem}_{name}.csv"
-        split_df.to_csv(out_path, index=False)
-        print(f"Saved: {out_path}  Shape: {split_df.shape}")
+    for i, c in enumerate(ALL_COMMODITIES):
+        print(f"=== {c.upper()} ===")
+        print(classification_report(y_true[:, i], y_pred[:, i]))
+
+    exact_match = (y_true == y_pred).all(axis=1).mean()
+    mean_accuracy = (y_true == y_pred).mean()
+    print(f"Exact match (all {len(ALL_COMMODITIES)} correct): {exact_match:.3f}")
+    print(f"Mean per-label accuracy: {mean_accuracy:.3f}")
 
 
 if __name__ == "__main__":

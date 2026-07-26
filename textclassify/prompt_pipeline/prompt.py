@@ -47,12 +47,6 @@ class Prompt:
 
         return "\n\n".join(rendered_parts).strip()
 
-class _SafeFormatDict(dict):
-    def __missing__(self, key: str) -> str:
-        return "{" + key + "}"
-    def __str__(self):
-        return self.render()
-
     def to_dict(self) -> Dict[str, str]:
         """Export parts as a dictionary."""
         return {part["name"]: part["content"] for part in self.parts}
@@ -64,20 +58,20 @@ class _SafeFormatDict(dict):
 
     def fuse(self, other: 'Prompt', parts: Optional[List[str]] = None) -> 'Prompt':
         """Fuse another prompt's parts into this prompt.
-        
+
         Args:
             other: Another Prompt object to fuse with
             parts: Optional list of part names to fuse (default: all parts)
-            
+
         Returns:
             self: The modified prompt for method chaining
-            
+
         Raises:
             ValueError: If specified part name doesn't exist in other prompt
         """
         # Determine which parts to fuse
         parts_to_fuse = parts if parts is not None else [p["name"] for p in other.parts]
-        
+
         # Add each part from other prompt
         for part_name in parts_to_fuse:
             for part in other.parts:
@@ -86,8 +80,13 @@ class _SafeFormatDict(dict):
                     break
             else:
                 raise ValueError(f"Part '{part_name}' not found in other prompt")
-        
+
         # Merge variables
         self.variables.update(other.variables)
-        
+
         return self
+
+
+class _SafeFormatDict(dict):
+    def __missing__(self, key: str) -> str:
+        return "{" + key + "}"
