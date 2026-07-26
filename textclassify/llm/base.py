@@ -864,20 +864,14 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                     if rel_idx < len(batch_predictions):
                         predictions[orig_pos] = batch_predictions[rel_idx]
             else:
-                # No cache in use or full run — append sequentially
-                # When not using cache, predictions list may be all None placeholders,
-                # so we append to build the final list
-                if all(p is None for p in predictions):
-                    # fresh append mode
-                    predictions = []
-                    predictions.extend(batch_predictions)
-                else:
-                    # mix-mode: fill next available None slots
-                    fill_idx = 0
-                    for j in range(len(predictions)):
-                        if predictions[j] is None and fill_idx < len(batch_predictions):
-                            predictions[j] = batch_predictions[fill_idx]
-                            fill_idx += 1
+                # No cache in use or full run — df_uncached is df here, so batches
+                # are processed in original row order. Write each batch's predictions
+                # directly to their real position (batch_start + rel_idx) rather than
+                # appending/filling, which silently dropped every batch after the first.
+                for rel_idx, batch_pred in enumerate(batch_predictions):
+                    pos = batch_start + rel_idx
+                    if pos < len(predictions):
+                        predictions[pos] = batch_pred
             
             if self.verbose and not isinstance(batch_iterator, tqdm):
                 self.logger.info(f"Batch {i+1} completed ({len(batch_predictions)} predictions)")
