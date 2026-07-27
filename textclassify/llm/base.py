@@ -43,16 +43,18 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         auto_use_cache: bool = True,
         cache_dir: str = "cache",
         use_nearest_neighbours: bool = False,
-        embedding_model: str = "all-MiniLM-L6-v2"
+        embedding_model: str = "all-MiniLM-L6-v2",
+        fixed_examples: bool = False
     ):
         """Initialize the LLM classifier.
-        
+
         Args:
             config: Configuration object
             text_column: Name of the column containing text data
             label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier (default: False)
-            few_shot_mode: Mode for few-shot learning (default: "few_shot")
+            few_shot_mode: Mode for few-shot learning (default: "few_shot"). When set to
+                an int, also controls how many few-shot examples are drawn per prompt.
             verbose: Whether to show detailed progress (default: True)
             provider: LLM provider to use ('openai', 'gemini', 'deepseek', etc.)
             output_dir: Base directory for saving results (default: "outputs")
@@ -60,6 +62,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             auto_save_results: Whether to automatically save results (default: True)
             auto_use_cache: Whether to automatically check and reuse cached predictions (default: False)
             cache_dir: Directory to search for cached predictions (default: "cache")
+            fixed_examples: If True, the few-shot examples are sampled once (from the
+                train_df stored via fit(), or passed explicitly to predict()) and reused
+                for every prompt. If False (default), examples are resampled fresh for
+                each test row (random, or nearest-neighbour if use_nearest_neighbours=True).
         """
         super().__init__(config)
         self.config.model_type = ModelType.LLM
@@ -67,12 +73,15 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self.few_shot_mode = few_shot_mode
         self.verbose = verbose
         self.mode = None
-        
+        self.train_df = None  # set via fit(); used as the few-shot pool by predict() when
+                               # no train_df is passed explicitly
+        self.val_df = None
+
         # Set provider - use parameter if provided, otherwise get from config, default to openai
         self.provider = provider or getattr(self.config, 'provider', 'openai')
         # Also set it on config for consistency
         self.config.provider = self.provider
-        
+
         # Cache management settings
         self.auto_use_cache = auto_use_cache
         self.cache_dir = cache_dir
@@ -115,9 +124,12 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if not api_key:
                 raise ValueError("No API key found for deepseek")
         else:  # default to openai
-            api_key = key_manager.get_key("openai")
+            # Prefer OPENROUTER_API_KEY when set -- create_llm_generator auto-detects
+            # OpenRouter from the sk-or-v1- key prefix and routes through
+            # OpenRouterContentGenerator instead of OpenAIContentGenerator.
+            api_key = key_manager.get_key("openrouter") or key_manager.get_key("openai")
             if not api_key:
-                raise ValueError("No API key found for openai")
+                raise ValueError("No API key found for openai/openrouter. Set OPENROUTER_API_KEY or OPENAI_API_KEY.")
             
         self.llm_generator = create_llm_generator(
             provider=self.provider,
@@ -144,6 +156,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             model_name=self.config.parameters["model"],
             provider=self.provider,
             sampler=sampler,
+            fixed_examples=fixed_examples,
         )
         
         if self.verbose:
@@ -213,72 +226,32 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         label_definitions: Optional[Dict[str, str]] = None,
     ) -> None:
         """
-        Pre-compute and cache Zero-Shot predictions for train (and optionally val) splits.
-        Must be called before training the FusionMLP.
-        
-        This method runs the LLM in Zero-Shot mode (no examples) on the training and
-        validation datasets, then caches the results. During FusionMLP training, these
-        cached predictions are loaded as input features, avoiding expensive re-computation.
-        
+        Store train_df (and optionally val_df) as the few-shot example pool.
+
+        Does not make any LLM calls. The stored train_df is used automatically by
+        predict()/predict_async() as the few-shot pool whenever they're called without
+        an explicit train_df argument -- see fixed_examples on __init__ for whether
+        the same examples get reused every time or resampled per prediction.
+
         Args:
-            train_df: Training data to predict and cache
-            val_df: Optional validation data to predict and cache
-            context: Optional context for classification
-            label_definitions: Optional label definitions
-            
+            train_df: Training data to use as the few-shot example pool
+            val_df: Optional validation data, stored for reference (not used for few-shot)
+            context: Unused (kept for backward-compatible signature)
+            label_definitions: Unused (kept for backward-compatible signature)
+
         Example:
             >>> llm = OpenAIClassifier(config, label_columns=commodities)
-            >>> llm.fit(train_df, val_df)  # Pre-compute and cache
-            >>> # Later during training:
-            >>> result = llm.predict(test_df=batch)  # Uses cache automatically
+            >>> llm.fit(train_df)  # just stores train_df
+            >>> result = llm.predict(test_df=batch)  # uses train_df as few-shot pool
         """
-        if self.verbose:
-            self.logger.info("=" * 70)
-            self.logger.info("FITTING LLM CLASSIFIER (Zero-Shot Pre-Caching)")
-            self.logger.info("=" * 70)
-            self.logger.info(f"Train samples: {len(train_df)}")
-            if val_df is not None:
-                self.logger.info(f"Val samples: {len(val_df)}")
-        
-        # Predict and cache train split
-        self._current_dataset_type = "train"
-        # Ensure global mode is set so prompt engineering does zero-shot for train
-        try:
-            self.set_mode("train")
-        except Exception:
-            pass
-        if self.verbose:
-            self.logger.info("\n[1/2] Processing TRAIN split (Zero-Shot)...")
-        
-        self.predict(
-            train_df=None,  # Zero-shot: no few-shot examples
-            test_df=train_df,
-            context=context,
-            label_definitions=label_definitions,
-        )
-        
-        # Predict and cache val split if provided
-        if val_df is not None:
-            self._current_dataset_type = "val"
-            if self.verbose:
-                self.logger.info("\n[2/2] Processing VAL split (Zero-Shot)...")
-            # Ensure prompt-engineering/predict sees val mode
-            try:
-                self.set_mode("val")
-            except Exception:
-                pass
+        self.train_df = train_df
+        self.val_df = val_df
 
-            self.predict(
-                train_df=None,  # Zero-shot: no few-shot examples
-                test_df=val_df,
-                context=context,
-                label_definitions=label_definitions,
-            )
-        
         if self.verbose:
-            self.logger.info("\n" + "=" * 70)
-            self.logger.info("✓ LLM FIT COMPLETE - Predictions cached and ready for training")
-            self.logger.info("=" * 70)
+            msg = f"Stored {len(train_df)} training examples as the few-shot pool"
+            if val_df is not None:
+                msg += f" (+ {len(val_df)} val examples stored for reference)"
+            self.logger.info(msg)
     
     def predict_val(
         self,
@@ -380,7 +353,13 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         label_definitions: Optional[Dict[str, str]] = None
     ) -> ClassificationResult:
         """Asynchronously predict labels for texts with detailed progress tracking."""
-        
+
+        # Fall back to the few-shot pool stored via fit() when no train_df is given
+        # explicitly. Passing train_df=None here does NOT force zero-shot when a pool
+        # was stored -- pass train_df=pd.DataFrame() explicitly (empty) for that.
+        if train_df is None and getattr(self, 'train_df', None) is not None:
+            train_df = self.train_df
+
         start_time = time.time()
         
         #  AUTO-CACHE: Check for cached predictions if enabled

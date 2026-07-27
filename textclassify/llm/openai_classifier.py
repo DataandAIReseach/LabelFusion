@@ -30,16 +30,18 @@ class OpenAIClassifier(BaseLLMClassifier):
         # Nearest-neighbour sampling parameters
         use_nearest_neighbours: bool = False,              # UK spelling
         embedding_model: str = "all-MiniLM-L6-v2",
-        use_nearest_neighbors: Optional[bool] = None       # US alias
+        use_nearest_neighbors: Optional[bool] = None,       # US alias
+        fixed_examples: bool = False
     ):
         """Initialize OpenAI classifier.
-        
+
         Args:
             config: Configuration object containing API keys and parameters
             text_column: Name of the column containing text data
             label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier
-            few_shot_mode: Mode for few-shot learning
+            few_shot_mode: Mode for few-shot learning. Pass an int to also control how
+                many few-shot examples are drawn per prompt (e.g. few_shot_mode=8).
             enable_cache: Whether to enable prediction caching (legacy parameter)
             cache_dir: Directory for caching prediction results
             output_dir: Base directory for saving results (default: "outputs")
@@ -49,6 +51,9 @@ class OpenAIClassifier(BaseLLMClassifier):
             use_nearest_neighbours: Enable nearest-neighbour few-shot sampling
             embedding_model: Embedding model used by nearest-neighbour sampler
             use_nearest_neighbors: US spelling alias for use_nearest_neighbours
+            fixed_examples: If True, sample the few-shot examples once and reuse the
+                same set for every prompt. If False (default), resample fresh per
+                test row (random, or nearest-neighbour if use_nearest_neighbours=True).
         """
         # Normalize US/UK spelling
         if use_nearest_neighbors is not None:
@@ -68,6 +73,7 @@ class OpenAIClassifier(BaseLLMClassifier):
             cache_dir=cache_dir,
             use_nearest_neighbours=use_nearest_neighbours,
             embedding_model=embedding_model,
+            fixed_examples=fixed_examples,
         )
         
         # Handle legacy caching parameter
@@ -144,68 +150,32 @@ class OpenAIClassifier(BaseLLMClassifier):
         label_definitions: Optional[Dict[str, str]] = None,
     ) -> None:
         """
-        Pre-compute and cache Zero-Shot predictions for train (and optionally val) splits.
-        Must be called before training the FusionMLP.
-        
-        This override adds OpenAI-specific results saving logic on top of the base
-        class caching behavior.
-        
+        Store train_df (and optionally val_df) as the few-shot example pool.
+
+        Does not make any LLM calls. The stored train_df is used automatically by
+        predict() as the few-shot pool whenever it's called without an explicit
+        train_df argument -- see fixed_examples on __init__ for whether the same
+        examples get reused every time or resampled per prediction.
+
         Args:
-            train_df: Training data to predict and cache
-            val_df: Optional validation data to predict and cache
-            context: Optional context for classification
-            label_definitions: Optional label definitions
-            
+            train_df: Training data to use as the few-shot example pool
+            val_df: Optional validation data, stored for reference (not used for few-shot)
+            context: Unused (kept for backward-compatible signature)
+            label_definitions: Unused (kept for backward-compatible signature)
+
         Example:
             >>> llm = OpenAIClassifier(config, label_columns=commodities)
-            >>> llm.fit(train_df, val_df)  # Pre-compute and cache
-            >>> # Later during training:
-            >>> result = llm.predict(test_df=batch)  # Uses cache automatically
+            >>> llm.fit(train_df)  # just stores train_df
+            >>> result = llm.predict(test_df=batch)  # uses train_df as few-shot pool
         """
-        # Set mode to train
-        self.mode = 'train'
-        self._current_dataset_type = 'train'
-        self._current_test_df = train_df
-        
+        self.train_df = train_df
+        self.val_df = val_df
+
         if getattr(self, 'verbose', True):
-            print(f"\n{'='*70}")
-            print(f"FITTING OPENAI CLASSIFIER (Zero-Shot Pre-Caching)")
-            print(f"{'='*70}")
-            print(f"Train samples: {len(train_df)}")
+            msg = f"Stored {len(train_df)} training examples as the few-shot pool"
             if val_df is not None:
-                print(f"Val samples: {len(val_df)}")
-        
-        # Predict train (zero-shot)
-        if getattr(self, 'verbose', True):
-            print(f"\n[1/2] Processing TRAIN split (Zero-Shot)...")
-        
-        self.predict(
-            train_df=None,  # Zero-shot: no examples
-            test_df=train_df,
-            context=context,
-            label_definitions=label_definitions,
-        )
-        
-        # Predict val if provided
-        if val_df is not None:
-            self.mode = 'val'
-            self._current_dataset_type = 'val'
-            self._current_test_df = val_df
-            
-            if getattr(self, 'verbose', True):
-                print(f"\n[2/2] Processing VAL split (Zero-Shot)...")
-            
-            self.predict(
-                train_df=None,  # Zero-shot: no examples
-                test_df=val_df,
-                context=context,
-                label_definitions=label_definitions,
-            )
-        
-        if getattr(self, 'verbose', True):
-            print(f"\n{'='*70}")
-            print(f"✓ OPENAI FIT COMPLETE - Predictions cached and ready for training")
-            print(f"{'='*70}\n")
+                msg += f" (+ {len(val_df)} val examples stored for reference)"
+            print(msg)
     
     def predict(
         self,
