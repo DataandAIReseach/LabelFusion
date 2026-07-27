@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2026-07-26_16-26-14_train_test_llm
+  git_commit: 9e5884d1227b922b5384542a4ba14873baaf6857
+  model_name: openai_classifier
+  timestamp: '2026-07-26T16:27:03.108610'
+metrics:
+  f1: 0.7833630952380952
+  hamming_loss: 0.2015625
+  micro_f1: 0.7984375
+  micro_precision: 0.7984375
+  micro_recall: 0.7984375
+  precision: 0.7776041666666667
+  recall: 0.8432291666666666
+  subset_accuracy: 0.475

@@ -28,6 +28,7 @@ class PromptEngineer:
         model_name: str = "gpt-4",
         sampler: Optional[NearestNeighbourSampler] = None,
         mode: Optional[str] = None,
+        fixed_examples: bool = False,
     ):
         """Initialize PromptEngineer.
 
@@ -42,12 +43,17 @@ class PromptEngineer:
             sampler: Optional NearestNeighbourSampler — if provided, uses semantic similarity
                      for few-shot example selection instead of random sampling.
                      fit() will be called once in engineer_prompts() before the test loop.
+            fixed_examples: If True, the few-shot examples are sampled once (per train_df)
+                     and reused for every prompt, instead of being resampled per test row.
         """
         self.text_column = text_column
         self.label_columns = label_columns
         self.multi_label = multi_label
         self._pipeline = pipeline
         self._sampler = sampler  # injected — PromptEngineer does not create this
+        self.fixed_examples = fixed_examples
+        self._fixed_examples_cache: Optional[pd.DataFrame] = None
+        self._fixed_examples_train_df_id: Optional[int] = None
 
         # Default to English warehouse at init time
         # Will be updated at engineer_prompts() time based on actual train_df language
@@ -513,6 +519,8 @@ class PromptEngineer:
 
         If a NearestNeighbourSampler is injected and query_text is provided,
         selects semantically similar examples. Otherwise falls back to random sampling.
+        If self.fixed_examples is True, the same sampled examples are reused for every
+        prompt (sampled once per train_df) instead of being resampled per test row.
 
         Args:
             train_df: Full training DataFrame (used for random fallback)
@@ -537,8 +545,16 @@ class PromptEngineer:
         if num_examples == 0:
             return ""
 
+        if self.fixed_examples:
+            # Sample once per train_df and reuse for every prompt. Nearest-neighbour
+            # sampling is inherently per-query, so fixed_examples uses a plain random
+            # sample regardless of whether a sampler is configured.
+            if self._fixed_examples_cache is None or self._fixed_examples_train_df_id != id(train_df):
+                self._fixed_examples_cache = train_df.sample(n=min(num_examples, len(train_df)), random_state=42)
+                self._fixed_examples_train_df_id = id(train_df)
+            sampled_data = self._fixed_examples_cache
         # Query sampler if available — fit() was already called in engineer_prompts()
-        if self._sampler is not None and query_text is not None:
+        elif self._sampler is not None and query_text is not None:
             sampled_data = self._sampler.sample(query_text=query_text, k=num_examples)
         else:
             sampled_data = train_df.sample(n=min(num_examples, len(train_df)))

@@ -1,0 +1,51 @@
+created_at: '2026-07-27T17:00:56.336288'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: michaelschlee
+    platform: Linux-6.8.0-136-generic-x86_64-with-glibc2.39
+    python_version: 3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]
+    working_directory: /home/michaelschlee/ownCloud/GIT/LabelFusion
+  experiment_id: 2026-07-27_13-39-08_train_test_llm
+  git_commit: 9e5884d1227b922b5384542a4ba14873baaf6857
+  model_name: ''
+  model_type: ''
+  timestamp: '2026-07-27T13:39:08.504933'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/openai_classifier_test_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/test_predictions_0ad4f22a7145.csv
+  - predictions/test_predictions_0ad4f22a7145.json
+test_results: null
+training_results:
+  batch_size: 32
+  classes:
+  - gold
+  - silver
+  - oil
+  - gas
+  classification_type: multi_label
+  completed: true
+  max_completion_tokens: 100
+  metrics:
+    f1: 0.7607571428571429
+    hamming_loss: 0.19525
+    micro_f1: 0.80475
+    micro_precision: 0.80475
+    micro_recall: 0.80475
+    precision: 0.9355833333333333
+    recall: 0.6889166666666666
+    subset_accuracy: 0.491
+  model_name: gpt-5-nano
+  model_type: llm
+  num_labels: 4
+  provider: openai
+  temperature: 0.1
+  test_samples: 1000
+  train_samples: 0
