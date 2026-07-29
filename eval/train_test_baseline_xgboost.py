@@ -19,7 +19,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
 from xgboost import XGBClassifier
 
-from convert_json_to_csvs import build_dataframe_from_latest_json
+from eval.convert_jsons_to_csvs import build_dataframe_from_latest_json
 
 ALL_COMMODITIES = ["gold", "silver", "oil", "gas"]
 N_TRIALS = 40
