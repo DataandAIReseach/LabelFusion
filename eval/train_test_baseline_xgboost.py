@@ -9,7 +9,8 @@ eval_silver_gold_oil_gas.ipynb) with the Optuna search (cell 3.2).
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT))
 
 import numpy as np
 import optuna
