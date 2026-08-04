@@ -33,8 +33,9 @@ LOGS_DIR = REPO_ROOT / "logs"
 # Optional: set to a specific articles JSON path to use that file instead of
 # the most recently modified one in data/articles/jsons. Relative paths are
 # resolved against the repo root, not the current working directory, so this
-# works no matter where you launch the script from.
-JSON_PATH = "./data/articles/jsons/articles_all_commodities_baseline_seed7_temp17_n200_confounded.json"
+# works no matter where you launch the script from. Leave as None to use the
+# most recently added JSON in data/articles/jsons.
+JSON_PATH = None
 
 logger = logging.getLogger(__name__)
 
