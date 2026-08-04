@@ -27,7 +27,7 @@ from xgboost import XGBClassifier
 from eval.convert_jsons_to_csvs import build_dataframe_from_latest_json, _flatten_articles_json
 
 ALL_COMMODITIES = ["gold", "silver", "oil", "gas"]
-N_TRIALS = 40
+N_TRIALS = 10
 LOGS_DIR = REPO_ROOT / "logs"
 
 # Optional: set to a specific articles JSON path to use that file instead of
@@ -71,10 +71,12 @@ def load_and_split(json_path=None):
         json_path = Path(json_path)
         if not json_path.is_absolute():
             json_path = REPO_ROOT / json_path
-        logger.info(f"Loading: {json_path}")
         df = _flatten_articles_json(json_path)
     else:
-        df, _ = build_dataframe_from_latest_json()
+        df, json_path = build_dataframe_from_latest_json()
+
+    print(f"Dataset JSON: {json_path}", flush=True)
+    logger.info(f"Dataset JSON: {json_path}")
 
     # Combine headline + body as input text
     df["text"] = df["headline"].fillna("") + " " + df["body"].fillna("")
@@ -108,33 +110,38 @@ def _combo_labels(y):
     ])
 
 
-def plot_confusion_matrix(y_split, y_pred, split_name):
+def plot_confusion_matrix(y_split, y_pred, split_name, timestamp, n_obs):
     """Multiclass confusion matrix over commodity-combination labels (e.g.
-    'gold', 'gold+silver', 'oil+gas+silver', ...) -- logged and saved as a
-    PNG to logs/."""
+    'gold', 'gold+silver', 'oil+gas+silver', ...) for the BEST (tuned) model
+    only -- logged and saved as a PNG to logs/, named with the run's
+    timestamp and the total number of observations in the dataset so
+    different runs never overwrite each other's plots."""
     y_true_combo = _combo_labels(y_split)
     y_pred_combo = _combo_labels(y_pred)
     combo_labels = sorted(set(y_true_combo) | set(y_pred_combo))
 
     cm = confusion_matrix(y_true_combo, y_pred_combo, labels=combo_labels)
-    logger.info(f"\nMulticlass confusion matrix over commodity combinations ({split_name}):")
+    logger.info(f"\nMulticlass confusion matrix over commodity combinations (best {split_name}):")
     logger.info("\n" + pd.DataFrame(cm, index=combo_labels, columns=combo_labels).to_string())
 
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = LOGS_DIR / f"confusion_matrix_{split_name.lower()}.png"
+    out_path = LOGS_DIR / f"confusion_matrix_best_{split_name.lower()}_{timestamp}_n{n_obs}.png"
 
     fig, ax = plt.subplots(figsize=(max(6, len(combo_labels) * 0.6), max(5, len(combo_labels) * 0.6)))
     ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=combo_labels).plot(
         ax=ax, xticks_rotation=45, cmap="Blues", colorbar=False)
-    ax.set_title(f"Commodity-combination confusion matrix — {split_name}")
+    ax.set_title(f"Commodity-combination confusion matrix — best model, {split_name}\n"
+                 f"{timestamp}  (n={n_obs})")
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
     plt.close(fig)
     logger.info(f"Saved confusion matrix plot: {out_path}")
 
 
-def evaluate(clf, X_split, y_split, split_name):
-    logger.info(f"\n{'='*20} {split_name} {'='*20}")
+def evaluate(clf, X_split, y_split, split_name, stage, timestamp=None, n_obs=None):
+    """stage: "baseline" or "best". A confusion matrix is only plotted for
+    the best (tuned) model -- timestamp/n_obs are required in that case."""
+    logger.info(f"\n{'='*20} {stage.upper()} {split_name} {'='*20}")
     y_pred = clf.predict(X_split)
 
     for i, c in enumerate(ALL_COMMODITIES):
@@ -155,9 +162,11 @@ def evaluate(clf, X_split, y_split, split_name):
     logger.info(f"F1 (weighted): {f1_weighted:.3f}")
     logger.info(f"F1 (samples):  {f1_samples:.3f}")
 
-    plot_confusion_matrix(y_split, y_pred, split_name)
+    if stage == "best":
+        plot_confusion_matrix(y_split, y_pred, split_name, timestamp, n_obs)
 
     return {
+        "stage": stage,
         "split": split_name,
         "exact_match": exact_match,
         "mean_accuracy": mean_acc,
@@ -224,17 +233,34 @@ def main():
     logger.info(f"Logging to: {log_file}")
 
     X_train, X_val, X_test, y_train, y_val, y_test = load_and_split(JSON_PATH)
+    n_obs = X_train.shape[0] + X_val.shape[0] + X_test.shape[0]
 
     logger.info("\n=== Baseline XGBoost (fixed hyperparameters) ===")
-    clf = train_baseline(X_train, y_train)
-    val_results  = evaluate(clf, X_val, y_val, "VAL")
-    test_results = evaluate(clf, X_test, y_test, "TEST")
+    baseline_clf = train_baseline(X_train, y_train)
+    baseline_val_results  = evaluate(baseline_clf, X_val, y_val, "VAL", stage="baseline")
+    baseline_test_results = evaluate(baseline_clf, X_test, y_test, "TEST", stage="baseline")
 
     logger.info("\n=== Optuna hyperparameter optimization ===")
-    optimize(X_train, y_train, X_val, y_val)
+    study = optimize(X_train, y_train, X_val, y_val)
 
-    results_file = LOGS_DIR / f"train_test_baseline_xgboost_{timestamp}_results.csv"
-    pd.DataFrame([val_results, test_results]).to_csv(results_file, index=False)
+    logger.info("\n=== Best XGBoost (best Optuna params) ===")
+    best_clf = MultiOutputClassifier(XGBClassifier(
+        **study.best_params,
+        eval_metric  = "logloss",
+        random_state = 42,
+        tree_method  = "hist",
+    ))
+    best_clf.fit(X_train, y_train)
+    best_val_results  = evaluate(best_clf, X_val, y_val, "VAL", stage="best",
+                                  timestamp=timestamp, n_obs=n_obs)
+    best_test_results = evaluate(best_clf, X_test, y_test, "TEST", stage="best",
+                                  timestamp=timestamp, n_obs=n_obs)
+
+    results_file = LOGS_DIR / f"train_test_baseline_xgboost_{timestamp}_n{n_obs}_results.csv"
+    pd.DataFrame([
+        baseline_val_results, baseline_test_results,
+        best_val_results, best_test_results,
+    ]).to_csv(results_file, index=False)
     logger.info(f"\nResults saved to: {results_file}")
 
 
