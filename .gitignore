@@ -30,7 +30,7 @@ tmp/
 
 # Logs
 *.log
-logs/
+
 .autofusion_kaggle_test/auto_fusion_classifier.pkl
 
 __pycache__/
