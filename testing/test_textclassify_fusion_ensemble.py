@@ -90,7 +90,7 @@ def load_articles(sample_size: int | None = None) -> pd.DataFrame:
 
 def split_articles(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Split into train/validation/test sets."""
-    train_df, temp_df = train_test_split(df, train_size=0.7, random_state=RANDOM_STATE)
+    train_df, temp_df = train_test_split(df, train_size=0.8, random_state=RANDOM_STATE)
     val_df, test_df = train_test_split(temp_df, train_size=0.5, random_state=RANDOM_STATE)
 
     for split_name, split_df in (("train", train_df), ("val", val_df), ("test", test_df)):
