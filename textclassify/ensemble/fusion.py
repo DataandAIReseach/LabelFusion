@@ -199,6 +199,7 @@ class FusionEnsemble(BaseEnsemble):
         # LLM prediction cache file paths from ensemble config
         self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', '')
         self.test_llm_cache_path = ensemble_config.parameters.get('test_llm_cache_path', '')
+        self.train_llm_cache_path = ensemble_config.parameters.get('train_llm_cache_path', '')
         
         # Results management
         output_dir = ensemble_config.parameters.get('output_dir', 'outputs')
@@ -479,7 +480,28 @@ class FusionEnsemble(BaseEnsemble):
             llm_val_predictions,
             val_df[text_column].tolist()
         )
-        
+
+        # Step 3b: Get LLM predictions on training set
+        print("Generating LLM predictions for train set...")
+        llm_train_predictions = self._get_or_generate_llm_predictions(
+            df=train_df,
+            train_df=None,
+            cache_path=self.train_llm_cache_path,
+            mode="train",
+            provided_predictions=(
+                llm_fit_results.get('train').predictions
+                if isinstance(llm_fit_results, dict) and llm_fit_results.get('train') is not None
+                else None
+            )
+        )
+
+        # Attach hashes to LLM train predictions and cache them for later reuse
+        llm_train_predictions_hashed = self._attach_hashes_to_predictions(
+            llm_train_predictions,
+            train_df[text_column].tolist()
+        )
+        self.llm_train_predictions_cache = llm_train_predictions
+
         # Create ClassificationResult for validation predictions
         # Extract true labels from validation DataFrame
         val_true_labels = None
