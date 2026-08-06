@@ -41,6 +41,7 @@ DATE_COLUMN = "article_date"
 TS_SERIES_NAMES = LABEL_COLUMNS
 TS_WINDOW_DAYS = 21
 RANDOM_STATE = 7
+SAMPLE_SIZE = 10
 
 LLM_MODEL = os.getenv("TEXTCLASSIFY_LLM_MODEL", "gpt-4o-mini")
 ROBERTA_MODEL = os.getenv("TEXTCLASSIFY_ROBERTA_MODEL", "roberta-base")
@@ -236,8 +237,10 @@ def run_fusion_integration(sample_size: int | None = None):
 
 
 def test_textclassify_fusion_ensemble():
-    """Pytest entry point for the integration test."""
-    result = run_fusion_integration(sample_size=None)
+    """Pytest entry point for the integration test. Uses a toy SAMPLE_SIZE-row
+    sample of the article dataset so the fusion pipeline runs quickly
+    as a smoke test rather than training over the full dataset."""
+    result = run_fusion_integration(sample_size=SAMPLE_SIZE)
     assert result is not None
     assert result.predictions
 
