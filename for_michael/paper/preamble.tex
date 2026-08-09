@@ -1,0 +1,456 @@
+%% ===========================================================================
+%%  preamble.tex — shared design system
+%%
+%%  Loaded by BOTH acl_latex.tex (the paper) and design_kit.tex (the pattern
+%%  gallery), so anything defined here is guaranteed to look the same in both.
+%%  Never put content here; content lives in sections/.
+%%
+%%  Hard constraints this file respects (see formatting.md, paper/guideline.md):
+%%   * acl.sty is official and UNMODIFIED — all of our styling happens here.
+%%   * acl.sty already loads: geometry, caption (font=10pt), natbib, hyperref,
+%%     and (in review mode) lineno. Loading those again with options would
+%%     raise an option clash, so we only ever \captionsetup{...} them.
+%%   * Body font must stay Times at 11pt with the style's leading; we adjust
+%%     float/caption spacing only, never \baselineskip or the type area.
+%% ===========================================================================
+
+
+%% ---------------------------------------------------------------------------
+%%  0. Standard includes (verbatim from the official acl_latex.tex)
+%% ---------------------------------------------------------------------------
+
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}     % correct rendering/hyphenation of accented words
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}       % better line breaking; saves a surprising amount
+\usepackage{inconsolata}     % typewriter face for code and prompts
+
+
+%% ---------------------------------------------------------------------------
+%%  1. Packages
+%% ---------------------------------------------------------------------------
+
+% -- tables ----------------------------------------------------------------
+\usepackage{booktabs}       % \toprule \midrule \bottomrule — the only rules we use
+\usepackage{multirow}       % vertically merged cells
+\usepackage{makecell}       % line breaks inside a cell: \makecell{a\\b}
+\usepackage{tabularx}       % X columns that soak up the remaining width
+\usepackage{threeparttable} % table notes that inherit the table's width
+\usepackage{supertabular}   % the ONLY long-table package that breaks across
+                            % columns in two-column mode (longtable cannot)
+\usepackage{siunitx}        % S columns for decimal-aligned numbers.
+                            % Only v2+v3-portable syntax is used: S[table-format=...]
+                            % and \num{...}. Do not add \sisetup keys that were
+                            % renamed in siunitx v3 (e.g. table-number-alignment).
+\usepackage{adjustbox}      % max width=\linewidth — shrink-to-fit, see \fitbox
+
+% -- figures ---------------------------------------------------------------
+\usepackage{graphicx}
+\usepackage{subcaption}     % subfigures; must come after caption (acl.sty loaded it)
+
+% -- algorithms ------------------------------------------------------------
+\usepackage{algorithm}      % the float
+\usepackage{algpseudocode}  % the pseudocode body
+
+% -- code and boxes --------------------------------------------------------
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable,skins,listings}
+
+% -- symbols, math, lists --------------------------------------------------
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{pifont}         % \ding{51} checkmark for the vote profiles
+\usepackage{enumitem}
+
+% -- cross references (LAST: cleveref must see hyperref and all float types) --
+\usepackage[capitalise,nameinlink]{cleveref}
+
+
+%% ---------------------------------------------------------------------------
+%%  2. Spacing
+%%
+%%  ACL papers are page-budget-bound (8 pages of content). These are the only
+%%  legitimate savings: float separation and caption skips. Everything here is
+%%  deliberately mild — if a draft overruns, cut text, do not shrink type.
+%% ---------------------------------------------------------------------------
+
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}   % float <-> text, top/bottom
+\setlength{\floatsep}{10pt plus 2pt minus 2pt}       % float <-> float
+\setlength{\intextsep}{10pt plus 2pt minus 2pt}      % around [h] floats
+\setlength{\dblfloatsep}{10pt plus 2pt minus 2pt}    % same, spanning floats
+\setlength{\dbltextfloatsep}{12pt plus 2pt minus 2pt}
+
+\captionsetup{skip=5pt}                              % caption <-> content
+\captionsetup[sub]{font=small,skip=3pt}
+
+% Table typography: booktabs wants no vertical rules and a little air.
+\setlength{\tabcolsep}{4.5pt}
+\renewcommand{\arraystretch}{1.06}
+
+% Compact lists (ACL drafts overflow on list padding more than anywhere else).
+\setlist[itemize]{leftmargin=1.2em,topsep=2pt,itemsep=1pt,parsep=0pt}
+\setlist[enumerate]{leftmargin=1.4em,topsep=2pt,itemsep=1pt,parsep=0pt}
+\setlist[description]{leftmargin=0pt,topsep=2pt,itemsep=1pt,parsep=0pt,style=nextline}
+
+% Float placement discipline: ACL floats belong at the top (or bottom) of a
+% column/page, never mid-text. Defaults nudge LaTeX in that direction; write
+% [t] explicitly on every float anyway.
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\bottomfraction}{0.7}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.75}
+\setcounter{topnumber}{3}
+\setcounter{dbltopnumber}{3}
+
+
+%% ---------------------------------------------------------------------------
+%%  3. Colours
+%%
+%%  One restrained palette, reused by boxes, code, and figures. Every colour
+%%  must survive greyscale printing and be distinguishable to colour-blind
+%%  readers, so hue never carries meaning alone (boxes also differ by title).
+%% ---------------------------------------------------------------------------
+
+\definecolor{cpInk}{HTML}{1A1A1A}       % text on light fills
+\definecolor{cpRule}{HTML}{9AA0A6}      % box frames, hairlines
+\definecolor{cpWash}{HTML}{F4F5F7}      % neutral fill (system prompts, code)
+\definecolor{cpBlue}{HTML}{2B5C8A}      % user/input, primary accent
+\definecolor{cpGreen}{HTML}{2E6B4F}     % model output
+\definecolor{cpAmber}{HTML}{8A6A1F}     % judge / rubric
+\definecolor{cpPlum}{HTML}{6B3F7A}      % examples, retrieved evidence
+\definecolor{cpRed}{HTML}{A33A32}       % failures, drafting notes
+
+
+%% ---------------------------------------------------------------------------
+%%  4. Tables — the three patterns
+%%
+%%  (a) column-width table   : table  + \fitbox   -> shrinks only if needed
+%%  (b) page-width table     : table* + \fitbox   -> spans both columns
+%%  (c) multi-page table     : \begin{cptablelong} (supertabular), appendix only
+%%
+%%  Rules for all three: caption ABOVE the tabular, booktabs rules only,
+%%  no vertical lines, units in the header, \best to mark winners.
+%% ---------------------------------------------------------------------------
+
+% Shrink-to-fit wrapper. \linewidth resolves to the column inside `table` and
+% to the full text width inside `table*`, so the SAME wrapper serves both and
+% a table can never overflow its container regardless of content. It only ever
+% scales down (max width), so small tables keep the body font size.
+\newenvironment{fitbox}
+  {\begin{adjustbox}{max width=\linewidth,center}}
+  {\end{adjustbox}}
+
+% Font size for table bodies. Change here, not per table.
+\newcommand{\tabfont}{\small}
+
+% Result marking (bold = best, underline = runner-up; both readable in grey).
+\newcommand{\best}[1]{\textbf{#1}}
+\newcommand{\second}[1]{\underline{#1}}
+\newcommand{\na}{\textendash}                    % measured, not applicable
+\newcommand{\nr}{$\emptyset$}                    % not run (matches vote profile)
+
+% Significance markers for comparison tables.
+\newcommand{\sigone}{\textsuperscript{*}}
+\newcommand{\sigtwo}{\textsuperscript{**}}
+\newcommand{\sigthree}{\textsuperscript{***}}
+
+% Header cell that wraps in a narrow column: \hcell{false alarm\\rate}
+\newcommand{\hcell}[1]{\makecell[bc]{#1}}
+
+% Group heading spanning several columns, with a rule underneath.
+\newcommand{\gcol}[2]{\multicolumn{#1}{c}{#2}}
+
+% Multi-page table in a single column (appendix). supertabular, not longtable:
+% longtable is illegal in two-column mode. Caption goes in \topcaption before.
+\newenvironment{cptablelong}[1]
+  {\tabfont\begin{supertabular}{#1}}
+  {\end{supertabular}}
+
+
+%% ---------------------------------------------------------------------------
+%%  5. Figures
+%%
+%%  Export conventions (keep figures honest and legible at print size):
+%%   * vector PDF, never PNG, unless the plot has raster content
+%%   * single column: 3.15 in wide  ·  spanning: 6.5 in wide
+%%   * label/tick font 8 pt so it matches this caption size after \includegraphics
+%%     at width=\columnwidth (i.e. do NOT scale figures in LaTeX)
+%%   * no in-figure titles — the caption is the title
+%% ---------------------------------------------------------------------------
+
+% Grey placeholder that reserves the real figure's footprint. Lets us lay out
+% and page-count before any plot exists: \figph{\columnwidth}{4.2cm}{caption id}
+\newcommand{\figph}[3]{%
+  \setlength{\fboxsep}{0pt}%
+  \fcolorbox{cpRule}{cpWash}{%
+    \parbox[c][#2][c]{#1}{\centering\small\color{cpRule}\ttfamily #3}}}
+
+
+%% ---------------------------------------------------------------------------
+%%  6. Algorithms
+%%
+%%  (a) single column : \begin{algorithm}[t]
+%%  (b) page width    : \begin{algorithm*}[t]  (float, cannot break)
+%%  (c) unbounded     : \begin{cpalgorithm}    (not a float: breaks across
+%%                       columns and pages, for long appendix pseudocode)
+%% ---------------------------------------------------------------------------
+
+\floatname{algorithm}{Algorithm}
+\algrenewcommand\algorithmicrequire{\textbf{Input:}}
+\algrenewcommand\algorithmicensure{\textbf{Output:}}
+\algrenewcommand{\algorithmiccomment}[1]{\hfill\small\textcolor{cpRule}{\# #1}}
+\algnewcommand{\LineComment}[1]{\State\small\textcolor{cpRule}{\# #1}}
+\newcommand{\algfont}{\small}
+
+% Non-floating algorithm: identical look, but the body may split. Numbering
+% shares the `algorithm` counter, so references stay consistent with (a)/(b).
+\newenvironment{cpalgorithm}[1][]
+  {\par\addvspace{8pt}\refstepcounter{algorithm}%
+   \noindent\rule{\linewidth}{0.8pt}\par\vspace{2pt}%
+   \noindent\textbf{\algorithmname~\thealgorithm}%
+   \ifx\relax#1\relax\else\quad #1\fi\par\vspace{1pt}%
+   \noindent\rule{\linewidth}{0.4pt}\par\vspace{2pt}\algfont}
+  {\par\vspace{2pt}\noindent\rule{\linewidth}{0.8pt}\par\addvspace{8pt}}
+% \algorithmname is defined by \floatname above; alias for the environment:
+\providecommand{\algorithmname}{Algorithm}
+
+
+%% ---------------------------------------------------------------------------
+%%  7. Code
+%%
+%%  Two shapes only:
+%%   \begin{pycode}[caption]  — verbatim Python, breaks across columns/pages
+%%   \begin{pycodenum}[...]   — same with line numbers (for text that refers
+%%                              to specific lines)
+%%  Page-width code must sit inside a figure* float (floats cannot break).
+%%  Inline: \code{EnsembleDetector} for identifiers in running text.
+%% ---------------------------------------------------------------------------
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\lstdefinestyle{cppython}{
+  language=Python,
+  basicstyle=\scriptsize\ttfamily\color{cpInk},
+  keywordstyle=\color{cpBlue}\bfseries,
+  commentstyle=\color{cpGreen},
+  stringstyle=\color{cpPlum},
+  identifierstyle=\color{cpInk},
+  showstringspaces=false,
+  breaklines=true,
+  breakatwhitespace=false,
+  postbreak=\mbox{\textcolor{cpRule}{$\hookrightarrow$}\space},
+  tabsize=4,
+  columns=fullflexible,
+  keepspaces=true,
+  upquote=true,
+  literate={-}{-}1 {'}{'}1,       % keep hyphens/quotes copy-pasteable
+}
+\lstdefinestyle{cpjson}{
+  basicstyle=\scriptsize\ttfamily\color{cpInk},
+  stringstyle=\color{cpPlum},
+  showstringspaces=false,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  upquote=true,
+}
+\lstdefinestyle{cpshell}{
+  language=bash,
+  basicstyle=\scriptsize\ttfamily\color{cpInk},
+  keywordstyle=\color{cpBlue},
+  commentstyle=\color{cpGreen},
+  showstringspaces=false,
+  breaklines=true,
+  columns=fullflexible,
+}
+
+% Shared geometry for every box in the document (boxes read as one family).
+\tcbset{cpbox/.style={
+  enhanced, breakable,
+  boxrule=0.5pt, arc=1.5pt,
+  left=5pt, right=5pt, top=4pt, bottom=4pt,
+  fonttitle=\small\bfseries, coltitle=cpInk,
+  attach boxed title to top left={yshift=-2mm,xshift=4mm},
+  boxed title style={boxrule=0.3pt, arc=1pt},
+}}
+
+% Grey frame + wash fill, shared by all code boxes.
+\tcbset{cpcode/.style={cpbox, listing only,
+  colback=cpWash, colframe=cpRule,
+  boxed title style={colback=cpWash!60!white, colframe=cpRule}}}
+
+\newtcblisting{pycode}[1][Python]{cpcode, listing style=cppython, title={#1}}
+
+\newtcblisting{pycodenum}[1][Python]{cpcode, title={#1},
+  listing options={style=cppython, numbers=left,
+                   numberstyle=\tiny\color{cpRule}, numbersep=6pt}}
+
+% Untitled variant for two-line snippets where a title box is overkill.
+\newtcblisting{pycodeplain}{cpcode, listing style=cppython}
+
+\newtcblisting{shellcode}[1][Shell]{cpcode, listing style=cpshell, title={#1}}
+
+\newtcblisting{jsoncode}[1][JSON]{cpcode, listing style=cpjson, title={#1}}
+
+
+%% ---------------------------------------------------------------------------
+%%  8. LLM prompt boxes
+%%
+%%  Prompts are data, not prose: they contain braces, underscores, and JSON, so
+%%  the default is a VERBATIM box (nothing to escape, copy-pasteable, breaks
+%%  across columns and pages):
+%%     \begin{sysprompt} ... \end{sysprompt}     system prompt
+%%     \begin{userprompt} ... \end{userprompt}   user / augmented prompt
+%%     \begin{modelout} ... \end{modelout}       model response
+%%     \begin{judgeprompt} ... \end{judgeprompt} LLM-as-judge instructions
+%%     \begin{evidence} ... \end{evidence}       retrieved chunk / document
+%%
+%%  Use the -fmt variants only when a prompt needs typeset emphasis (e.g.
+%%  \ph{placeholder} highlighting in the paper's method section); there,
+%%  every special character must be escaped by hand.
+%% ---------------------------------------------------------------------------
+
+% Placeholder inside a formatted prompt: \ph{break\_date}
+\newcommand{\ph}[1]{{\normalfont\itshape\color{cpBlue}\{\{#1\}\}}}
+
+\tcbset{cpprompt/.style={cpbox,
+  fontupper=\scriptsize\ttfamily,
+  before upper={\parindent0pt\parskip3pt\raggedright\sloppy}}}
+
+% Verbatim prompt text: no language keywords, wrap long lines, mark the wrap.
+\lstdefinestyle{cpprompttext}{
+  basicstyle=\scriptsize\ttfamily\color{cpInk},
+  breaklines=true, columns=fullflexible, keepspaces=true, upquote=true,
+  showstringspaces=false,
+  postbreak=\mbox{\textcolor{cpRule}{$\hookrightarrow$}\space},
+}
+\tcbset{cppromptverb/.style={cpprompt, listing only, listing style=cpprompttext}}
+
+\newtcblisting{sysprompt}[1][System prompt]{cppromptverb,
+  colback=cpWash, colframe=cpRule,
+  boxed title style={colback=cpWash!60!white, colframe=cpRule}, title={#1}}
+
+\newtcblisting{userprompt}[1][User prompt]{cppromptverb,
+  colback=cpBlue!4!white, colframe=cpBlue!55!white,
+  boxed title style={colback=cpBlue!12!white, colframe=cpBlue!55!white}, title={#1}}
+
+\newtcblisting{modelout}[1][Model output]{cppromptverb,
+  colback=cpGreen!4!white, colframe=cpGreen!55!white,
+  boxed title style={colback=cpGreen!12!white, colframe=cpGreen!55!white}, title={#1}}
+
+\newtcblisting{judgeprompt}[1][Judge prompt]{cppromptverb,
+  colback=cpAmber!5!white, colframe=cpAmber!55!white,
+  boxed title style={colback=cpAmber!14!white, colframe=cpAmber!55!white}, title={#1}}
+
+% Formatted (non-verbatim) counterparts — support \ph{} and \textbf{}.
+\newtcolorbox{syspromptfmt}[1][System prompt]{cpprompt,
+  colback=cpWash, colframe=cpRule,
+  boxed title style={colback=cpWash!60!white, colframe=cpRule}, title={#1}}
+\newtcolorbox{userpromptfmt}[1][User prompt]{cpprompt,
+  colback=cpBlue!4!white, colframe=cpBlue!55!white,
+  boxed title style={colback=cpBlue!12!white, colframe=cpBlue!55!white}, title={#1}}
+\newtcolorbox{modeloutfmt}[1][Model output]{cpprompt,
+  colback=cpGreen!4!white, colframe=cpGreen!55!white,
+  boxed title style={colback=cpGreen!12!white, colframe=cpGreen!55!white}, title={#1}}
+
+% Retrieved document / corpus excerpt (RAG sections). Prose, so not verbatim.
+\newtcolorbox{evidence}[1][Retrieved document]{cpbox,
+  fontupper=\small, before upper={\parindent0pt\parskip3pt},
+  colback=cpPlum!4!white, colframe=cpPlum!55!white,
+  boxed title style={colback=cpPlum!12!white, colframe=cpPlum!55!white}, title={#1}}
+
+% Qualitative example (input -> output pair discussed in the text).
+\newtcolorbox{examplebox}[1][Example]{cpbox,
+  fontupper=\small, before upper={\parindent0pt\parskip3pt},
+  colback=white, colframe=cpInk!35!white,
+  boxed title style={colback=cpInk!8!white, colframe=cpInk!35!white}, title={#1}}
+
+
+%% ---------------------------------------------------------------------------
+%%  9. Domain vocabulary
+%%
+%%  Every recurring name gets a macro, so a rename is one edit and the paper
+%%  can never disagree with itself about a member name or a symbol.
+%% ---------------------------------------------------------------------------
+
+% Tool name. REVIEW MODE: the submission is anonymous and the repository link
+% must be an anonymized one — check that naming the package does not identify
+% the authors (a public PyPI/GitHub project with the same name would).
+\newcommand{\pkg}{\textsc{whychange}}
+
+% Ensemble members (exactly the identifiers used in the code and the tables).
+\newcommand{\mMosum}{\code{mosum}}
+\newcommand{\mPeltL}{\code{pelt\_l2}}
+\newcommand{\mPeltN}{\code{pelt\_normal}}
+\newcommand{\mKernel}{\code{kernel\_rbf}}
+\newcommand{\mBaiPerron}{\code{bai\_perron}}
+\newcommand{\mZA}{\code{zivot\_andrews}}
+\newcommand{\mProphet}{\code{prophet\_trend}}
+
+% Three-state vote profile: fired / ran-but-silent / not-run.
+\newcommand{\vfired}{\textcolor{cpGreen}{\ding{51}}}
+\newcommand{\vsilent}{\textcolor{cpRule}{\textendash}}
+\newcommand{\vnotrun}{$\emptyset$}
+\newcommand{\voteLegend}{%
+  \vfired~fired \quad \vsilent~ran, silent \quad \vnotrun~not applicable}
+
+% Notation. Keep these the single source of truth for the maths.
+\newcommand{\nobs}{n}                                  % series length
+\newcommand{\ts}{\ensuremath{y_{1:\nobs}}}             % the series
+\newcommand{\pmem}[1]{\ensuremath{p_{#1}}}             % per-member p-value
+\newcommand{\pcomb}{\ensuremath{p_{\mathrm{comb}}}}    % Cauchy-combined p
+\newcommand{\epsclust}{\ensuremath{\varepsilon}}       % clustering tolerance
+\newcommand{\alphalev}{\ensuremath{\alpha}}            % acceptance level
+\newcommand{\blocklen}{\ensuremath{\ell}}              % permutation block length
+\newcommand{\nperm}{\ensuremath{B}}                    % number of permutations
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+% Prose shorthands.
+\newcommand{\ie}{i.e.,\ }
+\newcommand{\eg}{e.g.,\ }
+\newcommand{\etal}{et al.\ }
+
+
+%% ---------------------------------------------------------------------------
+%%  10. Drafting aids — MUST be silenced before submission
+%%
+%%  \draftmodefalse turns every marker below into a no-op, so a stray \todo
+%%  cannot reach a reviewer. Flip it in acl_latex.tex.
+%% ---------------------------------------------------------------------------
+
+\newif\ifdraftmode
+\draftmodetrue            % set \draftmodefalse in acl_latex.tex before submitting
+
+\newcommand{\todo}[1]{\ifdraftmode\textcolor{cpRed}{\textbf{[TODO: #1]}}\fi}
+\newcommand{\note}[1]{\ifdraftmode\textcolor{cpBlue}{\textbf{[NOTE: #1]}}\fi}
+% A number that still has to be regenerated from the final evaluation run:
+% \prov{0.84} is underlined while drafting and plain in the submission build,
+% so no placeholder figure can silently survive into the PDF.
+\newcommand{\prov}[1]{\ifdraftmode\textcolor{cpRed}{\underline{#1}}\else#1\fi}
+% Citation whose bibliographic details are not yet verified against the source
+% (EACL screens fabricated references — nothing ships with \unverified live).
+\newcommand{\unverified}[1]{\ifdraftmode\textcolor{cpRed}{[verify: #1]}\fi}
+
+
+% Build-mode test usable in the document body (acl.sty's own flag is internal):
+% \ifanonymous ... \else ... \fi  -> true in the [review] build.
+\makeatletter
+\newif\ifanonymous
+\ifacl@anonymize\anonymoustrue\else\anonymousfalse\fi
+\makeatother
+
+
+%% ---------------------------------------------------------------------------
+%%  11. Cross-reference names
+%% ---------------------------------------------------------------------------
+
+\crefname{algorithm}{Algorithm}{Algorithms}
+\Crefname{algorithm}{Algorithm}{Algorithms}
+\crefname{section}{Section}{Sections}
+\Crefname{section}{Section}{Sections}
+\crefname{appsec}{Appendix}{Appendices}
+\crefformat{footnote}{#2\footnotemark[#1]#3}
