@@ -1,6 +1,8 @@
 """Fine-tune the text expert (RoBERTa-large) and export its embeddings and scores.
 Needs a GPU (~8 minutes on a T4; Kaggle free tier works). CPU is possible but slow (~2h).
-Output: artifacts/expert_rb_b2_chrono_1.npz
+Trains on an 80/20 split of data/training_data/lab-manual-mm-train-5768.xlsx and
+evaluates/exports over train+val+data/test_data/lab-manual-mm-test-5768.xlsx.
+Output: artifacts/expert_rb_b2_mm5768_1.npz
 
     python scripts/3_train_text_expert.py [--model roberta-large] [--seed 1]
 """
@@ -10,6 +12,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
 from transformers import AutoModel, AutoTokenizer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,12 +39,13 @@ def main():
     MAXLEN, BATCH, ACC, LR, EPOCHS = 128, 16, 2, 1e-5, 6
     torch.manual_seed(args.seed); np.random.seed(args.seed)
 
-    dated = pd.read_csv(f"{ROOT}/data/gold_dated.csv", parse_dates=["date"]).sort_values("date").reset_index(drop=True)
-    cutoff = dated.date.quantile(0.75)
-    tr_full = dated[dated.date <= cutoff]
-    vcut = tr_full.date.quantile(0.85)
-    tr = dated[dated.date <= vcut]; va = dated[(dated.date > vcut) & (dated.date <= cutoff)]
-    print(f"device {DEV} | train {len(tr)} val {len(va)}")
+    train_full = pd.read_excel(f"{ROOT}/data/training_data/lab-manual-mm-train-5768.xlsx")
+    test = pd.read_excel(f"{ROOT}/data/test_data/lab-manual-mm-test-5768.xlsx")
+    tr, va = train_test_split(train_full, train_size=0.8, random_state=args.seed,
+                              stratify=train_full.label)
+    tr = tr.reset_index(drop=True); va = va.reset_index(drop=True)
+    dated = pd.concat([tr, va, test], ignore_index=True)
+    print(f"device {DEV} | train {len(tr)} val {len(va)} test {len(test)}")
 
     TOK = AutoTokenizer.from_pretrained(args.model)
     enc = lambda f: TOK(list(f.sentence.astype(str)), truncation=True, max_length=MAXLEN,
@@ -80,7 +84,7 @@ def main():
         for b0 in range(0, len(dated), 64):
             h, o = model(EA["input_ids"][b0:b0+64].to(DEV), EA["attention_mask"][b0:b0+64].to(DEV))
             Hs.append(h.float().cpu().numpy()); Ps.append(torch.softmax(o.float(), 1).cpu().numpy())
-    out = f"{ROOT}/artifacts/expert_rb_b2_chrono_{args.seed}.npz"
+    out = f"{ROOT}/artifacts/expert_rb_b2_mm5768_{args.seed}.npz"
     np.savez_compressed(out, hash=np.array([sha(s) for s in dated.sentence]),
                         h=np.concatenate(Hs).astype(np.float16),
                         p=np.concatenate(Ps).astype(np.float32))
