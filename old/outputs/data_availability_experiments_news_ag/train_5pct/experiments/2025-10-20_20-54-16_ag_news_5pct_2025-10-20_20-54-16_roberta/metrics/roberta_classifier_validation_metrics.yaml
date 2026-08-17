@@ -1,0 +1,43 @@
+metadata:
+  dataset_name: validation
+  experiment_id: 2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16_roberta
+  git_commit: 24f5d3e9febffa43560e191bcce5d720ba82fb21
+  model_name: roberta_classifier
+  timestamp: '2025-10-20T20:54:39.714097'
+metrics:
+  accuracy: 0.824
+  classification_report:
+    accuracy: 0.824
+    label_1:
+      f1-score: 0.8359375
+      precision: 0.816793893129771
+      recall: 0.856
+      support: 125.0
+    label_2:
+      f1-score: 0.9318181818181818
+      precision: 0.8848920863309353
+      recall: 0.984
+      support: 125.0
+    label_3:
+      f1-score: 0.7985611510791367
+      precision: 0.7254901960784313
+      recall: 0.888
+      support: 125.0
+    label_4:
+      f1-score: 0.7029702970297029
+      precision: 0.922077922077922
+      recall: 0.568
+      support: 125.0
+    macro avg:
+      f1-score: 0.8173217824817554
+      precision: 0.8373135244042649
+      recall: 0.824
+      support: 500.0
+    weighted avg:
+      f1-score: 0.8173217824817554
+      precision: 0.8373135244042649
+      recall: 0.824
+      support: 500.0
+  f1_weighted: 0.8173217824817554
+  precision_weighted: 0.8373135244042649
+  recall_weighted: 0.824

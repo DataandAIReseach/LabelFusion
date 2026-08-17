@@ -1,0 +1,171 @@
+%% LabelFusion-TS on FOMC stance — internal draft for co-author discussion.
+%% Build: latexmk -pdf acl_latex.tex
+\documentclass[11pt]{article}
+\usepackage[review]{acl}
+\input{preamble.tex}
+
+\newcommand{\lfts}{LabelFusion\hbox{-}TS}
+\newcommand{\lf}{LabelFusion}
+\newcommand{\topone}{top-1}
+
+\title{\lfts{}: Fusing Large Language Models, Transformer Encoders,\\and Financial Time Series for Monetary-Policy Stance Classification}
+
+\author{Internal draft for discussion}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Financial text is written, read, and interpreted inside a market context, yet financial text classifiers almost universally receive text alone. The surrounding market data, a continuously available and machine-readable signal, is rarely offered to the model as an input modality. The \lf{} architecture combines a prompt-engineered large language model (LLM) with a fine-tuned RoBERTa encoder and was designed so that further input sources can be integrated seamlessly; its authors propose price time series as the natural next modality. We realise this proposal, \lfts{}, and evaluate it on hawkish--dovish classification of Federal Reserve communication, a task where the meaning of a sentence depends on the economic situation it was spoken into. Trained on sentences up to 2015 and tested on 2015--2022, \lfts{} reaches a weighted F1 of 65.0\%, improving over the text-only fusion (62.1\%) and over a zero-shot LLM (64.1\%). The market data contributes exactly where it should: it tells the model which economic regime the words belong to.
+\end{abstract}
+
+
+\section{Introduction}
+
+Most tasks in financial natural language processing are solved by models that read text and nothing else. This is a curious restriction. Every financial document exists inside a market context: analysts who interpret a central-bank statement do so with the rate path, the inflation trajectory, and the equity market in view, and the same sentence can carry opposite meaning in different circumstances. The market context is not an exotic resource. It is public, machine-readable, available at daily resolution for decades, and perfectly aligned in time with any dated document. As an input modality for financial text classifiers it is, nevertheless, largely overlooked: the multimodal literature runs almost entirely in the opposite direction, using text as auxiliary context for price forecasting \citep{tan2025inferring,dolphin2022multimodal}, while classifiers of financial text remain text-only.
+
+\citet{schlee2025labelfusion} introduced \lf{}, which combines the label scores of a prompted LLM with the embeddings of a fine-tuned RoBERTa encoder \citep{liu2019roberta} through a small voting network, and showed that the fusion outperforms either component once enough labelled data is available. The architecture was explicitly designed for the seamless integration of further input sources, and the paper closes by proposing price time series, processed by time-series transformer architectures, as the next modality. This paper carries out that proposal.
+
+We test it where market context should matter most: classifying Federal Reserve communication as hawkish, dovish, or neutral, using the expert-annotated benchmark of \citet{shah2023trillion}. Central-bank language is deliberately hedged. A sentence such as \emph{``the Committee will act as appropriate''} is hawkish during a tightening cycle and dovish during an easing one; the words alone do not decide. Because the interpretation of such language shifts with the economic situation, and because the situation is fully described by public market series, this task is a natural probe for the modality. We evaluate the way the system would be used: trained on the past, tested on the future.
+
+Our contributions are:
+\begin{enumerate}
+\item \lfts{}, which extends \lf{} with a third expert: a small time-series transformer that reads the market context of each document, realising the extension proposed in the original work.
+\item A time-honest evaluation of monetary-policy stance classification: models are trained on sentences up to 2015 and tested on 2015--2022, so no knowledge of the test years can leak into training.
+\item Evidence for the overarching claim: adding the market modality improves the fusion from 62.1\% to 65.0\% weighted F1 and lifts it past a modern zero-shot LLM, in a regime with only ${\sim}1{,}300$ labelled training sentences.
+\end{enumerate}
+
+
+\section{Related Work}
+
+\paragraph{\lf{}.}
+Given a text $x$, \lf{} \citep{schlee2025labelfusion} obtains label scores $z = f_{\mathrm{LLM}}(x)$ from a prompted LLM and a contextual embedding $h = f_{\mathrm{RB}}(x)$ from a fine-tuned RoBERTa encoder, and fuses them with a small MLP, $\hat{y} = f_{\mathrm{MLP}}([\,h;z\,])$. On Reuters-21578 the fusion beats both components at full training data, while the prompted LLM dominates in the low-data regime. We keep this design unchanged and add one expert.
+
+\paragraph{Monetary-policy stance classification.}
+\citet{shah2023trillion} built the benchmark we use: sentences from FOMC meeting minutes, press-conference transcripts, and speeches (1996--2022), each labelled hawkish, dovish, or neutral by trained annotators, together with baselines from rule-based systems to fine-tuned RoBERTa-large and zero-shot ChatGPT. Their own market analysis runs downstream of classification, relating predicted stance to asset prices. To our knowledge, no published work uses market data as an \emph{input} to stance classification; the connection between central-bank communication and markets is otherwise well documented \citep{tetlock2007giving,barber2008glitters}.
+
+\paragraph{Time series and text.}
+Purpose-built series encoders such as PatchTST \citep{nie2023patchtst} treat a time series as a sequence of patches, which suits short fixed windows. The multimodal time-series literature predominantly uses text to help forecast series; the reverse direction, series helping to classify text, is the gap this paper addresses.
+
+
+\section{Data and Task}
+\label{sec:data}
+
+\paragraph{Benchmark.}
+The dataset of \citet{shah2023trillion} contains 2{,}479 expert-annotated sentences (hawkish / dovish / neutral) drawn from three types of Federal Reserve communication between 1996 and 2022. The task is single-label, three-class classification of one sentence at a time; the benchmark's headline metric is weighted F1.
+
+\paragraph{Dating the sentences.}
+Connecting a sentence to market data requires knowing \emph{when} it was said, and the released sentences carry only a year. We therefore matched every sentence back to its dated source document (all source documents are public and included in the authors' repository) by exact and containment text matching, recovering an unambiguous document date for 1{,}692 sentences (73\%); the remainder, mostly boilerplate that recurs across documents, is excluded. Details in Appendix~\ref{app:dating}.
+
+\paragraph{Market context.}
+For each sentence we build a window of six daily series over the 126 business days ending the day \emph{before} its document date: the federal funds rate, the 2-year Treasury yield, the yield-curve slope (10y minus 2y), the log equity index, CPI year-over-year inflation, and the unemployment rate, each expressed as its change since the window start. All series are public (FRED). Two safeguards keep the window honest: it ends before the document date, and the macro releases enter with a 45-day lag, so the window contains only what markets actually knew at the time.
+
+\paragraph{Evaluation protocol.}
+We split by time: training on the 1{,}274 sentences up to September 2015 (with the most recent 15\% held out for model selection) and testing on the 418 sentences from 2015--2022. This mirrors deployment, where a model trained on past communication must read future statements, and it prevents a subtle leak that a random split would allow: sentences from the same era appearing on both sides and revealing the regime.
+
+
+\section{\lfts{}}
+\label{sec:model}
+
+\begin{figure}[t]
+  \centering
+  \figph{\columnwidth}{4.2cm}{architecture diagram}
+  \caption{\lfts{}. Three experts are trained independently: a fine-tuned RoBERTa encoder reads the sentence; a prompted LLM votes on the sentence; a small time-series transformer reads the market window of the sentence's document. A voting MLP, trained separately with the experts frozen, combines the RoBERTa embedding, the LLM vote, and the market embedding into the final stance prediction, exactly as in \lf{} with one additional input.}
+  \label{fig:arch}
+\end{figure}
+
+\lfts{} keeps the recipe of \lf{}: each expert is trained on the task individually, then frozen, and a small voting network is trained separately on their outputs (Figure~\ref{fig:arch}).
+
+\paragraph{Text expert.}
+RoBERTa-large \citep{liu2019roberta} is fine-tuned on the training sentences; its CLS embedding $h \in \mathbb{R}^{1024}$ represents the sentence, as in \lf{}.
+
+\paragraph{LLM expert.}
+An instruction-tuned open LLM\footnote{\texttt{gemma4:31b} at temperature 0. We use verbatim the classification prompt that \citet{shah2023trillion} used for ChatGPT, so this expert is exactly the benchmark's LLM baseline with a current model.} classifies each sentence zero-shot; its vote is encoded as $z \in \{0,1\}^{3}$.
+
+\paragraph{Market expert.}
+A small patch transformer in the spirit of PatchTST \citep{nie2023patchtst} reads the market window: the $126 \times 6$ window is cut into 18 week-long patches, each linearly embedded; four transformer layers (width 64, ${\sim}0.4$M parameters) exchange information across the weeks, and the averaged output is the market embedding $m \in \mathbb{R}^{64}$. The expert is trained in two stages, both independent of the other experts: first on six decades of historical windows to predict whether the policy rate changes within the next month, which teaches it what rate cycles look like before it ever sees a labelled sentence, and then on the training sentences (window $\rightarrow$ stance label).
+
+\paragraph{Fusion.}
+With all experts frozen, a voting MLP with one hidden layer combines the three views of a sentence,
+\begin{equation}
+\hat{y} \;=\; f_{\mathrm{MLP}}\big(\big[\,h;\; z;\; m\,\big]\big) \;\in\; [0,1]^{3},
+\label{eq:fusion}
+\end{equation}
+which is \lf{}'s fusion with one added input. Removing $m$ recovers \lf{} exactly; this is the comparison that isolates what the market modality contributes.
+
+
+\section{Results}
+\label{sec:results}
+
+\begin{table}[t]
+  \caption{Stance classification on the time-split test set (418 sentences from 2015--2022; models trained on sentences up to 2015). Weighted F1 and accuracy in percent, following the benchmark's metric.}
+  \label{tab:main}
+  \centering
+  \begin{fitbox}
+  \tabfont
+  \begin{tabular}{@{}lcc@{}}
+    \toprule
+    & wF1 (\%) & Acc.\ (\%) \\
+    \midrule
+    majority class                     & 26.9 & 44.0 \\
+    market expert alone                & 38.7 & 39.2 \\
+    \midrule
+    \lf{} (text + LLM)                 & 62.1 & 62.0 \\
+    RoBERTa-large, fine-tuned          & 62.6 & 62.4 \\
+    LLM zero-shot                      & 64.1 & 64.6 \\
+    \lfts{} (ours)                     & \best{65.0} & \best{64.8} \\
+    \bottomrule
+  \end{tabular}
+  \end{fitbox}
+\end{table}
+
+Table~\ref{tab:main} reports the time-split evaluation. The market expert alone reaches 38.7\% weighted F1: market data by itself carries a real but weak stance signal, well above the majority baseline and far below any text model. The fine-tuned encoder reaches 62.6\% and the text-only fusion 62.1\%; the zero-shot LLM, with no training data at all, reaches 64.1\% and outperforms both. Adding the market expert changes the picture: \lfts{} reaches 65.0\%, a gain of $+2.9$ points over the text-only fusion and the only configuration that surpasses the zero-shot LLM.
+
+Two aspects of this result are worth stating precisely. First, the entire improvement comes from adding one modality: architecture, experts, and training recipe are otherwise identical between \lf{} and \lfts{}. Second, the pattern reproduces the central observation of \citet{schlee2025labelfusion} under harder conditions. In their experiments, the fusion needed roughly 80\% of a much larger training set before it overtook the prompted LLM. Here, with only ${\sim}1{,}300$ labelled sentences and a test set drawn from years the models never saw, the text-only fusion still trails the LLM, exactly as their low-data results predict, and it is the market modality that closes the gap.
+
+
+\section{Discussion}
+\label{sec:discussion}
+
+\paragraph{Why market context helps here.}
+The mechanism is visible in the data before any model is trained: in documents preceded by six months of rising rates, 65\% of the stance-bearing sentences in the training years are hawkish; after falling rates, 25\%. The economic situation shifts the meaning of Fed language, and hedged sentences inherit their stance from the regime they are spoken into. The market window hands the classifier exactly this missing variable. Consistent with that reading, the market expert is nearly useless alone (38.7\%) but valuable in combination: its embedding lets the fusion reinterpret the text, which is why the contribution appears only when text and market enter the model together.
+
+\paragraph{Relation to the zero-shot LLM.}
+The comparison with the zero-shot LLM understates our case in one respect: the LLM was trained on data that includes the 2015--2022 test years and public commentary about them, whereas the fine-tuned models saw nothing after 2015. That the fused system nevertheless edges past it suggests the market modality contributes information that even era-exposed pretraining does not supply on demand.
+
+\paragraph{Limitations.}
+We report single training runs, as does the benchmark and \citet{schlee2025labelfusion}; a seed-variance analysis is in preparation. The study covers one task, one benchmark, and a test span of seven years dominated by two unusual regimes (the zero-rate era and the 2022 tightening). Dating recovered 73\% of the benchmark's sentences, so our split is not identical to the official one. And the market expert's standalone weakness means the modality is a complement to text, not a substitute; nothing here suggests market data alone classifies financial text.
+
+
+\section{Conclusion}
+
+Financial text classifiers routinely ignore an input that every human analyst consults: the market context. We added it to an existing fusion architecture as one further expert, exactly as that architecture's authors proposed, and evaluated the result on central-bank stance classification under a train-on-the-past, test-on-the-future protocol. The market modality improved the fusion by $2.9$ points of weighted F1 and lifted it past a zero-shot LLM in the low-label regime where text-only fusion falls behind. The broader point is simple: for financial tasks, the time series surrounding a document is cheap, public, perfectly time-aligned, and informative, and there is little reason to keep leaving it out.
+
+% Internal draft: further results (seed analysis, ablations over ~100 TS-expert and fusion
+% configurations, additional evaluation protocols) exist and will be added before submission.
+
+\bibliography{refs}
+
+\appendix
+
+\section{Dating Procedure}
+\label{app:dating}
+
+The benchmark releases sentences with labels and a year, but not the document date needed to attach market data. All source documents are public and included in the benchmark's repository as date-named files. We match each sentence to its document by exact text match against the per-document sentence files and, where that fails, by containment matching of the normalised sentence against the raw document text. Sentences matching documents on more than one date (recurring boilerplate) and sentences matching no document are excluded. This yields 1{,}692 uniquely dated sentences of 2{,}312 unique sentences (73\%), with label proportions close to the full benchmark (dovish 28\%, hawkish 25\%, neutral 47\%).
+
+\section{Market Window Details}
+\label{app:window}
+
+Series (all FRED): federal funds effective rate (DFF), 2-year Treasury yield (DGS2), yield-curve slope (DGS10 $-$ DGS2), Nasdaq Composite as log index (NASDAQCOM), CPI year-over-year from CPIAUCSL, and the unemployment rate (UNRATE). Windows span 126 business days and end the day before the document date. CPI and unemployment enter with a 45-day publication lag. Each channel is expressed as its change since the window start and standardised with statistics computed on the training split only.
+
+\section{LLM Prompt}
+\label{app:prompt}
+
+The LLM expert uses, verbatim, the prompt published by \citet{shah2023trillion} for their ChatGPT baseline: \emph{``Discard all the previous instructions. Behave like you are an expert sentence classifier. Classify the following sentence from FOMC into `HAWKISH', `DOVISH', or `NEUTRAL' class. Label `HAWKISH' if it is corresponding to tightening of the monetary policy, `DOVISH' if it is corresponding to easing of the monetary policy, or `NEUTRAL' if the stance is neutral. Provide the label in the first line and provide a short explanation in the second line. The sentence: [sentence]''} The first line of the reply is parsed as the vote.
+
+\section{Training Details}
+\label{app:training}
+
+Text expert: \texttt{roberta-large}, maximum length 128 tokens, AdamW with learning rate $10^{-5}$, class-weighted cross-entropy, batch size 16 with gradient accumulation 2, up to 6 epochs with epoch selection on the held-out validation tail, mixed precision, single T4 GPU (${\sim}8$ minutes). Market expert: patch length 7 (18 patches), width 64, 4 layers, 8 heads, dropout 0.2; pretraining on windows sampled every second business day 1962--2015 with a 3-class rate-change target (30-day horizon, $\pm 10$bp threshold); task training with Adam at $3 \times 10^{-4}$, up to 40 epochs with validation selection. Voting MLP: one hidden layer of 64, trained on the concatenated expert outputs with the experts frozen. The market expert and fusion train in minutes on CPU.
+
+\end{document}

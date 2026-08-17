@@ -216,6 +216,7 @@ class FusionEnsemble(BaseEnsemble):
                 self.results_manager, 
                 f"fusion_ensemble_{self.results_manager.experiment_id}"
             )
+<<<<<<< HEAD
         
         # LLM prediction cache file paths from ensemble config
         self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', '')
@@ -236,6 +237,8 @@ class FusionEnsemble(BaseEnsemble):
                 self.results_manager, 
                 f"fusion_ensemble_{self.results_manager.experiment_id}"
             )
+=======
+>>>>>>> michael_emnlp
         
         # Initialize training state
         self.is_trained = False

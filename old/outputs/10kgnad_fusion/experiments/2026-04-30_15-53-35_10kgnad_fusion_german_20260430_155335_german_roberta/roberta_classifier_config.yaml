@@ -1,0 +1,24 @@
+config:
+  batch_size: 32
+  classes: &id001
+  - Etat
+  - Inland
+  - International
+  - Kultur
+  - Panorama
+  - Sport
+  - Web
+  - Wirtschaft
+  - Wissenschaft
+  label_columns: *id001
+  learning_rate: 2.0e-05
+  max_length: 256
+  model_name: benjamin/roberta-base-wechsel-german
+  multi_label: false
+  num_epochs: 2
+  num_labels: 9
+  text_column: text
+metadata:
+  experiment_id: 2026-04-30_15-53-35_10kgnad_fusion_german_20260430_155335_german_roberta
+  model_name: roberta_classifier
+  timestamp: '2026-04-30T16:02:11.752465'

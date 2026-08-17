@@ -1,0 +1,12 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2026-04-28_11-16-01_10kgnad_openai_20260428_111558
+  git_commit: 93fb4ed6eb0bb139392e883ef859a3faf1a97343
+  model_name: openai_classifier
+  timestamp: '2026-04-28T11:20:41.282015'
+metrics:
+  accuracy: 0.8122568093385214
+  auc: 0.9031445873777275
+  f1: 0.8119860607229075
+  precision: 0.81598696796976
+  recall: 0.8299186809689799

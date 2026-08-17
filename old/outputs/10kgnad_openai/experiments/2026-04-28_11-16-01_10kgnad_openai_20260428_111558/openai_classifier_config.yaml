@@ -1,0 +1,22 @@
+config:
+  batch_size: 32
+  few_shot_mode: 5
+  label_columns:
+  - Etat
+  - Inland
+  - International
+  - Kultur
+  - Panorama
+  - Sport
+  - Web
+  - Wirtschaft
+  - Wissenschaft
+  model_name: gpt-5-mini
+  multi_label: false
+  provider: openai
+  text_column: text
+  threshold: 0.5
+metadata:
+  experiment_id: 2026-04-28_11-16-01_10kgnad_openai_20260428_111558
+  model_name: openai_classifier
+  timestamp: '2026-04-28T11:20:41.285333'

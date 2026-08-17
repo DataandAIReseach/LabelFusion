@@ -1,0 +1,1762 @@
+[
+  {
+    "percentage": 0.01,
+    "percentage_str": "1pct",
+    "experiment_name": "ag_news_1pct_2025-10-20_20-49-14",
+    "output_dir": "outputs/data_availability_experiments/train_1pct",
+    "train_samples": 40,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 40,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14",
+        "experiment_dir": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14",
+        "created_at": "2025-10-20T20:49:15.009411",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/predictions",
+          "models": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/models",
+          "metrics": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/metrics",
+          "logs": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/logs",
+          "plots": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/plots",
+          "cache": "outputs/data_availability_experiments/train_1pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14"
+    },
+    "test_metrics": {
+      "accuracy": 0.834,
+      "precision": 0.8556510278076505,
+      "recall": 0.8340000000000001,
+      "f1": 0.8313077709430322,
+      "auc": 0.8893333333333333
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.25,
+          "precision_weighted": 0.0625,
+          "recall_weighted": 0.25,
+          "f1_weighted": 0.1,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1-score": 0.0,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1-score": 0.0,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1-score": 0.0,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.25,
+              "recall": 1.0,
+              "f1-score": 0.4,
+              "support": 125.0
+            },
+            "accuracy": 0.25,
+            "macro avg": {
+              "precision": 0.0625,
+              "recall": 0.25,
+              "f1-score": 0.1,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.0625,
+              "recall": 0.25,
+              "f1-score": 0.1,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 40,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.25,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14_roberta",
+            "created_at": "2025-10-20T20:49:14.690939",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_1pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.834,
+          "precision": 0.8556510278076505,
+          "recall": 0.8340000000000001,
+          "f1": 0.8313077709430322,
+          "auc": 0.8893333333333333
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 40,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14",
+            "experiment_dir": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14",
+            "created_at": "2025-10-20T20:49:15.009411",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/predictions",
+              "models": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/models",
+              "metrics": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/metrics",
+              "logs": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/logs",
+              "plots": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14/plots",
+              "cache": "outputs/data_availability_experiments/train_1pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_1pct/experiments/2025-10-20_20-49-14_ag_news_1pct_2025-10-20_20-49-14"
+        }
+      }
+    }
+  },
+  {
+    "percentage": 0.02,
+    "percentage_str": "2pct",
+    "experiment_name": "ag_news_2pct_2025-10-20_20-50-27",
+    "output_dir": "outputs/data_availability_experiments/train_2pct",
+    "train_samples": 80,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 80,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27",
+        "experiment_dir": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27",
+        "created_at": "2025-10-20T20:50:27.364610",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/predictions",
+          "models": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/models",
+          "metrics": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/metrics",
+          "logs": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/logs",
+          "plots": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/plots",
+          "cache": "outputs/data_availability_experiments/train_2pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27"
+    },
+    "test_metrics": {
+      "accuracy": 0.904,
+      "precision": 0.9047894816124914,
+      "recall": 0.9039999999999999,
+      "f1": 0.904156846644677,
+      "auc": 0.9359999999999999
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.25,
+          "precision_weighted": 0.0625,
+          "recall_weighted": 0.25,
+          "f1_weighted": 0.1,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1-score": 0.0,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1-score": 0.0,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1-score": 0.0,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.25,
+              "recall": 1.0,
+              "f1-score": 0.4,
+              "support": 125.0
+            },
+            "accuracy": 0.25,
+            "macro avg": {
+              "precision": 0.0625,
+              "recall": 0.25,
+              "f1-score": 0.1,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.0625,
+              "recall": 0.25,
+              "f1-score": 0.1,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 80,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.25,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27_roberta",
+            "created_at": "2025-10-20T20:50:27.275971",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_2pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.904,
+          "precision": 0.9047894816124914,
+          "recall": 0.9039999999999999,
+          "f1": 0.904156846644677,
+          "auc": 0.9359999999999999
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 80,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27",
+            "experiment_dir": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27",
+            "created_at": "2025-10-20T20:50:27.364610",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/predictions",
+              "models": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/models",
+              "metrics": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/metrics",
+              "logs": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/logs",
+              "plots": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27/plots",
+              "cache": "outputs/data_availability_experiments/train_2pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_2pct/experiments/2025-10-20_20-50-27_ag_news_2pct_2025-10-20_20-50-27"
+        }
+      }
+    }
+  },
+  {
+    "percentage": 0.03,
+    "percentage_str": "3pct",
+    "experiment_name": "ag_news_3pct_2025-10-20_20-51-42",
+    "output_dir": "outputs/data_availability_experiments/train_3pct",
+    "train_samples": 120,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 120,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42",
+        "experiment_dir": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42",
+        "created_at": "2025-10-20T20:51:42.852546",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/predictions",
+          "models": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/models",
+          "metrics": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/metrics",
+          "logs": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/logs",
+          "plots": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/plots",
+          "cache": "outputs/data_availability_experiments/train_3pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42"
+    },
+    "test_metrics": {
+      "accuracy": 0.898,
+      "precision": 0.901541014592273,
+      "recall": 0.8979999999999999,
+      "f1": 0.8979767435915289,
+      "auc": 0.9319999999999999
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.738,
+          "precision_weighted": 0.7749798295743521,
+          "recall_weighted": 0.738,
+          "f1_weighted": 0.7336856154315562,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.8787878787878788,
+              "recall": 0.464,
+              "f1-score": 0.6073298429319371,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.9292035398230089,
+              "recall": 0.84,
+              "f1-score": 0.8823529411764706,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.6022727272727273,
+              "recall": 0.848,
+              "f1-score": 0.7043189368770764,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.6896551724137931,
+              "recall": 0.8,
+              "f1-score": 0.7407407407407407,
+              "support": 125.0
+            },
+            "accuracy": 0.738,
+            "macro avg": {
+              "precision": 0.7749798295743521,
+              "recall": 0.738,
+              "f1-score": 0.7336856154315561,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.7749798295743521,
+              "recall": 0.738,
+              "f1-score": 0.7336856154315562,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 120,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.72,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42_roberta",
+            "created_at": "2025-10-20T20:51:42.650901",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_3pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.898,
+          "precision": 0.901541014592273,
+          "recall": 0.8979999999999999,
+          "f1": 0.8979767435915289,
+          "auc": 0.9319999999999999
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 120,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42",
+            "experiment_dir": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42",
+            "created_at": "2025-10-20T20:51:42.852546",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/predictions",
+              "models": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/models",
+              "metrics": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/metrics",
+              "logs": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/logs",
+              "plots": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42/plots",
+              "cache": "outputs/data_availability_experiments/train_3pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_3pct/experiments/2025-10-20_20-51-42_ag_news_3pct_2025-10-20_20-51-42"
+        }
+      }
+    }
+  },
+  {
+    "percentage": 0.04,
+    "percentage_str": "4pct",
+    "experiment_name": "ag_news_4pct_2025-10-20_20-52-59",
+    "output_dir": "outputs/data_availability_experiments/train_4pct",
+    "train_samples": 160,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 160,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59",
+        "experiment_dir": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59",
+        "created_at": "2025-10-20T20:52:59.660199",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/predictions",
+          "models": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/models",
+          "metrics": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/metrics",
+          "logs": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/logs",
+          "plots": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/plots",
+          "cache": "outputs/data_availability_experiments/train_4pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59"
+    },
+    "test_metrics": {
+      "accuracy": 0.9,
+      "precision": 0.9013195111163849,
+      "recall": 0.8999999999999999,
+      "f1": 0.9003012228466953,
+      "auc": 0.9333333333333332
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.434,
+          "precision_weighted": 0.5250755184959996,
+          "recall_weighted": 0.434,
+          "f1_weighted": 0.37945536232205335,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.896551724137931,
+              "recall": 0.416,
+              "f1-score": 0.5683060109289617,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.3148614609571788,
+              "recall": 1.0,
+              "f1-score": 0.4789272030651341,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.8888888888888888,
+              "recall": 0.32,
+              "f1-score": 0.47058823529411764,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.0,
+              "recall": 0.0,
+              "f1-score": 0.0,
+              "support": 125.0
+            },
+            "accuracy": 0.434,
+            "macro avg": {
+              "precision": 0.5250755184959996,
+              "recall": 0.434,
+              "f1-score": 0.37945536232205335,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.5250755184959996,
+              "recall": 0.434,
+              "f1-score": 0.37945536232205335,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 160,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.436,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59_roberta",
+            "created_at": "2025-10-20T20:52:59.580869",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_4pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.9,
+          "precision": 0.9013195111163849,
+          "recall": 0.8999999999999999,
+          "f1": 0.9003012228466953,
+          "auc": 0.9333333333333332
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 160,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59",
+            "experiment_dir": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59",
+            "created_at": "2025-10-20T20:52:59.660199",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/predictions",
+              "models": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/models",
+              "metrics": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/metrics",
+              "logs": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/logs",
+              "plots": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59/plots",
+              "cache": "outputs/data_availability_experiments/train_4pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_4pct/experiments/2025-10-20_20-52-59_ag_news_4pct_2025-10-20_20-52-59"
+        }
+      }
+    }
+  },
+  {
+    "percentage": 0.05,
+    "percentage_str": "5pct",
+    "experiment_name": "ag_news_5pct_2025-10-20_20-54-16",
+    "output_dir": "outputs/data_availability_experiments/train_5pct",
+    "train_samples": 200,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 200,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16",
+        "experiment_dir": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16",
+        "created_at": "2025-10-20T20:54:16.900660",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/predictions",
+          "models": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/models",
+          "metrics": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/metrics",
+          "logs": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/logs",
+          "plots": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/plots",
+          "cache": "outputs/data_availability_experiments/train_5pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16"
+    },
+    "test_metrics": {
+      "accuracy": 0.89,
+      "precision": 0.8929616155836128,
+      "recall": 0.8899999999999999,
+      "f1": 0.8899554687028397,
+      "auc": 0.9266666666666667
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.81,
+          "precision_weighted": 0.8288537936494262,
+          "recall_weighted": 0.81,
+          "f1_weighted": 0.8016209210438161,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.7730496453900709,
+              "recall": 0.872,
+              "f1-score": 0.8195488721804511,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.9022556390977443,
+              "recall": 0.96,
+              "f1-score": 0.9302325581395349,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.7115384615384616,
+              "recall": 0.888,
+              "f1-score": 0.7900355871886121,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.9285714285714286,
+              "recall": 0.52,
+              "f1-score": 0.6666666666666666,
+              "support": 125.0
+            },
+            "accuracy": 0.81,
+            "macro avg": {
+              "precision": 0.8288537936494265,
+              "recall": 0.8099999999999999,
+              "f1-score": 0.8016209210438161,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.8288537936494262,
+              "recall": 0.81,
+              "f1-score": 0.8016209210438161,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 200,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.824,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16_roberta",
+            "created_at": "2025-10-20T20:54:16.828103",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_5pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.89,
+          "precision": 0.8929616155836128,
+          "recall": 0.8899999999999999,
+          "f1": 0.8899554687028397,
+          "auc": 0.9266666666666667
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 200,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16",
+            "experiment_dir": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16",
+            "created_at": "2025-10-20T20:54:16.900660",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/predictions",
+              "models": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/models",
+              "metrics": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/metrics",
+              "logs": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/logs",
+              "plots": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16/plots",
+              "cache": "outputs/data_availability_experiments/train_5pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_5pct/experiments/2025-10-20_20-54-16_ag_news_5pct_2025-10-20_20-54-16"
+        }
+      }
+    }
+  },
+  {
+    "percentage": 0.06,
+    "percentage_str": "6pct",
+    "experiment_name": "ag_news_6pct_2025-10-20_20-55-36",
+    "output_dir": "outputs/data_availability_experiments/train_6pct",
+    "train_samples": 240,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 240,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36",
+        "experiment_dir": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36",
+        "created_at": "2025-10-20T20:55:36.341060",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/predictions",
+          "models": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/models",
+          "metrics": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/metrics",
+          "logs": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/logs",
+          "plots": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/plots",
+          "cache": "outputs/data_availability_experiments/train_6pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36"
+    },
+    "test_metrics": {
+      "accuracy": 0.888,
+      "precision": 0.8922288190580874,
+      "recall": 0.8879999999999999,
+      "f1": 0.8880059527810636,
+      "auc": 0.9253333333333333
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision_weighted": 0.8486437493384144,
+          "recall_weighted": 0.844,
+          "f1_weighted": 0.8437081666731878,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.7943262411347518,
+              "recall": 0.896,
+              "f1-score": 0.8421052631578947,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.95,
+              "recall": 0.912,
+              "f1-score": 0.9306122448979591,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.7835820895522388,
+              "recall": 0.84,
+              "f1-score": 0.8108108108108109,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.8666666666666667,
+              "recall": 0.728,
+              "f1-score": 0.7913043478260869,
+              "support": 125.0
+            },
+            "accuracy": 0.844,
+            "macro avg": {
+              "precision": 0.8486437493384144,
+              "recall": 0.8440000000000001,
+              "f1-score": 0.8437081666731879,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.8486437493384144,
+              "recall": 0.844,
+              "f1-score": 0.8437081666731878,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 240,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.844,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36_roberta",
+            "created_at": "2025-10-20T20:55:36.270850",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_6pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.888,
+          "precision": 0.8922288190580874,
+          "recall": 0.8879999999999999,
+          "f1": 0.8880059527810636,
+          "auc": 0.9253333333333333
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 240,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36",
+            "experiment_dir": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36",
+            "created_at": "2025-10-20T20:55:36.341060",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/predictions",
+              "models": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/models",
+              "metrics": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/metrics",
+              "logs": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/logs",
+              "plots": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36/plots",
+              "cache": "outputs/data_availability_experiments/train_6pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_6pct/experiments/2025-10-20_20-55-36_ag_news_6pct_2025-10-20_20-55-36"
+        }
+      }
+    }
+  },
+  {
+    "percentage": 0.07,
+    "percentage_str": "7pct",
+    "experiment_name": "ag_news_7pct_2025-10-20_20-56-57",
+    "output_dir": "outputs/data_availability_experiments/train_7pct",
+    "train_samples": 280,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 280,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57",
+        "experiment_dir": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57",
+        "created_at": "2025-10-20T20:56:57.679240",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/predictions",
+          "models": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/models",
+          "metrics": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/metrics",
+          "logs": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/logs",
+          "plots": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/plots",
+          "cache": "outputs/data_availability_experiments/train_7pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57"
+    },
+    "test_metrics": {
+      "accuracy": 0.89,
+      "precision": 0.8924817208310032,
+      "recall": 0.89,
+      "f1": 0.8903462776482286,
+      "auc": 0.9266666666666666
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.868,
+          "precision_weighted": 0.8716337807042662,
+          "recall_weighted": 0.868,
+          "f1_weighted": 0.8678273397281582,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.8111888111888111,
+              "recall": 0.928,
+              "f1-score": 0.8656716417910447,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.943089430894309,
+              "recall": 0.928,
+              "f1-score": 0.9354838709677419,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.824,
+              "recall": 0.824,
+              "f1-score": 0.824,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.908256880733945,
+              "recall": 0.792,
+              "f1-score": 0.8461538461538461,
+              "support": 125.0
+            },
+            "accuracy": 0.868,
+            "macro avg": {
+              "precision": 0.8716337807042662,
+              "recall": 0.8680000000000001,
+              "f1-score": 0.8678273397281582,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.8716337807042662,
+              "recall": 0.868,
+              "f1-score": 0.8678273397281582,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 280,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.87,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57_roberta",
+            "created_at": "2025-10-20T20:56:57.604063",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_7pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.89,
+          "precision": 0.8924817208310032,
+          "recall": 0.89,
+          "f1": 0.8903462776482286,
+          "auc": 0.9266666666666666
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 280,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57",
+            "experiment_dir": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57",
+            "created_at": "2025-10-20T20:56:57.679240",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/predictions",
+              "models": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/models",
+              "metrics": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/metrics",
+              "logs": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/logs",
+              "plots": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57/plots",
+              "cache": "outputs/data_availability_experiments/train_7pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_7pct/experiments/2025-10-20_20-56-57_ag_news_7pct_2025-10-20_20-56-57"
+        }
+      }
+    }
+  },
+  {
+    "percentage": 0.08,
+    "percentage_str": "8pct",
+    "experiment_name": "ag_news_8pct_2025-10-20_20-58-20",
+    "output_dir": "outputs/data_availability_experiments/train_8pct",
+    "train_samples": 320,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 320,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20",
+        "experiment_dir": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20",
+        "created_at": "2025-10-20T20:58:20.532358",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/predictions",
+          "models": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/models",
+          "metrics": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/metrics",
+          "logs": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/logs",
+          "plots": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/plots",
+          "cache": "outputs/data_availability_experiments/train_8pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20"
+    },
+    "test_metrics": {
+      "accuracy": 0.916,
+      "precision": 0.9173426051501502,
+      "recall": 0.9159999999999999,
+      "f1": 0.916310908848875,
+      "auc": 0.944
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.89,
+          "precision_weighted": 0.8920333116343147,
+          "recall_weighted": 0.89,
+          "f1_weighted": 0.8904184805586892,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.9224137931034483,
+              "recall": 0.856,
+              "f1-score": 0.8879668049792531,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.9512195121951219,
+              "recall": 0.936,
+              "f1-score": 0.9435483870967742,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.8283582089552238,
+              "recall": 0.888,
+              "f1-score": 0.8571428571428571,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.8661417322834646,
+              "recall": 0.88,
+              "f1-score": 0.873015873015873,
+              "support": 125.0
+            },
+            "accuracy": 0.89,
+            "macro avg": {
+              "precision": 0.8920333116343147,
+              "recall": 0.89,
+              "f1-score": 0.8904184805586893,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.8920333116343147,
+              "recall": 0.89,
+              "f1-score": 0.8904184805586892,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 320,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.88,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20_roberta",
+            "created_at": "2025-10-20T20:58:20.457188",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_8pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.916,
+          "precision": 0.9173426051501502,
+          "recall": 0.9159999999999999,
+          "f1": 0.916310908848875,
+          "auc": 0.944
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 320,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20",
+            "experiment_dir": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20",
+            "created_at": "2025-10-20T20:58:20.532358",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/predictions",
+              "models": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/models",
+              "metrics": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/metrics",
+              "logs": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/logs",
+              "plots": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20/plots",
+              "cache": "outputs/data_availability_experiments/train_8pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_8pct/experiments/2025-10-20_20-58-20_ag_news_8pct_2025-10-20_20-58-20"
+        }
+      }
+    }
+  },
+  {
+    "percentage": 0.09,
+    "percentage_str": "9pct",
+    "experiment_name": "ag_news_9pct_2025-10-20_20-59-44",
+    "output_dir": "outputs/data_availability_experiments/train_9pct",
+    "train_samples": 360,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 360,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44",
+        "experiment_dir": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44",
+        "created_at": "2025-10-20T20:59:44.977061",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/predictions",
+          "models": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/models",
+          "metrics": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/metrics",
+          "logs": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/logs",
+          "plots": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/plots",
+          "cache": "outputs/data_availability_experiments/train_9pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44"
+    },
+    "test_metrics": {
+      "accuracy": 0.9,
+      "precision": 0.9016165837859059,
+      "recall": 0.8999999999999999,
+      "f1": 0.9001142165839875,
+      "auc": 0.9333333333333332
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.886,
+          "precision_weighted": 0.8887515274351716,
+          "recall_weighted": 0.886,
+          "f1_weighted": 0.8861436577672741,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.8769230769230769,
+              "recall": 0.912,
+              "f1-score": 0.8941176470588236,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.959349593495935,
+              "recall": 0.944,
+              "f1-score": 0.9516129032258065,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.8088235294117647,
+              "recall": 0.88,
+              "f1-score": 0.842911877394636,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.9099099099099099,
+              "recall": 0.808,
+              "f1-score": 0.8559322033898306,
+              "support": 125.0
+            },
+            "accuracy": 0.886,
+            "macro avg": {
+              "precision": 0.8887515274351716,
+              "recall": 0.8859999999999999,
+              "f1-score": 0.8861436577672741,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.8887515274351716,
+              "recall": 0.886,
+              "f1-score": 0.8861436577672741,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 360,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.884,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44_roberta",
+            "created_at": "2025-10-20T20:59:44.904846",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_9pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.9,
+          "precision": 0.9016165837859059,
+          "recall": 0.8999999999999999,
+          "f1": 0.9001142165839875,
+          "auc": 0.9333333333333332
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 360,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44",
+            "experiment_dir": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44",
+            "created_at": "2025-10-20T20:59:44.977061",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/predictions",
+              "models": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/models",
+              "metrics": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/metrics",
+              "logs": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/logs",
+              "plots": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44/plots",
+              "cache": "outputs/data_availability_experiments/train_9pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_9pct/experiments/2025-10-20_20-59-44_ag_news_9pct_2025-10-20_20-59-44"
+        }
+      }
+    }
+  },
+  {
+    "percentage": 0.1,
+    "percentage_str": "10pct",
+    "experiment_name": "ag_news_10pct_2025-10-20_21-00-55",
+    "output_dir": "outputs/data_availability_experiments/train_10pct",
+    "train_samples": 400,
+    "val_samples": 500,
+    "test_samples": 500,
+    "training_result": {
+      "ensemble_method": "fusion",
+      "training_samples": 400,
+      "validation_samples": 500,
+      "num_labels": 4,
+      "classes": [
+        "label_1",
+        "label_2",
+        "label_3",
+        "label_4"
+      ],
+      "classification_type": "multi_class",
+      "ml_model_trained": true,
+      "fusion_mlp_trained": true,
+      "used_cached_val_llm_predictions": false,
+      "experiment_info": {
+        "experiment_id": "2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55",
+        "experiment_dir": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55",
+        "created_at": "2025-10-20T21:00:56.077065",
+        "directories": {
+          "predictions": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/predictions",
+          "models": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/models",
+          "metrics": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/metrics",
+          "logs": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/logs",
+          "plots": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/plots",
+          "cache": "outputs/data_availability_experiments/train_10pct/cache"
+        }
+      },
+      "output_directory": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55"
+    },
+    "test_metrics": {
+      "accuracy": 0.896,
+      "precision": 0.8962532002048131,
+      "recall": 0.8959999999999999,
+      "f1": 0.8961192979087665,
+      "auc": 0.9306666666666666
+    },
+    "test_predictions": 500,
+    "all_models": {
+      "roberta": {
+        "test_metrics": {
+          "accuracy": 0.884,
+          "precision_weighted": 0.885741621562517,
+          "recall_weighted": 0.884,
+          "f1_weighted": 0.8836665271461756,
+          "classification_report": {
+            "label_1": {
+              "precision": 0.8846153846153846,
+              "recall": 0.92,
+              "f1-score": 0.9019607843137255,
+              "support": 125.0
+            },
+            "label_2": {
+              "precision": 0.9523809523809523,
+              "recall": 0.96,
+              "f1-score": 0.9561752988047809,
+              "support": 125.0
+            },
+            "label_3": {
+              "precision": 0.8059701492537313,
+              "recall": 0.864,
+              "f1-score": 0.833976833976834,
+              "support": 125.0
+            },
+            "label_4": {
+              "precision": 0.9,
+              "recall": 0.792,
+              "f1-score": 0.8425531914893617,
+              "support": 125.0
+            },
+            "accuracy": 0.884,
+            "macro avg": {
+              "precision": 0.885741621562517,
+              "recall": 0.8839999999999999,
+              "f1-score": 0.8836665271461756,
+              "support": 500.0
+            },
+            "weighted avg": {
+              "precision": 0.885741621562517,
+              "recall": 0.884,
+              "f1-score": 0.8836665271461756,
+              "support": 500.0
+            }
+          }
+        },
+        "training_result": {
+          "model_name": "roberta-base",
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "training_samples": 400,
+          "validation_samples": 500,
+          "validation_predictions": {
+            "accuracy": 0.888,
+            "num_samples": 500
+          },
+          "device": "cuda",
+          "experiment_info": {
+            "experiment_id": "2025-10-20_21-00-55_ag_news_10pct_2025-10-20_21-00-55_roberta",
+            "experiment_dir": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-55_ag_news_10pct_2025-10-20_21-00-55_roberta",
+            "created_at": "2025-10-20T21:00:55.996538",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-55_ag_news_10pct_2025-10-20_21-00-55_roberta/predictions",
+              "models": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-55_ag_news_10pct_2025-10-20_21-00-55_roberta/models",
+              "metrics": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-55_ag_news_10pct_2025-10-20_21-00-55_roberta/metrics",
+              "logs": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-55_ag_news_10pct_2025-10-20_21-00-55_roberta/logs",
+              "plots": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-55_ag_news_10pct_2025-10-20_21-00-55_roberta/plots",
+              "cache": "outputs/data_availability_experiments/train_10pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-55_ag_news_10pct_2025-10-20_21-00-55_roberta"
+        }
+      },
+      "llm": {
+        "test_metrics": {
+          "accuracy": 0.844,
+          "precision": 0.856745924176122,
+          "recall": 0.8439999999999999,
+          "f1": 0.8442383166350448,
+          "auc": 0.8959999999999999
+        },
+        "model_name": "openai"
+      },
+      "fusion": {
+        "test_metrics": {
+          "accuracy": 0.896,
+          "precision": 0.8962532002048131,
+          "recall": 0.8959999999999999,
+          "f1": 0.8961192979087665,
+          "auc": 0.9306666666666666
+        },
+        "training_result": {
+          "ensemble_method": "fusion",
+          "training_samples": 400,
+          "validation_samples": 500,
+          "num_labels": 4,
+          "classes": [
+            "label_1",
+            "label_2",
+            "label_3",
+            "label_4"
+          ],
+          "classification_type": "multi_class",
+          "ml_model_trained": true,
+          "fusion_mlp_trained": true,
+          "used_cached_val_llm_predictions": false,
+          "experiment_info": {
+            "experiment_id": "2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55",
+            "experiment_dir": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55",
+            "created_at": "2025-10-20T21:00:56.077065",
+            "directories": {
+              "predictions": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/predictions",
+              "models": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/models",
+              "metrics": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/metrics",
+              "logs": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/logs",
+              "plots": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55/plots",
+              "cache": "outputs/data_availability_experiments/train_10pct/cache"
+            }
+          },
+          "output_directory": "outputs/data_availability_experiments/train_10pct/experiments/2025-10-20_21-00-56_ag_news_10pct_2025-10-20_21-00-55"
+        }
+      }
+    }
+  }
+]

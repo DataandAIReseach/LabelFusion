@@ -1,0 +1,84 @@
+Baseline
+
+2026-08-04 11:41:19,584 - INFO - Exact match (all 4 correct): 0.675
+2026-08-04 11:41:19,584 - INFO - Mean per-label accuracy: 0.906
+2026-08-04 11:41:19,584 - INFO - F1 (micro):    0.945
+2026-08-04 11:41:19,584 - INFO - F1 (macro):    0.945
+2026-08-04 11:41:19,584 - INFO - F1 (weighted): 0.945
+2026-08-04 11:41:19,584 - INFO - F1 (samples):  0.940
+2026-08-04 11:41:19,584 - INFO - 
+
+Shorttext
+
+2026-08-04 11:54:06,513 - INFO - Exact match (all 4 correct): 0.650
+2026-08-04 11:54:06,513 - INFO - Mean per-label accuracy: 0.900
+2026-08-04 11:54:06,513 - INFO - F1 (micro):    0.942
+2026-08-04 11:54:06,514 - INFO - F1 (macro):    0.942
+2026-08-04 11:54:06,514 - INFO - F1 (weighted): 0.941
+2026-08-04 11:54:06,514 - INFO - F1 (samples):  0.931
+2026-08-04 11:54:06,514 - INFO - 
+
+Shorttext + Extended Signals
+
+2026-08-04 19:41:32,854 - INFO - Exact match (all 4 correct): 0.600
+2026-08-04 19:41:32,854 - INFO - Mean per-label accuracy: 0.881
+2026-08-04 19:41:32,854 - INFO - F1 (micro):    0.931
+2026-08-04 19:41:32,854 - INFO - F1 (macro):    0.931
+2026-08-04 19:41:32,854 - INFO - F1 (weighted): 0.931
+2026-08-04 19:41:32,854 - INFO - F1 (samples):  0.924
+2026-08-04 19:41:32,855 - INFO -
+
+Shorttext + Extended Signals + Extended SHARED_THEMES
+
+2026-08-04 20:07:17,563 - INFO - Exact match (all 4 correct): 0.475
+2026-08-04 20:07:17,564 - INFO - Mean per-label accuracy: 0.850
+2026-08-04 20:07:17,564 - INFO - F1 (micro):    0.915
+2026-08-04 20:07:17,564 - INFO - F1 (macro):    0.915
+2026-08-04 20:07:17,564 - INFO - F1 (weighted): 0.916
+2026-08-04 20:07:17,564 - INFO - F1 (samples):  0.905
+2026-08-04 20:07:17,565 - INFO -
+
+Shorttext + Extended Signals + Extended SHARED_THEMES + SHORTED STYLE_DISTORTIONS
+
+2026-08-04 20:59:42,142 - INFO - Exact match (all 4 correct): 0.475
+2026-08-04 20:59:42,142 - INFO - Mean per-label accuracy: 0.838
+2026-08-04 20:59:42,142 - INFO - F1 (micro):    0.908
+2026-08-04 20:59:42,142 - INFO - F1 (macro):    0.908
+2026-08-04 20:59:42,142 - INFO - F1 (weighted): 0.909
+2026-08-04 20:59:42,142 - INFO - F1 (samples):  0.894
+2026-08-04 20:59:42,143 - INFO - 
+
+Shorttext + Extended Signals + Extended SHARED_THEMES + SHORTED STYLE_DISTORTIONS + extended NEWS_OUTLETS
+
+2026-08-04 21:05:14,713 - INFO - Exact match (all 4 correct): 0.425
+2026-08-04 21:05:14,714 - INFO - Mean per-label accuracy: 0.838
+2026-08-04 21:05:14,714 - INFO - F1 (micro):    0.907
+2026-08-04 21:05:14,714 - INFO - F1 (macro):    0.906
+2026-08-04 21:05:14,714 - INFO - F1 (weighted): 0.907
+2026-08-04 21:05:14,714 - INFO - F1 (samples):  0.899
+2026-08-04 21:05:14,716 - INFO - 
+
+Shorttext + Extended Signals + Extended SHARED_THEMES + shorted STYLE_DISTORTIONS + extended NEWS_OUTLETS + ambiguity in INDIRECT section
+
+2026-08-04 21:34:43,791 - INFO - Exact match (all 4 correct): 0.525
+2026-08-04 21:34:43,791 - INFO - Mean per-label accuracy: 0.863
+2026-08-04 21:34:43,791 - INFO - F1 (micro):    0.921
+2026-08-04 21:34:43,791 - INFO - F1 (macro):    0.921
+2026-08-04 21:34:43,791 - INFO - F1 (weighted): 0.921
+2026-08-04 21:34:43,791 - INFO - F1 (samples):  0.914
+2026-08-04 21:34:43,791 - INFO -
+
+Shorttext (50-100) + Extended Signals + Extended SHARED_THEMES + shorted STYLE_DISTORTIONS + extended NEWS_OUTLETS + ambiguity in INDIRECT section (50%)
+
+2026-08-05 13:12:59,175 - INFO - Exact match (all 4 correct): 0.625
+2026-08-05 13:12:59,175 - INFO - Mean per-label accuracy: 0.900
+2026-08-05 13:12:59,175 - INFO - F1 (micro):    0.943
+2026-08-05 13:12:59,175 - INFO - F1 (macro):    0.943
+2026-08-05 13:12:59,175 - INFO - F1 (weighted): 0.943
+2026-08-05 13:12:59,175 - INFO - F1 (samples):  0.933
+2026-08-05 13:12:59,176 - INFO - 
+
+
+ 
+
+
