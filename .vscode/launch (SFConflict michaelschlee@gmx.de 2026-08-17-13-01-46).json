@@ -2,13 +2,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python Debugger: Current File",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${file}",
-      "console": "integratedTerminal"
-    },
-    {
       "name": "Eval GoEmotions: Quick smoke",
       "type": "debugpy",
       "request": "launch",
@@ -44,35 +37,59 @@
         "PYTHONPATH": "${workspaceFolder}"
       },
       "justMyCode": false
-    },
+    }
+  ]
+}
+  // Launch configuration for debugging `eval_goemotions.py` from VS Code Run/Debug (bug button).
+  // This configuration runs the file with a small default sample size so it finishes quickly
+  // and avoids triggering long trainings by default. You can edit `args` as needed.
+  "version": "0.2.0",
+  "configurations": [
     {
-      "name": "10kGNAD: Run eval_10kGNAD",
+      "name": "Python: Run eval_goemotions (quick)",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/tests/eval_10kGNAD.py",
+      "program": "${workspaceFolder}/tests/evaluation/eval_goemotions.py",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
+      "args": [
+        "--n-samples", "10",
+        "--llm-provider", "openai",
+        "--output-dir", "outputs/goemotions_experiments/debug_run",
+        "--no-baselines"
+      ],
       "env": {
-        "PYTHONPATH": "${workspaceFolder}",
-        "DATA_DIR": "${workspaceFolder}/Dataset_Descriptives/data/10kGNAD",
-        "OUTPUT_DIR": "${workspaceFolder}/outputs/10kgnad_fusion",
-        "CACHE_DIR": "${workspaceFolder}/cache/10kGNAD"
-      },
-      "justMyCode": false
+        // Set any environment variables you need here, e.g. OPENAI_API_KEY
+        // "OPENAI_API_KEY": "your_key_here"
+      }
     },
+    {
+      "name": "Python: Run eval_goemotions (full files)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/evaluation/eval_goemotions.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "--full",
+        "--llm-provider", "openai",
+        "--output-dir", "outputs/goemotions_experiments/full_run"
+      ],
+      "env": {}
+    }
+  ]
+}
+{
+  "version": "0.2.0",
+  "configurations": [
     {
       "name": "Run eval_goemotions.py (No Debug)",
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/tests/evaluation/eval_goemotions.py",
       "console": "integratedTerminal",
-      "args": [
-        "--n-samples",
-        "20"
-      ],
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      },
+      "args": ["--n-samples", "20"],
+      "env": {"PYTHONPATH": "${workspaceFolder}"},
       "justMyCode": false
     },
     {
@@ -81,13 +98,8 @@
       "request": "launch",
       "program": "${workspaceFolder}/tests/evaluation/eval_goemotions.py",
       "console": "integratedTerminal",
-      "args": [
-        "--n-samples",
-        "20"
-      ],
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      },
+      "args": ["--n-samples", "20"],
+      "env": {"PYTHONPATH": "${workspaceFolder}"},
       "justMyCode": false
     },
     {
@@ -96,17 +108,8 @@
       "request": "launch",
       "program": "${workspaceFolder}/tests/evaluation/eval_goemotions.py",
       "console": "integratedTerminal",
-      "args": [
-        "--n-samples",
-        "${input:nSamples}",
-        "--llm-provider",
-        "${input:llmProvider}",
-        "--cache-dir",
-        "${input:cacheDir}"
-      ],
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}"
-      },
+      "args": ["--n-samples", "${input:nSamples}", "--llm-provider", "${input:llmProvider}", "--cache-dir", "${input:cacheDir}"],
+      "env": {"PYTHONPATH": "${workspaceFolder}"},
       "justMyCode": false
     }
   ],
@@ -121,10 +124,7 @@
       "id": "llmProvider",
       "type": "pickString",
       "description": "LLM provider",
-      "options": [
-        "openai",
-        "deepseek"
-      ],
+      "options": ["openai", "deepseek"],
       "default": "openai"
     },
     {

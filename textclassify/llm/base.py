@@ -15,7 +15,9 @@ import datetime
 from ..core.base import AsyncBaseClassifier
 from ..core.types import ClassificationResult, ClassificationType, ModelType
 from ..core.exceptions import PredictionError, ValidationError, APIError
-from ..prompt_engineer.base import PromptEngineer
+from ..prompt_pipeline.prompt_engineer import PromptEngineer
+from ..prompt_pipeline.default import DefaultPromptPipeline
+from ..prompt_pipeline.nearest_neighbour_sampler import NearestNeighbourSampler
 from ..services.llm_content_generator import create_llm_generator
 from ..config.api_keys import APIKeyManager
 from ..utils.results_manager import ResultsManager, ModelResultsManager
@@ -39,16 +41,20 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         auto_save_results: bool = True,
         # Cache management parameters
         auto_use_cache: bool = True,
-        cache_dir: str = "cache"
+        cache_dir: str = "cache",
+        use_nearest_neighbours: bool = False,
+        embedding_model: str = "all-MiniLM-L6-v2",
+        fixed_examples: bool = False
     ):
         """Initialize the LLM classifier.
-        
+
         Args:
             config: Configuration object
             text_column: Name of the column containing text data
             label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier (default: False)
-            few_shot_mode: Mode for few-shot learning (default: "few_shot")
+            few_shot_mode: Mode for few-shot learning (default: "few_shot"). When set to
+                an int, also controls how many few-shot examples are drawn per prompt.
             verbose: Whether to show detailed progress (default: True)
             provider: LLM provider to use ('openai', 'gemini', 'deepseek', etc.)
             output_dir: Base directory for saving results (default: "outputs")
@@ -56,6 +62,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             auto_save_results: Whether to automatically save results (default: True)
             auto_use_cache: Whether to automatically check and reuse cached predictions (default: False)
             cache_dir: Directory to search for cached predictions (default: "cache")
+            fixed_examples: If True, the few-shot examples are sampled once (from the
+                train_df stored via fit(), or passed explicitly to predict()) and reused
+                for every prompt. If False (default), examples are resampled fresh for
+                each test row (random, or nearest-neighbour if use_nearest_neighbours=True).
         """
         super().__init__(config)
         self.config.model_type = ModelType.LLM
@@ -63,11 +73,18 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         self.few_shot_mode = few_shot_mode
         self.verbose = verbose
         self.mode = None
-        
+        self.train_df = None  # set via fit(); used as the few-shot pool by predict() when
+                               # no train_df is passed explicitly
+        self.val_df = None
+
         # Set provider - use parameter if provided, otherwise get from config, default to openai
         self.provider = provider or getattr(self.config, 'provider', 'openai')
         # Also set it on config for consistency
         self.config.provider = self.provider
+
+        # Cache management settings
+        self.auto_use_cache = auto_use_cache
+        self.cache_dir = cache_dir
         
         # Cache management settings
         self.auto_use_cache = auto_use_cache
@@ -98,17 +115,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             self.logger.info(f"Multi-label: {self.multi_label}")
             self.logger.info(f"Few-shot mode: {self.few_shot_mode}")
         
-        # Initialize prompt engineer with configuration
-        self.prompt_engineer = PromptEngineer(
-            text_column=self.text_column,
-            label_columns=self.label_columns,
-            multi_label=self.multi_label,
-            few_shot_mode=self.few_shot_mode,
-            model_name=self.config.parameters["model"],  # Pass model from config.parameters
-            provider=self.provider  # Pass provider for correct instance handling
-        )
-        
-        # Initialize LLM generator
+        # Initialize LLM generator first (needed by DefaultPromptPipeline)
         key_manager = APIKeyManager()
         
         # Get appropriate API key based on provider
@@ -121,14 +128,39 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             if not api_key:
                 raise ValueError("No API key found for deepseek")
         else:  # default to openai
-            api_key = key_manager.get_key("openai")
+            # Prefer OPENROUTER_API_KEY when set -- create_llm_generator auto-detects
+            # OpenRouter from the sk-or-v1- key prefix and routes through
+            # OpenRouterContentGenerator instead of OpenAIContentGenerator.
+            api_key = key_manager.get_key("openrouter") or key_manager.get_key("openai")
             if not api_key:
-                raise ValueError("No API key found for openai")
+                raise ValueError("No API key found for openai/openrouter. Set OPENROUTER_API_KEY or OPENAI_API_KEY.")
             
         self.llm_generator = create_llm_generator(
             provider=self.provider,
             model_name=self.config.parameters["model"],
             api_key=api_key
+        )
+
+        # Initialize prompt pipeline — detects language at runtime and translates warehouse if needed
+        self._prompt_pipeline = DefaultPromptPipeline(generator=self.llm_generator)
+
+        # Create sampler if requested — injected into PromptEngineer
+        # fit() is called later inside engineer_prompts() once train_df is available
+        sampler = NearestNeighbourSampler(model_name=embedding_model) if use_nearest_neighbours else None
+
+        # Initialize prompt engineer with the pipeline and optional sampler
+        # Language detection and warehouse translation happen inside engineer_prompts()
+        # at runtime, based on the actual train_df text
+        self.prompt_engineer = PromptEngineer(
+            text_column=self.text_column,
+            label_columns=self.label_columns,
+            multi_label=self.multi_label,
+            pipeline=self._prompt_pipeline,
+            few_shot_mode=self.few_shot_mode,
+            model_name=self.config.parameters["model"],
+            provider=self.provider,
+            sampler=sampler,
+            fixed_examples=fixed_examples,
         )
         
         if self.verbose:
@@ -190,6 +222,133 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             label_definitions=label_definitions
         ))
 
+    def fit(
+        self,
+        train_df: pd.DataFrame,
+        val_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None,
+    ) -> None:
+        """
+        Store train_df (and optionally val_df) as the few-shot example pool.
+
+        Does not make any LLM calls. The stored train_df is used automatically by
+        predict()/predict_async() as the few-shot pool whenever they're called without
+        an explicit train_df argument -- see fixed_examples on __init__ for whether
+        the same examples get reused every time or resampled per prediction.
+
+        Args:
+            train_df: Training data to use as the few-shot example pool
+            val_df: Optional validation data, stored for reference (not used for few-shot)
+            context: Unused (kept for backward-compatible signature)
+            label_definitions: Unused (kept for backward-compatible signature)
+
+        Example:
+            >>> llm = OpenAIClassifier(config, label_columns=commodities)
+            >>> llm.fit(train_df)  # just stores train_df
+            >>> result = llm.predict(test_df=batch)  # uses train_df as few-shot pool
+        """
+        self.train_df = train_df
+        self.val_df = val_df
+
+        if self.verbose:
+            msg = f"Stored {len(train_df)} training examples as the few-shot pool"
+            if val_df is not None:
+                msg += f" (+ {len(val_df)} val examples stored for reference)"
+            self.logger.info(msg)
+    
+    def predict_val(
+        self,
+        train_df: Optional[pd.DataFrame] = None,
+        val_df: Optional[pd.DataFrame] = None,
+        texts: Optional[List[str]] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
+    ) -> ClassificationResult:
+        """Synchronous helper to predict on a validation dataset.
+
+        This is a thin wrapper that sets the model mode to "val" and delegates
+        to :meth:`predict_async`.
+        """
+        # Allow passing texts directly
+        if texts is not None and val_df is None:
+            val_df = pd.DataFrame({self.text_column: texts})
+
+        if val_df is None:
+            raise ValidationError("Either val_df or texts must be provided for predict_val")
+
+        # Ensure mode and delegate
+        self.set_mode("val")
+        return asyncio.run(self.predict_async(
+            test_df=val_df,
+            train_df=train_df,
+            context=context,
+            label_definitions=label_definitions
+        ))
+
+    async def predict_val_async(
+        self,
+        val_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
+    ) -> ClassificationResult:
+        """Asynchronous helper to predict on a validation dataset."""
+        if val_df is None:
+            raise ValidationError("val_df must be provided for predict_val_async")
+
+        self.set_mode("val")
+        return await self.predict_async(
+            test_df=val_df,
+            train_df=train_df,
+            context=context,
+            label_definitions=label_definitions
+        )
+
+    def predict_test(
+        self,
+        train_df: Optional[pd.DataFrame] = None,
+        test_df: Optional[pd.DataFrame] = None,
+        texts: Optional[List[str]] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
+    ) -> ClassificationResult:
+        """Synchronous helper to predict on a test dataset (alias of `predict`)."""
+        # Allow passing texts directly
+        if texts is not None and test_df is None:
+            test_df = pd.DataFrame({self.text_column: texts})
+
+        if test_df is None:
+            raise ValidationError("Either test_df or texts must be provided for predict_test")
+
+        self.set_mode("test")
+        return asyncio.run(self.predict_async(
+            test_df=test_df,
+            train_df=train_df,
+            context=context,
+            label_definitions=label_definitions
+        ))
+
+    async def predict_test_async(
+        self,
+        test_df: pd.DataFrame,
+        train_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None
+    ) -> ClassificationResult:
+        """Asynchronous helper to predict on a test dataset (alias of `predict_async`)."""
+        if test_df is None:
+            raise ValidationError("test_df must be provided for predict_test_async")
+
+        self.set_mode("test")
+        return await self.predict_async(
+            test_df=test_df,
+            train_df=train_df,
+            context=context,
+            label_definitions=label_definitions
+        )
+
+    # ========================================================================
     async def predict_async(
         self,
         test_df: pd.DataFrame,
@@ -198,7 +357,13 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         label_definitions: Optional[Dict[str, str]] = None
     ) -> ClassificationResult:
         """Asynchronously predict labels for texts with detailed progress tracking."""
-        
+
+        # Fall back to the few-shot pool stored via fit() when no train_df is given
+        # explicitly. Passing train_df=None here does NOT force zero-shot when a pool
+        # was stored -- pass train_df=pd.DataFrame() explicitly (empty) for that.
+        if train_df is None and getattr(self, 'train_df', None) is not None:
+            train_df = self.train_df
+
         start_time = time.time()
         
         #  AUTO-CACHE: Check for cached predictions if enabled
@@ -317,7 +482,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             self._setup_prompt_configuration(context, label_definitions)
             
             if self.verbose:
-                self.logger.info("Prompt configuration completed")
+                self.logger.info("Prompt configuration completed" )
                 print("Prompt configuration ready")
             
             # Step 3: Prompt engineering
@@ -543,21 +708,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         from pathlib import Path
         import hashlib
         import json
-        import sys
-        
-        # Always print to stderr to avoid buffering issues
-        def dbg(msg):
-            print(msg, file=sys.stderr, flush=True)
-        
-        dbg("\n" + "="*80)
-        dbg("DEBUG: has_test_cache_for_dataset CALLED")
-        dbg("="*80)
 
-        verbose = True  # Force debug output
         cache_dir = getattr(self, 'cache_dir', 'cache')
         p = Path(cache_dir)
         if not p.exists():
-            dbg(f"Cache dir {cache_dir} does not exist")
             return False
 
         # Compute stable 8-char hash for DataFrame using ONLY text column (consistent with _initialize_batch_cache_file)
@@ -571,48 +725,92 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             csv_bytes = text_series.to_csv(index=False).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
 
-        dbg(f"Looking for dataset hash: {dataset_hash}")
-
         discovered = self.discover_cached_predictions(cache_dir)
         if not discovered:
-            dbg("No discovered caches")
             return False
 
-        # Check both validation and test cache files
-        candidates = discovered.get('validation_predictions', []) + discovered.get('test_predictions', [])
-        dbg(f"Found {len(candidates)} candidate cache files")
-        dbg(f"Dataset hash: {dataset_hash}")
-        for c in candidates[:3]:
-            dbg(f"Candidate: {c}")
-        
+        candidates = discovered.get('test_predictions', []) or []
         for file_path in candidates:
             try:
                 fname = Path(file_path).name
-                dbg(f"Checking file: {fname}")
-                dbg(f"  Does '{fname}' end with '_{dataset_hash}.json'? {fname.endswith(f'_{dataset_hash}.json')}")
-                
                 if fname.endswith(f"_{dataset_hash}.json"):
-                    dbg(f"✓ MATCH by filename: {fname}")
                     return True
 
                 with open(file_path, 'r') as f:
                     data = json.load(f)
                 meta = data.get('metadata', {}) if isinstance(data, dict) else {}
-                meta_hash = meta.get('dataset_hash')
-                dbg(f"  Metadata hash: {meta_hash}, Looking for: {dataset_hash}, Match: {meta_hash == dataset_hash}")
-                
-                if meta_hash == dataset_hash:
-                    dbg(f"✓ MATCH by metadata hash: {file_path}")
+                if meta.get('dataset_hash') == dataset_hash:
                     return True
-                else:
-                    dbg(f"✗ No match - metadata hash mismatch")
 
-            except Exception as e:
-                dbg(f"Error checking {file_path}: {e}")
+            except Exception:
                 continue
 
-        dbg(f"No matching cache found after checking {len(candidates)} files")
-        dbg("="*80)
+        return False
+
+
+
+    def _normalize_text_for_cache(self, text: Any) -> str:
+        """Normalize text before hashing so semantically identical text maps to one key."""
+        if text is None:
+            return ""
+        try:
+            if pd.isna(text):
+                return ""
+        except Exception:
+            pass
+        return re.sub(r"\s+", " ", str(text)).strip()
+
+    def _make_text_hash(self, text: Any) -> str:
+        """Create a stable content hash for cache lookups."""
+        normalized_text = self._normalize_text_for_cache(text)
+        return hashlib.sha256(normalized_text.encode("utf-8")).hexdigest()
+    
+    def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
+        """Return True if a test cache file matching the given DataFrame exists, else False.
+
+        Computes an 8-char dataset hash from the provided DataFrame and checks
+        cached test JSON filenames and their metadata for a match. Uses self.cache_dir.
+        """
+        from pathlib import Path
+        import hashlib
+        import json
+
+        cache_dir = getattr(self, 'cache_dir', 'cache')
+        p = Path(cache_dir)
+        if not p.exists():
+            return False
+
+        # Compute stable 8-char hash for DataFrame using ONLY text column (consistent with _initialize_batch_cache_file)
+        try:
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+        except Exception:
+            # Fallback: hash text column as CSV
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
+            dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+
+        discovered = self.discover_cached_predictions(cache_dir)
+        if not discovered:
+            return False
+
+        candidates = discovered.get('test_predictions', []) or []
+        for file_path in candidates:
+            try:
+                fname = Path(file_path).name
+                if fname.endswith(f"_{dataset_hash}.json"):
+                    return True
+
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                meta = data.get('metadata', {}) if isinstance(data, dict) else {}
+                if meta.get('dataset_hash') == dataset_hash:
+                    return True
+
+            except Exception:
+                continue
+
         return False
 
 
@@ -635,17 +833,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         cache_file_path = self._initialize_batch_cache_file(df, mode=mode)
 
         # Build list of indices for which we need to run inference
-        has_cache = self.has_test_cache_for_dataset(df)
-        if self.verbose:
-            print(f" DEBUG: has_test_cache_for_dataset returned: {has_cache}")
-            if self._prediction_cache and hasattr(self._prediction_cache, 'predictions_cache'):
-                print(f" DEBUG: _prediction_cache has {len(self._prediction_cache.predictions_cache)} predictions")
-            else:
-                print(f" DEBUG: _prediction_cache is None or has no predictions_cache attribute")
-        
-        if has_cache:
+        if self.has_test_cache_for_dataset(df):
             uncached_positions: List[int] = []
-            cached_count = 0
             for pos, (_, row) in enumerate(df.iterrows()):
                 text = row.get(text_column, "")
                 try:
@@ -654,17 +843,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                         pred = cached.get('prediction') if isinstance(cached, dict) else None
                         if isinstance(pred, list):
                             predictions[pos] = pred
-                            cached_count += 1
                             continue
-                except Exception as e:
+                except Exception:
                     # On any cache error, treat as uncached and continue
-                    if self.verbose:
-                        print(f" DEBUG: Cache check failed for sample {pos}: {e}")
                     pass
                 uncached_positions.append(pos)
-
-            if self.verbose:
-                print(f" DEBUG: Found {cached_count} cached predictions, {len(uncached_positions)} need processing")
 
             if len(uncached_positions) == 0:
                 # All samples cached — return formatted cached predictions
@@ -679,8 +862,8 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             total_batches = (len(df) + self.batch_size - 1) // self.batch_size
         
         if self.verbose:
-            self.logger.info(f"Processing {len(df_uncached)} samples in {total_batches} batches of size {self.batch_size}")
-            print(f"Processing {len(df_uncached)} samples in {total_batches} batches...")
+            self.logger.info(f"Processing {len(df)} samples in {total_batches} batches of size {self.batch_size}")
+            print(f"Processing in {total_batches} batches...")
         
         # Use tqdm for progress bar if verbose mode is enabled
         batch_iterator = range(0, len(df_uncached), self.batch_size)
@@ -714,20 +897,14 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                     if rel_idx < len(batch_predictions):
                         predictions[orig_pos] = batch_predictions[rel_idx]
             else:
-                # No cache in use or full run — append sequentially
-                # When not using cache, predictions list may be all None placeholders,
-                # so we append to build the final list
-                if all(p is None for p in predictions):
-                    # fresh append mode
-                    predictions = []
-                    predictions.extend(batch_predictions)
-                else:
-                    # mix-mode: fill next available None slots
-                    fill_idx = 0
-                    for j in range(len(predictions)):
-                        if predictions[j] is None and fill_idx < len(batch_predictions):
-                            predictions[j] = batch_predictions[fill_idx]
-                            fill_idx += 1
+                # No cache in use or full run — df_uncached is df here, so batches
+                # are processed in original row order. Write each batch's predictions
+                # directly to their real position (batch_start + rel_idx) rather than
+                # appending/filling, which silently dropped every batch after the first.
+                for rel_idx, batch_pred in enumerate(batch_predictions):
+                    pos = batch_start + rel_idx
+                    if pos < len(predictions):
+                        predictions[pos] = batch_pred
             
             if self.verbose and not isinstance(batch_iterator, tqdm):
                 self.logger.info(f"Batch {i+1} completed ({len(batch_predictions)} predictions)")
@@ -815,7 +992,7 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                                 prediction = pred_entry.get('prediction', [])
                                 response_text = pred_entry.get('response_text', '')
                                 prompt = pred_entry.get('prompt', '')
-                                
+
                                 # Use add_prediction_direct to avoid triggering auto-save
                                 self._prediction_cache.add_prediction_direct(
                                     text=text,
@@ -884,8 +1061,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             # Add batch predictions
             for idx, (_, row) in enumerate(batch_df.iterrows()):
                 if idx < len(batch_predictions):
+                    text_value = row.get(text_column, '')
                     prediction_entry = {
-                        'text': row.get(text_column, ''),
+                        'text': text_value,
+                        'text_hash': self._make_text_hash(text_value),
                         'prediction': batch_predictions[idx],
                         'batch_num': batch_num
                     }
@@ -934,87 +1113,131 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         """
         if self.verbose:
             self.logger.debug(f"Processing batch with {len(batch_df)} texts")
-        
+
         texts = batch_df[text_column].tolist()
-        
+
         # Check if prompts are already engineered
         if 'engineered_prompt' in batch_df.columns:
             prompts = batch_df['engineered_prompt'].tolist()
         else:
             prompts = [self.prompt_engineer.build_prompt(text) for text in texts]
-        
+
         if self.verbose:
-            self.logger.debug(f"Generated {len(prompts)} prompts for LLM calls")
+            self.logger.debug(f"Prepared {len(prompts)} prompts for LLM calls")
+
+        # Reuse cached predictions immediately and only call the LLM once per unique text.
+        predictions: List[Optional[List[int]]] = [None] * len(texts)
+        pending_by_hash: Dict[str, List[int]] = {}
+        pending_prompts: Dict[str, str] = {}
+        pending_meta: Dict[str, Dict[str, Any]] = {}
+
+        for idx, text in enumerate(texts):
+            text_hash = self._make_text_hash(text)
+
+            cached_prediction = None
+            if hasattr(self, '_prediction_cache') and self._prediction_cache:
+                try:
+                    if self._prediction_cache.has_prediction(text):
+                        cached = self._prediction_cache.get_prediction(text)
+                        if isinstance(cached, dict):
+                            cached_prediction = cached.get('prediction')
+                except Exception:
+                    cached_prediction = None
+
+            if isinstance(cached_prediction, list):
+                predictions[idx] = cached_prediction
+                continue
+
+            pending_by_hash.setdefault(text_hash, []).append(idx)
+            pending_prompts.setdefault(text_hash, prompts[idx] if idx < len(prompts) else self.prompt_engineer.build_prompt(text))
+
+            row_meta: Dict[str, Any] = {}
+            for id_key in ('id', 'ID', 'Id', 'index', 'row_id'):
+                if id_key in batch_df.columns:
+                    try:
+                        row_meta['id'] = batch_df.iloc[idx][id_key]
+                        break
+                    except Exception:
+                        pass
+            pending_meta.setdefault(text_hash, row_meta)
+
+        if not pending_by_hash:
+            return [p if p is not None else self._handle_error(ValueError("Missing prediction")) for p in predictions]
+
+        unique_hashes = list(pending_by_hash.keys())
+        unique_prompts = [pending_prompts[text_hash] for text_hash in unique_hashes]
 
         responses = await asyncio.gather(
-            *[self._call_llm(prompt) for prompt in prompts],
+            *[self._call_llm(prompt) for prompt in unique_prompts],
             return_exceptions=True
         )
-        
+
         successful_responses = sum(1 for r in responses if not isinstance(r, Exception))
         failed_responses = len(responses) - successful_responses
-        
+
         if self.verbose and failed_responses > 0:
             self.logger.warning(f"WARNING: {failed_responses} out of {len(responses)} LLM calls failed")
-        
-        # Parse responses and retry if needed for multi-label with wrong length
-        predictions = []
+
         max_retries = 3
-        
-        for i, r in enumerate(responses):
-            if isinstance(r, Exception):
-                predictions.append(self._handle_error(r))
+        unique_predictions: Dict[str, List[int]] = {}
+
+        for i, text_hash in enumerate(unique_hashes):
+            response = responses[i]
+
+            if isinstance(response, Exception):
+                unique_predictions[text_hash] = self._handle_error(response)
                 continue
-            
-            # Try parsing with retries for multi-label binary format issues
+
             prediction = None
             for attempt in range(max_retries):
-                prediction = self._parse_prediction_response(r)
-                
-                # Check if we got the right number of labels (only for multi-label)
+                prediction = self._parse_prediction_response(response)
+
                 if self.multi_label and len(prediction) == len(self.classes_):
-                    break  # Success!
-                elif not self.multi_label:
-                    break  # For single-label, we don't need to retry
+                    break
+                if not self.multi_label:
+                    break
+
+                if attempt < max_retries - 1:
+                    if self.verbose:
+                        self.logger.warning(
+                            f"Retry {attempt + 1}/{max_retries}: Wrong label count ({len(prediction)} != {len(self.classes_)}), retrying LLM call..."
+                        )
+                    response = await self._call_llm(unique_prompts[i])
+                    if isinstance(response, Exception):
+                        prediction = self._handle_error(response)
+                        break
                 else:
-                    # Wrong number of labels in multi-label - retry
-                    if attempt < max_retries - 1:
-                        if self.verbose:
-                            self.logger.warning(f"Retry {attempt + 1}/{max_retries}: Wrong label count ({len(prediction)} != {len(self.classes_)}), retrying LLM call...")
-                        # Call LLM again
-                        r = await self._call_llm(prompts[i])
-                        if isinstance(r, Exception):
-                            prediction = self._handle_error(r)
-                            break
-                    else:
-                        if self.verbose:
-                            self.logger.warning(f"After {max_retries} retries, still wrong label count. Using best-effort prediction.")
-            
-            predictions.append(prediction)
+                    if self.verbose:
+                        self.logger.warning("After %d retries, still wrong label count. Using best-effort prediction.", max_retries)
+
+            unique_predictions[text_hash] = prediction if prediction is not None else self._handle_error(ValueError("Could not parse prediction"))
+
+        # Expand unique predictions back to the batch order.
+        for text_hash, row_indices in pending_by_hash.items():
+            pred = unique_predictions.get(text_hash)
+            if pred is None:
+                pred = self._handle_error(ValueError("Missing prediction"))
+            for idx in row_indices:
+                predictions[idx] = pred
 
         # If incremental cache is enabled, store the raw responses + parsed predictions
         try:
             if hasattr(self, '_prediction_cache') and self._prediction_cache:
-                for idx, pred in enumerate(predictions):
-                    # Determine success and response text
-                    resp = responses[idx]
+                for text_hash, row_indices in pending_by_hash.items():
+                    pred = unique_predictions.get(text_hash)
+                    if pred is None:
+                        continue
+
+                    idx = row_indices[0]
+                    resp = responses[unique_hashes.index(text_hash)]
                     success = not isinstance(resp, Exception)
                     response_text = resp if success else ''
-                    prompt = prompts[idx] if idx < len(prompts) else ''
-                    text_val = batch_df.iloc[idx].get(self.text_column, '')
-
-                    # Attempt to lift an identifier from the DataFrame row if present
-                    meta = {}
-                    for id_key in ('id', 'ID', 'Id', 'index', 'row_id'):
-                        if id_key in batch_df.columns:
-                            try:
-                                meta['id'] = batch_df.iloc[idx][id_key]
-                                break
-                            except Exception:
-                                pass
+                    prompt = pending_prompts.get(text_hash, '')
+                    text_val = texts[idx]
+                    meta = dict(pending_meta.get(text_hash, {}))
+                    meta['text_hash'] = text_hash
 
                     try:
-                        # store_prediction expects binary vector as prediction
                         self._prediction_cache.store_prediction(
                             text_val,
                             pred,
@@ -1025,15 +1248,13 @@ class BaseLLMClassifier(AsyncBaseClassifier):
                             metadata=meta or None
                         )
                     except Exception:
-                        # non-fatal: continue without failing the batch
                         if self.verbose:
                             self.logger.debug("Could not store prediction to cache for a sample")
         except Exception:
-            # If anything goes wrong with caching, do not fail predictions
             if self.verbose:
                 self.logger.debug("Prediction caching encountered an error; continuing without persisting this batch")
 
-        return predictions
+        return [p if p is not None else self._handle_error(ValueError("Missing prediction")) for p in predictions]
 
     def _parse_prediction_response(self, response: str) -> List[int]:
         """Parse the LLM response for predictions.

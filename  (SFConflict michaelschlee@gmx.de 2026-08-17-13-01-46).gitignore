@@ -15,8 +15,7 @@ models/
 
 # Data directories (keep structure but ignore large files)
 /docu/
-/literature/
-/Dataset_Descriptives/
+/data/
 
 # Environment variables
 .env
@@ -30,7 +29,7 @@ tmp/
 
 # Logs
 *.log
-
+logs/
 .autofusion_kaggle_test/auto_fusion_classifier.pkl
 
 __pycache__/
@@ -50,6 +49,3 @@ __pycache__/
 
 # Egg-info artifacts
 textclassify.egg-info/
-
-/old/
-/notes/
