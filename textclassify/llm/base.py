@@ -85,10 +85,13 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Cache management settings
         self.auto_use_cache = auto_use_cache
         self.cache_dir = cache_dir
+<<<<<<< HEAD
         
         # Cache management settings
         self.auto_use_cache = auto_use_cache
         self.cache_dir = cache_dir
+=======
+>>>>>>> michael_emnlp
         
         # Setup logging
         if self.verbose:
@@ -698,6 +701,72 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # few_shot_mode and multi_label are already set in constructor
         label_type = getattr(self.config, 'label_type', 'single')
         self.prompt_engineer.multi_label = (label_type == "multiple")
+    
+    def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
+        """Return True if a test cache file matching the given DataFrame exists, else False.
+
+        Computes an 8-char dataset hash from the provided DataFrame and checks
+        cached test JSON filenames and their metadata for a match. Uses self.cache_dir.
+        """
+        from pathlib import Path
+        import hashlib
+        import json
+
+        cache_dir = getattr(self, 'cache_dir', 'cache')
+        p = Path(cache_dir)
+        if not p.exists():
+            return False
+
+        # Compute stable 8-char hash for DataFrame using ONLY text column (consistent with _initialize_batch_cache_file)
+        try:
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
+        except Exception:
+            # Fallback: hash text column as CSV
+            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
+            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
+            dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
+
+        discovered = self.discover_cached_predictions(cache_dir)
+        if not discovered:
+            return False
+
+        candidates = discovered.get('test_predictions', []) or []
+        for file_path in candidates:
+            try:
+                fname = Path(file_path).name
+                if fname.endswith(f"_{dataset_hash}.json"):
+                    return True
+
+                with open(file_path, 'r') as f:
+                    data = json.load(f)
+                meta = data.get('metadata', {}) if isinstance(data, dict) else {}
+                if meta.get('dataset_hash') == dataset_hash:
+                    return True
+
+            except Exception:
+                continue
+
+        return False
+
+
+
+    def _normalize_text_for_cache(self, text: Any) -> str:
+        """Normalize text before hashing so semantically identical text maps to one key."""
+        if text is None:
+            return ""
+        try:
+            if pd.isna(text):
+                return ""
+        except Exception:
+            pass
+        return re.sub(r"\s+", " ", str(text)).strip()
+
+    def _make_text_hash(self, text: Any) -> str:
+        """Create a stable content hash for cache lookups."""
+        normalized_text = self._normalize_text_for_cache(text)
+        return hashlib.sha256(normalized_text.encode("utf-8")).hexdigest()
     
     def has_test_cache_for_dataset(self, df: pd.DataFrame) -> bool:
         """Return True if a test cache file matching the given DataFrame exists, else False.
