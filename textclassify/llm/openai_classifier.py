@@ -26,23 +26,39 @@ class OpenAIClassifier(BaseLLMClassifier):
         experiment_name: Optional[str] = None,
         auto_save_results: bool = True,
         # Cache management parameters
-        auto_use_cache: bool = True
+        auto_use_cache: bool = True,
+        # Nearest-neighbour sampling parameters
+        use_nearest_neighbours: bool = False,              # UK spelling
+        embedding_model: str = "all-MiniLM-L6-v2",
+        use_nearest_neighbors: Optional[bool] = None,       # US alias
+        fixed_examples: bool = False
     ):
         """Initialize OpenAI classifier.
-        
+
         Args:
             config: Configuration object containing API keys and parameters
             text_column: Name of the column containing text data
             label_columns: List of column names containing labels
             multi_label: Whether this is a multi-label classifier
-            few_shot_mode: Mode for few-shot learning
+            few_shot_mode: Mode for few-shot learning. Pass an int to also control how
+                many few-shot examples are drawn per prompt (e.g. few_shot_mode=8).
             enable_cache: Whether to enable prediction caching (legacy parameter)
             cache_dir: Directory for caching prediction results
             output_dir: Base directory for saving results (default: "outputs")
             experiment_name: Name for this experiment (default: auto-generated)
             auto_save_results: Whether to automatically save results (default: True)
-            auto_use_cache: Whether to automatically check and reuse cached predictions (default: False)
+            auto_use_cache: Whether to automatically check and reuse cached predictions (default: True)
+            use_nearest_neighbours: Enable nearest-neighbour few-shot sampling
+            embedding_model: Embedding model used by nearest-neighbour sampler
+            use_nearest_neighbors: US spelling alias for use_nearest_neighbours
+            fixed_examples: If True, sample the few-shot examples once and reuse the
+                same set for every prompt. If False (default), resample fresh per
+                test row (random, or nearest-neighbour if use_nearest_neighbours=True).
         """
+        # Normalize US/UK spelling
+        if use_nearest_neighbors is not None:
+            use_nearest_neighbours = use_nearest_neighbors
+
         super().__init__(
             config=config,
             text_column=text_column,
@@ -55,7 +71,9 @@ class OpenAIClassifier(BaseLLMClassifier):
             auto_save_results=auto_save_results,
             auto_use_cache=auto_use_cache,
             cache_dir=cache_dir,
-            
+            use_nearest_neighbours=use_nearest_neighbours,
+            embedding_model=embedding_model,
+            fixed_examples=fixed_examples,
         )
         
         # Handle legacy caching parameter
@@ -94,23 +112,19 @@ class OpenAIClassifier(BaseLLMClassifier):
         if not p.exists():
             return False
 
-        # Compute stable 8-char hash for DataFrame using ONLY text column (consistent with _initialize_batch_cache_file)
+        # Compute stable 8-char hash for DataFrame
         try:
-            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
-            hashed = pd.util.hash_pandas_object(text_series, index=False).values
+            hashed = pd.util.hash_pandas_object(df, index=True).values
             dataset_hash = hashlib.md5(hashed).hexdigest()[:8]
         except Exception:
-            # Fallback: hash text column as CSV
-            text_series = df[self.text_column] if self.text_column in df.columns else df.iloc[:, 0]
-            csv_bytes = text_series.to_csv(index=False).encode('utf-8')
+            csv_bytes = df.to_csv(index=True).encode('utf-8')
             dataset_hash = hashlib.md5(csv_bytes).hexdigest()[:8]
 
         discovered = self.discover_cached_predictions(cache_dir)
         if not discovered:
             return False
 
-        # Check both validation and test cache files
-        candidates = discovered.get('validation_predictions', []) + discovered.get('test_predictions', [])
+        candidates = discovered.get('test_predictions', []) or []
         for file_path in candidates:
             try:
                 fname = Path(file_path).name
@@ -127,6 +141,41 @@ class OpenAIClassifier(BaseLLMClassifier):
                 continue
 
         return False
+    
+    def fit(
+        self,
+        train_df: pd.DataFrame,
+        val_df: Optional[pd.DataFrame] = None,
+        context: Optional[str] = None,
+        label_definitions: Optional[Dict[str, str]] = None,
+    ) -> None:
+        """
+        Store train_df (and optionally val_df) as the few-shot example pool.
+
+        Does not make any LLM calls. The stored train_df is used automatically by
+        predict() as the few-shot pool whenever it's called without an explicit
+        train_df argument -- see fixed_examples on __init__ for whether the same
+        examples get reused every time or resampled per prediction.
+
+        Args:
+            train_df: Training data to use as the few-shot example pool
+            val_df: Optional validation data, stored for reference (not used for few-shot)
+            context: Unused (kept for backward-compatible signature)
+            label_definitions: Unused (kept for backward-compatible signature)
+
+        Example:
+            >>> llm = OpenAIClassifier(config, label_columns=commodities)
+            >>> llm.fit(train_df)  # just stores train_df
+            >>> result = llm.predict(test_df=batch)  # uses train_df as few-shot pool
+        """
+        self.train_df = train_df
+        self.val_df = val_df
+
+        if getattr(self, 'verbose', True):
+            msg = f"Stored {len(train_df)} training examples as the few-shot pool"
+            if val_df is not None:
+                msg += f" (+ {len(val_df)} val examples stored for reference)"
+            print(msg)
     
     def predict(
         self,
@@ -151,9 +200,8 @@ class OpenAIClassifier(BaseLLMClassifier):
         Returns:
             ClassificationResult with predictions, metrics, and saved files info
         """
-        # Set mode to 'test' only if not already set
-        if not self.mode:
-            self.mode = 'test'
+        # Keep externally configured mode (e.g., train/val/test) intact.
+        # BaseLLMClassifier will still default to "test" if mode is unset.
         
         # Store test_df reference for results saving
         if test_df is not None:
@@ -170,7 +218,7 @@ class OpenAIClassifier(BaseLLMClassifier):
         
         #  EXPLICIT RESULTS SAVING (like RoBERTa)
         if self.results_manager:
-            dataset_type = getattr(self, '_current_dataset_type', 'test')
+            dataset_type = getattr(self, '_current_dataset_type', None) or self.mode or 'test'
             current_df = getattr(self, '_current_test_df', None)
             
             if current_df is not None:
@@ -183,7 +231,7 @@ class OpenAIClassifier(BaseLLMClassifier):
                     # 2. Save metrics YAML (if available)
                     if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
                         metrics_file = self.results_manager.save_metrics(
-                            result.metadata['metrics'], "test", "openai_classifier"
+                            result.metadata['metrics'], dataset_type, "openai_classifier"
                         )
                         saved_files["metrics"] = metrics_file
                     
@@ -253,6 +301,7 @@ class OpenAIClassifier(BaseLLMClassifier):
                     print(f"Warning: Could not save OpenAI prediction results: {e}")
         
         return result
+
 
     async def _call_llm(self, prompt: str) -> str:
         """Call OpenAI API with the given prompt using the service layer.
