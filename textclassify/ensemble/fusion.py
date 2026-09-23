@@ -216,29 +216,6 @@ class FusionEnsemble(BaseEnsemble):
                 self.results_manager, 
                 f"fusion_ensemble_{self.results_manager.experiment_id}"
             )
-<<<<<<< HEAD
-        
-        # LLM prediction cache file paths from ensemble config
-        self.val_llm_cache_path = ensemble_config.parameters.get('val_llm_cache_path', '')
-        self.test_llm_cache_path = ensemble_config.parameters.get('test_llm_cache_path', '')
-        
-        # Results management
-        output_dir = ensemble_config.parameters.get('output_dir', 'outputs')
-        experiment_name = ensemble_config.parameters.get('experiment_name', 'fusion_ensemble')
-        auto_save_results = ensemble_config.parameters.get('auto_save_results', True)
-        
-        self.results_manager = None
-        if auto_save_results:
-            self.results_manager = ResultsManager(
-                base_output_dir=output_dir,
-                experiment_name=experiment_name
-            )
-            self.model_results_manager = ModelResultsManager(
-                self.results_manager, 
-                f"fusion_ensemble_{self.results_manager.experiment_id}"
-            )
-=======
->>>>>>> michael_emnlp
         
         # Initialize training state
         self.is_trained = False

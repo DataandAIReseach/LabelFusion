@@ -40,8 +40,7 @@ class Prompt:
         rendered_parts = []
         for part in self.parts:
             try:
-<<<<<<< HEAD:textclassify/prompt_engineer/prompt.py
-                rendered = part["content"].format(**combined_vars)
+                rendered = part["content"].format_map(_SafeFormatDict(combined_vars))
             except (KeyError, ValueError) as e:
                 # If format fails, it might be due to unescaped braces in the content
                 # Try to escape braces that are not part of variable placeholders
@@ -64,14 +63,9 @@ class Prompt:
                 
                 # Try rendering again
                 try:
-                    rendered = temp_content.format(**combined_vars)
+                    rendered = temp_content.format_map(_SafeFormatDict(combined_vars))
                 except (KeyError, ValueError) as e2:
                     raise ValueError(f"Failed to render prompt even after escaping: {e2}")
-=======
-                rendered = part["content"].format_map(_SafeFormatDict(combined_vars))
-            except (KeyError, ValueError) as e:
-                raise ValueError(f"Failed to render prompt: {e}")
->>>>>>> michael_emnlp:textclassify/prompt_pipeline/prompt.py
             rendered_parts.append(rendered)
 
         return "\n\n".join(rendered_parts).strip()

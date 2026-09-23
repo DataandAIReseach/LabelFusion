@@ -11,6 +11,11 @@ from .base import BaseLLMClassifier
 
 class OpenAIClassifier(BaseLLMClassifier):
     """Text classifier using OpenAI's GPT models."""
+
+    # Used when saving results / reporting model info; subclasses that reuse this
+    # classifier for other OpenAI-compatible APIs (e.g. OpenRouter) override these.
+    PROVIDER = "openai"
+    PROVIDER_DISPLAY_NAME = "OpenAI"
     
     def __init__(
         self,
@@ -65,7 +70,7 @@ class OpenAIClassifier(BaseLLMClassifier):
             label_columns=label_columns,
             multi_label=multi_label,
             few_shot_mode=few_shot_mode,
-            provider='openai',
+            provider=self.PROVIDER,
             output_dir=output_dir,
             experiment_name=experiment_name,
             auto_save_results=auto_save_results,
@@ -231,13 +236,13 @@ class OpenAIClassifier(BaseLLMClassifier):
                     # 2. Save metrics YAML (if available)
                     if hasattr(result, 'metadata') and result.metadata and 'metrics' in result.metadata:
                         metrics_file = self.results_manager.save_metrics(
-                            result.metadata['metrics'], dataset_type, "openai_classifier"
+                            result.metadata['metrics'], dataset_type, f"{self.PROVIDER}_classifier"
                         )
                         saved_files["metrics"] = metrics_file
                     
                     # 3. Save model configuration YAML
                     model_config_dict = {
-                        'provider': 'openai',
+                        'provider': self.PROVIDER,
                         'model_name': self.model,
                         'temperature': self.temperature,
                         'max_completion_tokens': self.max_completion_tokens,
@@ -255,14 +260,14 @@ class OpenAIClassifier(BaseLLMClassifier):
                     
                     config_file = self.results_manager.save_model_config(
                         model_config_dict, 
-                        "openai_classifier"
+                        f"{self.PROVIDER}_classifier"
                     )
                     saved_files["config"] = config_file
                     
                     # 4. Save experiment summary
                     experiment_summary = {
                         'model_type': 'llm',
-                        'provider': 'openai',
+                        'provider': self.PROVIDER,
                         'model_name': self.model,
                         'num_labels': len(self.classes_),
                         'classes': self.classes_,
@@ -282,12 +287,12 @@ class OpenAIClassifier(BaseLLMClassifier):
                     if getattr(self, 'verbose', True):
                         exp_info = self.results_manager.get_experiment_info()
                         if hasattr(self, 'logger'):
-                            self.logger.info(f" OpenAI prediction results saved to: {exp_info['experiment_dir']}")
+                            self.logger.info(f" {self.PROVIDER_DISPLAY_NAME} prediction results saved to: {exp_info['experiment_dir']}")
                             self.logger.info(f" Files saved:")
                             for file_type, file_path in saved_files.items():
                                 self.logger.info(f"   - {file_type}: {file_path}")
                     
-                    print(f" OpenAI prediction results saved: {saved_files}")
+                    print(f" {self.PROVIDER_DISPLAY_NAME} prediction results saved: {saved_files}")
                     
                     # 6. Add file paths to result metadata
                     if not result.metadata:
@@ -297,8 +302,8 @@ class OpenAIClassifier(BaseLLMClassifier):
                 except Exception as e:
                     if getattr(self, 'verbose', True):
                         if hasattr(self, 'logger'):
-                            self.logger.error(f"Warning: Could not save OpenAI prediction results: {e}")
-                    print(f"Warning: Could not save OpenAI prediction results: {e}")
+                            self.logger.error(f"Warning: Could not save {self.PROVIDER_DISPLAY_NAME} prediction results: {e}")
+                    print(f"Warning: Could not save {self.PROVIDER_DISPLAY_NAME} prediction results: {e}")
         
         return result
 
@@ -328,9 +333,9 @@ class OpenAIClassifier(BaseLLMClassifier):
     
     @property
     def model_info(self) -> Dict[str, any]:
-        """Get OpenAI model information."""
+        """Get model information."""
         return {
-            "provider": "openai",
+            "provider": self.PROVIDER,
             "model": self.model,
             "temperature": self.temperature,
             "max_completion_tokens": self.max_completion_tokens,

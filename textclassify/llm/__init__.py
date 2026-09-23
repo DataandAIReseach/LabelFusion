@@ -1,7 +1,7 @@
 """LLM-based text classifiers module.
 
 This module provides LLM-based text classifiers with support for:
-- Multiple LLM providers (OpenAI, Gemini, DeepSeek)
+- Multiple LLM providers (OpenAI, Gemini, DeepSeek, OpenRouter)
 - Few-shot learning
 - Multi-label and multi-class classification
 - Automatic and manual prediction caching
@@ -42,11 +42,13 @@ from .base import BaseLLMClassifier
 from .openai_classifier import OpenAIClassifier
 from .gemini_classifier import GeminiClassifier
 from .deepseek_classifier import DeepSeekClassifier
+from .openrouter_classifier import OpenRouterClassifier
 
 __all__ = [
     "BaseLLMClassifier",
     "OpenAIClassifier",
     "GeminiClassifier",
     "DeepSeekClassifier",
+    "OpenRouterClassifier",
 ]
 
