@@ -39,6 +39,7 @@ class LLMProvider(Enum):
     CLAUDE = "claude"
     GEMINI = "gemini"
     DEEPSEEK = "deepseek"
+    OPENROUTER = "openrouter"
 
 
 @dataclass

@@ -2,7 +2,7 @@
 TextClassify: A comprehensive text classification package supporting LLMs and traditional ML models.
 
 This package provides multi-class and multi-label text classification capabilities using:
-- LLM providers: OpenAI, Claude, Gemini, DeepSeek
+- LLM providers: OpenAI, Claude, Gemini, DeepSeek, OpenRouter
 - Traditional ML models: RoBERTa (optional)
 - Ensemble methods for optimized performance
 """
@@ -23,6 +23,7 @@ from .core.exceptions import TextClassifyError, ModelNotFoundError, Configuratio
 from .llm.openai_classifier import OpenAIClassifier
 from .llm.gemini_classifier import GeminiClassifier
 from .llm.deepseek_classifier import DeepSeekClassifier
+from .llm.openrouter_classifier import OpenRouterClassifier
 
 # Traditional ML Classifiers (optional - require transformers/torch)
 try:
@@ -80,6 +81,7 @@ __all__ = [
     "OpenAIClassifier",
     "GeminiClassifier",
     "DeepSeekClassifier",
+    "OpenRouterClassifier",
     
     # Ensemble Methods
     "VotingEnsemble",

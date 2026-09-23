@@ -85,13 +85,6 @@ class BaseLLMClassifier(AsyncBaseClassifier):
         # Cache management settings
         self.auto_use_cache = auto_use_cache
         self.cache_dir = cache_dir
-<<<<<<< HEAD
-        
-        # Cache management settings
-        self.auto_use_cache = auto_use_cache
-        self.cache_dir = cache_dir
-=======
->>>>>>> michael_emnlp
         
         # Setup logging
         if self.verbose:
@@ -130,6 +123,10 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             api_key = key_manager.get_key("deepseek")
             if not api_key:
                 raise ValueError("No API key found for deepseek")
+        elif self.provider == 'openrouter':
+            api_key = key_manager.get_key("openrouter")
+            if not api_key:
+                raise ValueError("No API key found for openrouter. Set OPENROUTER_API_KEY environment variable.")
         else:  # default to openai
             # Prefer OPENROUTER_API_KEY when set -- create_llm_generator auto-detects
             # OpenRouter from the sk-or-v1- key prefix and routes through
