@@ -1,10 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Optional
+import asyncio
 import os
 
 try:
     import openai
-    from openai import OpenAI
+    from openai import AsyncOpenAI, OpenAI
     OPENAI_AVAILABLE = True
 except ModuleNotFoundError:
     OPENAI_AVAILABLE = False
@@ -78,10 +79,20 @@ class OpenRouterContentGenerator(BaseLLMContentGenerator):
         if not OPENAI_AVAILABLE:
             raise RuntimeError("OpenAI SDK not available (required for OpenRouter compatibility)")
         self.model_name = model_name
-        self.client = OpenAI(
-            api_key=api_key or os.environ.get("OPENROUTER_API_KEY"),
-            base_url=self.OPENROUTER_BASE_URL,
-        )
+        self.api_key = api_key or os.environ.get("OPENROUTER_API_KEY")
+        self._clients = {}
+
+    @property
+    def client(self) -> "AsyncOpenAI":
+        # Async client so asyncio.gather in the classifier really sends a batch
+        # concurrently (the sync client blocked the event loop: one call at a time).
+        # One client per event loop: predict() uses a fresh asyncio.run() each call.
+        loop = asyncio.get_running_loop()
+        if loop not in self._clients:
+            self._clients[loop] = AsyncOpenAI(
+                api_key=self.api_key, base_url=self.OPENROUTER_BASE_URL, max_retries=5
+            )
+        return self._clients[loop]
 
     async def generate_content(self, prompt: str, role_prompt: Optional[str] = None) -> str:
         """Generate content via OpenRouter."""
@@ -91,7 +102,7 @@ class OpenRouterContentGenerator(BaseLLMContentGenerator):
                 messages.append({"role": "system", "content": role_prompt})
             messages.append({"role": "user", "content": prompt})
 
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
             )

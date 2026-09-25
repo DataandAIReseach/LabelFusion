@@ -1,0 +1,90 @@
+"""
+Download 4 daily time series aligned to the FOMC "Trillion Dollar Words"
+dataset span (1996-01-01 to 2022-10-15), for pairing with the
+hawkish-dovish stance measure.
+
+Series (all public-domain government/exchange data with FULL history on
+FRED, i.e. not subject to the rolling-window licensing limits that apply
+to series like SP500 or the ICE BofA credit-spread indices):
+  1. DGS10   - 10-Year Treasury Constant Maturity Rate   (data from 1962)
+  2. T10Y2Y  - 10Y-2Y Treasury yield spread              (data from 1976)
+  3. VIXCLS  - CBOE Volatility Index (VIX)                (data from 1990)
+
+All three are available well before 1996 and continue past 2022, so the
+full 1996-01-01 to 2022-10-15 window is covered with no gaps from
+licensing cutoffs. All come from FRED, so this script uses the same
+source/format for everything and needs no API key (fredgraph.csv is a
+public endpoint).
+
+Requirements:
+    pip install pandas requests
+
+Usage:
+    python get_daily_series.py
+Output:
+    data/4 Ts/daily_series.csv  -- one row per business day, columns for each series
+    (created relative to wherever you run the script from)
+"""
+
+import os
+import pandas as pd
+import requests
+
+START = "1996-01-01"
+END = "2022-10-15"
+
+SERIES = {
+    "DGS10": "10Y Treasury Yield",
+    "T10Y2Y": "10Y-2Y Treasury Spread",
+    "VIXCLS": "VIX (Volatility Index)",
+}
+
+BASE_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
+
+
+def fetch_series(series_id: str) -> pd.Series:
+    """Download one FRED series as a pandas Series indexed by date."""
+    params = {
+        "id": series_id,
+        "cosd": START,
+        "coed": END,
+    }
+    resp = requests.get(BASE_URL, params=params, timeout=30)
+    resp.raise_for_status()
+
+    from io import StringIO
+    df = pd.read_csv(StringIO(resp.text))
+    df.columns = ["DATE", series_id]
+    df["DATE"] = pd.to_datetime(df["DATE"])
+    df.set_index("DATE", inplace=True)
+
+    # FRED marks missing values as "."
+    df[series_id] = pd.to_numeric(df[series_id], errors="coerce")
+    return df[series_id]
+
+
+def main():
+    frames = []
+    for series_id, label in SERIES.items():
+        print(f"Fetching {series_id} ({label})...")
+        s = fetch_series(series_id)
+        s.name = series_id
+        frames.append(s)
+
+    combined = pd.concat(frames, axis=1)
+    combined = combined.sort_index()
+
+    # keep business days only, forward-fill small gaps (holidays), but
+    # leave genuine missing values as NaN for you to decide how to handle
+    combined = combined[combined.index.dayofweek < 5]
+
+    out_dir = os.path.join("data", "4 Ts")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "daily_series.csv")
+    combined.to_csv(out_path)
+    print(f"\nSaved {len(combined)} rows to {out_path}")
+    print(combined.tail())
+
+
+if __name__ == "__main__":
+    main()

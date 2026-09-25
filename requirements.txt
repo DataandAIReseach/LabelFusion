@@ -46,11 +46,11 @@ googleapis-common-protos==1.70.0
 grpcio==1.73.1
 grpcio-status==1.71.2
 h11==0.16.0
-hf-xet==1.1.7
+hf-xet==1.6.0
 httpcore==1.0.9
 httplib2==0.22.0
 httpx==0.28.1
-huggingface-hub==0.34.4
+huggingface-hub==1.10.0
 identify==2.6.12
 idna==3.10
 iniconfig==2.1.0
@@ -136,7 +136,7 @@ pytrends==4.9.2
 pytz==2025.2
 PyYAML==6.0.2
 pyzmq==27.0.0
-regex==2025.7.34
+regex==2025.10.23
 requests==2.32.4
 rsa==4.9.1
 safetensors==0.6.2
@@ -154,7 +154,7 @@ stack-data==0.6.3
 sympy==1.14.0
 -e git+https://github.com/ChrisW09/classifyfusion.git@1915a02af3302dd4732088f976648918c9e2f5d0#egg=textclassify
 threadpoolctl==3.6.0
-tokenizers==0.21.4
+tokenizers==0.22.2
 torch==2.7.1
 torchaudio==2.7.1
 torchvision==0.22.1
