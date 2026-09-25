@@ -1,0 +1,19 @@
+config:
+  cache_dir: /home/michaelschlee/ownCloud/GIT/LabelFusion/testing/outputs/llm_cache/predict_all_test_gpt-5-nano_5_shot_lab-manual-split-combine-test-78516
+  classes: &id001
+  - dovish
+  - hawkish
+  - neutral
+  classification_type: single_label
+  few_shot_mode: 5
+  label_columns: *id001
+  max_completion_tokens: 100
+  model_name: openai/gpt-5-nano
+  multi_label: false
+  provider: openrouter
+  temperature: 0.1
+  text_column: sentence
+metadata:
+  experiment_id: 2026-09-24_23-55-38_predict_all_test_gpt-5-nano_5_shot_lab-manual-split-combine-test-78516
+  model_name: openrouter_classifier
+  timestamp: '2026-09-25T00:00:28.104792'

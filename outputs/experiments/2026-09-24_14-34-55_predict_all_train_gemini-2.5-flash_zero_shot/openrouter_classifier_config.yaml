@@ -1,0 +1,19 @@
+config:
+  cache_dir: /home/michaelschlee/ownCloud/GIT/LabelFusion/testing/outputs/llm_cache/predict_all_train_gemini-2.5-flash_zero_shot
+  classes: &id001
+  - dovish
+  - hawkish
+  - neutral
+  classification_type: single_label
+  few_shot_mode: zero_shot
+  label_columns: *id001
+  max_completion_tokens: 100
+  model_name: google/gemini-2.5-flash
+  multi_label: false
+  provider: openrouter
+  temperature: 0.1
+  text_column: sentence
+metadata:
+  experiment_id: 2026-09-24_14-34-55_predict_all_train_gemini-2.5-flash_zero_shot
+  model_name: openrouter_classifier
+  timestamp: '2026-09-24T14:35:18.400462'

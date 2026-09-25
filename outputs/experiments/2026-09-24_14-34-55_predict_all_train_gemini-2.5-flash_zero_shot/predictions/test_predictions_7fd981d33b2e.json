@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "experiment_id": "2026-09-24_14-34-55_predict_all_train_gemini-2.5-flash_zero_shot",
+    "model_name": "google/gemini-2.5-flash",
+    "model_type": "llm",
+    "classification_type": "single_label",
+    "timestamp": "2026-09-24T14:35:18.399195",
+    "dataset_name": "test",
+    "dataset_hash": "7fd981d33b2e",
+    "num_predictions": 20,
+    "git_commit": "7736af7562551d176aa804a0bfc60c09bde4b192"
+  },
+  "predictions": [
+    "neutral",
+    "dovish",
+    "neutral",
+    "hawkish",
+    "dovish",
+    "dovish",
+    "neutral",
+    "hawkish",
+    "neutral",
+    "neutral",
+    "hawkish",
+    "dovish",
+    "neutral",
+    "neutral",
+    "dovish",
+    "neutral",
+    "dovish",
+    "hawkish",
+    "neutral",
+    "neutral"
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "auc": 1.0
+  }
+}

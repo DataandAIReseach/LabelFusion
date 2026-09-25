@@ -158,12 +158,13 @@ class PromptEngineer:
 
         # 3. Sample once for shared prompt parts (role, context, procedure)
         # - When mode=='test' and train_df is available, sample training examples for few-shot
-        # - When mode in ('train','val') we do zero-shot: do not sample training examples; instead
-        #   use the role_source (usually the real test set) to build role/context prompts
+        # - Otherwise (zero-shot, or train/val modes) no labelled data may be used: role_source is
+        #   the data being predicted (or the test set), so its labels would leak into every prompt.
+        #   The shared prompts are then generated from the label names only.
         if local_mode == 'test' and train_df is not None and not train_df.empty:
             sampled_df = train_df.sample(n=min(sample_size, len(train_df)), random_state=42)
         else:
-            sampled_df = role_source.sample(n=min(sample_size, len(role_source)), random_state=42)
+            sampled_df = None
 
         # Initialize base prompt with shared components
         init_p = Prompt()
@@ -227,7 +228,8 @@ class PromptEngineer:
             p = Prompt()
             p.fuse(copy.deepcopy(init_p))
 
-            p.add_part("train_data_intro_prompt", train_data_intro)
+            if sampled_df is not None:
+                p.add_part("train_data_intro_prompt", train_data_intro)
 
             # For train/val prediction modes we want zero-shot (no training examples in prompt)
             train_data = self.fill_train_data_prompt(

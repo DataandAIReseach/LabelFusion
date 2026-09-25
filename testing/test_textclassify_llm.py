@@ -2,15 +2,25 @@
 
 Text-only pipeline over the FOMC hawkish/dovish/neutral task, mirroring
 test_textclassify_fusion_ensemble.py but using the LLM expert instead of
-RoBERTa:
+RoBERTa. No RoBERTa, no market/time-series branch -- LLM only.
 
-  1. Load data/training_data/lab-manual-mm-split-train-5768.xlsx and take
-     just SAMPLE_SIZE (5) rows as the few-shot example pool.
-  2. Load data/test_data/lab-manual-mm-split-test-5768.xlsx as the held-out
-     test set.
-  3. "Fit" the LLM expert (this only stores the 5 examples as its few-shot
-     pool -- no training happens) and evaluate zero-/few-shot on the test
-     split. No RoBERTa, no market/time-series branch -- LLM only.
+Two modes, selected by TEXTCLASSIFY_SAMPLE_SIZE (default 0 = zero-shot):
+
+  * Zero-shot (SAMPLE_SIZE = 0): the train split is not touched at all. The
+    LLM sees only the label names and the test sentences and classifies
+    data/test_data/lab-manual-mm-split-test-5768.xlsx.
+  * Few-shot (SAMPLE_SIZE > 0): take SAMPLE_SIZE rows of
+    data/training_data/lab-manual-mm-split-train-5768.xlsx as the few-shot
+    example pool, "fit" the LLM expert (this only stores the examples -- no
+    training happens) and evaluate on the test split.
+
+The LLM is called through OpenRosuter. Put the key in the repo-root .env file:
+
+    OPENROUTER_API_KEY=sk-or-v1-...
+
+and optionally pick a model (OpenRouter "<vendor>/<model>" id):
+
+    TEXTCLASSIFY_LLM_MODEL=anthropic/claude-sonnet-4.5
 
 The test is intentionally guarded so it does not run during a normal pytest
 session unless RUN_TEXTCLASSIFY_FUSION_TEST=1 is set.
@@ -23,6 +33,7 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+from dotenv import load_dotenv
 
 try:
     import pytest
@@ -33,7 +44,10 @@ except ImportError:  # pragma: no cover - optional for direct script execution
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from textclassify import OpenAIClassifier
+# Load OPENROUTER_API_KEY (and optional TEXTCLASSIFY_LLM_MODEL) from the repo-root .env
+load_dotenv(REPO_ROOT / ".env")
+
+from textclassify import OpenRouterClassifier
 from textclassify.core.types import ModelConfig, ModelType
 
 
@@ -47,9 +61,10 @@ LABEL_MAP = {0: "dovish", 1: "hawkish", 2: "neutral"}
 LABEL_COLUMNS = list(LABEL_MAP.values())
 TEXT_COLUMN = "sentence"
 RANDOM_STATE = 5768
-SAMPLE_SIZE = 5  # number of few-shot training examples
+# Number of few-shot training examples; 0 = zero-shot (no training examples at all)
+SAMPLE_SIZE = int(os.getenv("TEXTCLASSIFY_SAMPLE_SIZE", "0"))
 
-LLM_MODEL = os.getenv("TEXTCLASSIFY_LLM_MODEL", "gpt-4o-mini")
+LLM_MODEL = os.getenv("TEXTCLASSIFY_LLM_MODEL", "openai/gpt-4o-mini")
 
 if pytest is not None:
     pytestmark = pytest.mark.skipif(
@@ -94,42 +109,63 @@ def load_train_test(sample_size: int | None = None) -> tuple[pd.DataFrame, pd.Da
     return train_df.reset_index(drop=True), test_df.reset_index(drop=True)
 
 
-def build_llm_model() -> OpenAIClassifier:
-    """Build the LLM few-shot classifier."""
+def build_llm_model(sample_size: int = SAMPLE_SIZE) -> OpenRouterClassifier:
+    """Build the LLM classifier (via OpenRouter)."""
+    if not os.getenv("OPENROUTER_API_KEY"):
+        raise RuntimeError(
+            f"OPENROUTER_API_KEY is not set. Add OPENROUTER_API_KEY=sk-or-v1-... to {REPO_ROOT / '.env'}"
+        )
     llm_config = ModelConfig(
         model_name=LLM_MODEL,
         model_type=ModelType.LLM,
         parameters={
             "model": LLM_MODEL,
             "temperature": 0.1,
-            "max_completion_tokens": 100,
+            # Reasoning models (gpt-5*) spend this budget on hidden reasoning too
+            "max_completion_tokens": int(os.getenv("TEXTCLASSIFY_MAX_TOKENS", "100")),
         },
     )
-    return OpenAIClassifier(
+    # Separate experiment name and cache dir per mode: the auto-cache matches on the
+    # test set only, so a shared cache would return few-shot predictions for a
+    # zero-shot run (and vice versa).
+    # The model is part of the name too, so different models never share a cache.
+    model_slug = LLM_MODEL.replace("/", "_")
+    run_name = f"{model_slug}_" + ("zero_shot" if sample_size == 0 else f"few_shot_{sample_size}")
+    return OpenRouterClassifier(
         config=llm_config,
         text_column=TEXT_COLUMN,
         label_columns=LABEL_COLUMNS,
         multi_label=False,
-        few_shot_mode=SAMPLE_SIZE,
+        few_shot_mode="zero_shot" if sample_size == 0 else sample_size,
         output_dir=str(OUTPUT_DIR),
-        experiment_name="llm_only_test",
-        cache_dir=str(OUTPUT_DIR / "llm_cache"),
+        experiment_name=f"llm_only_{run_name}",
+        cache_dir=str(OUTPUT_DIR / "llm_cache" / run_name),
     )
 
 
 def run_llm_only(sample_size: int = SAMPLE_SIZE):
-    """"Train" (store few-shot examples for) the LLM expert on sample_size
-    examples from the train split, then evaluate on the held-out test split."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    """Evaluate the LLM expert on the held-out test split.
 
-    train_df, test_df = load_train_test(sample_size=sample_size)
-    print(f"few-shot pool: {len(train_df)} rows | label counts: {train_df['label'].value_counts().to_dict()}")
+    sample_size == 0: zero-shot -- no training examples are stored or passed.
+    sample_size > 0:  "train" (store few-shot examples for) the LLM expert on
+                      sample_size examples from the train split first."""
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    zero_shot = sample_size == 0
+
+    train_df, test_df = load_train_test(sample_size=None if zero_shot else sample_size)
     print(f"test: {len(test_df)} rows | label counts: {test_df['label'].value_counts().to_dict()}")
 
-    llm_model = build_llm_model()
+    llm_model = build_llm_model(sample_size)
 
-    print(f"\nStoring {len(train_df)} examples as the few-shot pool...")
-    llm_model.fit(train_df)
+    if zero_shot:
+        # No fit() and train_df=None: nothing from the train split reaches the LLM,
+        # neither as few-shot examples nor in the generated role/context prompts.
+        print(f"\nZero-shot mode ({LLM_MODEL}): no training examples.")
+        train_df = None
+    else:
+        print(f"few-shot pool: {len(train_df)} rows | label counts: {train_df['label'].value_counts().to_dict()}")
+        print(f"\nStoring {len(train_df)} examples as the few-shot pool...")
+        llm_model.fit(train_df)
 
     print("\nEvaluating on test split...")
     result = llm_model.predict(train_df=train_df, test_df=test_df)
@@ -147,14 +183,12 @@ def run_llm_only(sample_size: int = SAMPLE_SIZE):
 
 
 def test_textclassify_llm():
-    """Pytest entry point for the integration test. Uses SAMPLE_SIZE (5)
-    few-shot examples so the pipeline runs quickly as a smoke test."""
+    """Pytest entry point for the integration test. Uses SAMPLE_SIZE
+    (default 0 = zero-shot; set TEXTCLASSIFY_SAMPLE_SIZE for few-shot)."""
     result = run_llm_only(sample_size=SAMPLE_SIZE)
     assert result is not None
     assert result.predictions
 
 
 if __name__ == "__main__":
-    sample_size_env = os.getenv("TEXTCLASSIFY_SAMPLE_SIZE")
-    sample_size = int(sample_size_env) if sample_size_env else SAMPLE_SIZE
-    run_llm_only(sample_size=sample_size)
+    run_llm_only(sample_size=SAMPLE_SIZE)

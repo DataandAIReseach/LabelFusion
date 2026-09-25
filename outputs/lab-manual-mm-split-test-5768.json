@@ -1,0 +1,1364 @@
+[
+  {
+    "sentence":"In discussing the effect of labor market conditions on inflation, a number of participants expressed skepticism about recent studies suggesting that long-term unemployment provides less downward pressure on wage and price inflation than short-term unemployment does.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Several participants discussed the possible complications that additional purchases could cause for the eventual withdrawal of policy accommodation, a few mentioned the prospect of inflationary risks, and some noted that further asset purchases could foster market behavior that could undermine financial stability.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"As yields on inflation-indexed Treasury securities rose roughly in line with their nominal counterparts, longer-term inflation compensation remained about unchanged.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In their discussion of monetary policy for the intermeeting period, Committee members agreed that keeping the target range for the federal funds rate at 0 to 1\/4 percent would be appropriate.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Several members noted the benefits of accumulating further information that could help clarify the contours of the outlook for economic activity and inflation as well as the need for further policy action.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The staff continued to view the uncertainty around its projections for real GDP growth, the unemployment rate, and inflation as generally similar to the average of the past 20 years.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Most major indexes of equity prices moved up sharply on the bullish economic reports.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"A few participants judged that while the labor market was close to full employment, some margins of slack remained; these participants pointed to the employment-to-population ratio or the labor force participation rate for prime-age workers, which remained below pre-recession levels, as well as the absence to date of clear signs of a pickup in aggregate wage growth.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The deceleration seemed to reflect primarily an unwinding of heightened demand for the relative safety and liquidity of money market mutual funds that had boosted M2 in prior months.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Market-based measures of inflation compensation continued to indicate expectations that inflation would decline notably in coming quarters, and measures of medium-term inflation compensation fell over the intermeeting period.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The labor force participation rate, along with the employment-to-population ratio, increased, on net, in recent months.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Long-term government bond yields declined and headline equity indexes increased, on net, in most of these countries, with bank stock prices in the euro area rising more than broader indexes.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Job gains had been strong, on average, in recent months, and the unemployment rate had remained low.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Several other participants, however, noted that increases in excess reserves or the monetary base, by themselves, might not have a significant stimulative effect on the economy or prices because the normal bank intermediation mechanism appeared to be impaired, and banks may not be willing to lend their excess reserves.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"remained well below their levels at the beginning of the year, and that weaker demand and earlier declines in oil prices had been holding down consumer price inflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"In these circumstances, the Committee believed that some further measured policy firming was likely to be needed to keep the risks to the attainment of both sustainable economic growth and price stability roughly in balance.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Domestic respondents to the April SLOOS generally reported tightening their lending standards and experiencing weaker loan demand across all major CRE loan categories during the first quarter.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Some restraint on aggregate demand would come from other sectors of the economy--notably government spending, net exports, housing, and perhaps business inventories.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Meeting Participants' Views and Committee Policy ActionIn conjunction with this FOMC meeting, all meeting participants-the four members of the Board of Governors and the presidents of the twelve Federal Reserve Banks-provided projections for economic growth, the unemployment rate, and consumer price inflation for each year from 2009 through 2011.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The members expected price pressures to remain relatively contained over the next several quarters in the context of what they anticipated would be only a gradual reduction of the excess capacity in labor and product markets as the recovery progressed.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Beyond 2017, the forecast for real GDP growth was little revised.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"While these developments were positive, participants noted several factors that likely would continue to restrain the expansion in economic activity.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"In general, financial markets were viewed as well positioned to support more vigorous expansion in economic activity.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"In the Committee's discussion of current and prospective economic developments, members referred to the widespread statistical and anecdotal evidence that the surprising strength in economic activity over the closing months of 1996 was persisting in 1997.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"However, in light of the projected persistence of slack in labor and product markets and the anticipated stability in long-term inflation expectations, the increase in inflation was expected to be mostly transitory if oil and other commodity prices did not rise significantly further.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"This action was taken against the backdrop of heightened concerns and uncertainty created by the recent terrorist attacks and their potentially adverse effects on asset prices and the performance of the economy.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"If the outlook for the labor market does not improve substantially, the Committee will continue its purchases of agency mortgage-backed securities, undertake additional asset purchases, and employ its other policy tools as appropriate until such improvement is achieved in a context of price stability.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"When the Committee decides to begin to remove policy accommodation, it will take a balanced approach consistent with its longer-run goals of maximum employment and inflation of 2 percent. \"",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The Committee will continue to monitor economic and financial developments and will act as needed to promote sustainable economic growth and price stability. \"",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Overall employment gains were relatively well maintained, and labor markets were still tight though showing signs of softening.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Many members concluded that because there did not seem to be any urgency to tighten current policy for domestic reasons, given the likelihood that inflation would remain subdued for a while, important weight should be given to potential reactions abroad.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"However, if incoming information indicates faster progress toward the Committee's employment and inflation objectives than the Committee now expects, then increases in the target range for the federal funds rate are likely to occur sooner than currently anticipated.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"A couple of participants pointed to the decline in credit spreads to relatively low levels by historical standards; one of these participants noted the risk of either a sharp rise in spreads, which could have negative repercussions for aggregate demand, or a continuation of the decline in spreads, which could undermine financial stability over time.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Many observed, however, that a favorable outcome to the hostilities in the Middle East and lower oil prices in line with quotations in futures markets should generate a positive response in equity markets, boost consumer sentiment, and foster a rebound in consumer spending as the year progressed.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"A few participants also noted that uncertainty about the extent of resource slack in the economy was considerable and that it was quite possible that the economy could soon be operating close to potential, particularly if labor force participation rates did not turn up much while employment continued to register gains.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Committee then turned to a discussion of the economic and financial outlook and the implementation of monetary policy over the intermeeting period ahead.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The staff's outlook for inflation was broadly unchanged.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"While numerous contacts reported generally disappointing holiday sales in an environment of atypically large and widespread discounting, a surge in motor vehicle sales in December fostered by aggressive sales incentives and some pickup in retail sales late in the holiday season helped to sustain moderate overall growth in consumer spending through the year-end.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Later in the period, AFE yields partially rebounded and foreign equity prices fully recovered on some easing of U. S. ­–China trade tensions, as well as perceptions of reduced political uncertainty in the United Kingdom and Italy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Still, core consumer price indices remained relatively damped and had risen only a little over the last year, especially when measured by the PCE chain-price index, and that suggested underlying price pressures remained largely contained.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The vote encompassed approval of the paragraph below for inclusion in the press statement to be released shortly after the meeting: \"The Committee perceives the upside and downside risks to the attainment of both sustainable growth and price stability for the next few quarters are roughly equal.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Participants expected economic activity to contract sharply in the fourth quarter of 2008 and in early 2009.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"inflation was projected to pick up gradually in association with a partial reversal of the decline in energy prices this year.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"In general, participants viewed recent consumer price developments as consistent with their expectation that inflation was on a trajectory to achieve the Committee's symmetric 2 percent objective on a sustained basis.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In the United Kingdom, however, gilt yields declined and the pound weakened against the dollar in response to weaker-than-expected inflation data and to an upward revision by the Bank of England, at its early February policy meeting, of its assessment of the degree of slack in the labor market.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Most participants remarked that the standard of \"substantial further progress\" had been met with regard to the Committee's price-stability goal or that it was likely to be met soon.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The vote encompassed approval of the paragraph below for inclusion in the statement to be released shortly after the meeting: \"The Committee judges that some further policy firming may yet be needed to address inflation risks but emphasizes that the extent and timing of any such firming will depend importantly on the evolution of the economic outlook as implied by incoming information.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The U. S. trade deficit in goods and services widened substantially in January and February from its fourth-quarter average, with exports falling sharply and imports rising strongly.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"M2 growth picked up appreciably during December and January, evidently reflecting extra demands for liquidity and safety during the century-date-change period.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In December, the consumer price index (CPI) rose somewhat faster than in recent months, primarily reflecting an upturn in consumer energy prices",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Participants also generally agreed that the recent data had not led them to significantly change their outlooks for the most likely rates of economic growth and inflation in coming quarters.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In furtherance of these objectives, the Committee reaffirmed at its meeting in June the ranges it had established in February for growth of M2 and M3 of 1 to 5 percent and 2 to 6 percent respectively, measured from the fourth quarter of 1998 to the fourth quarter of 1999.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"However, the dollar partially retraced these increases following the much weaker-than-expected U. S. employment report for May, finishing the period a bit stronger against the currencies of the AFEs and about 3 percent higher against EME currencies.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Apart from notably adverse business sentiment and disappointing growth in sales and profits, factors that were curbing capital expenditures cited by members included persisting capital overhangs stemming from what were now seen as excessive earlier buildups in equipment and software and substantial idle capacity in many industrial and commercial structures.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"However, as had been the case for many years, the members remained concerned that forecasts of money growth were still subject to a wide range of error in terms of the anticipated relationships between money growth and aggregate economic performance.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Although higher energy and other costs had the potential to add to inflation pressure, core inflation had been relatively low in the preceding few months and longer-term inflation expectations remained contained.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Indeed, the proposed reduction in the nominal federal funds rate would about offset the apparent increase in the real federal funds rate stemming from a recent decline in inflation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Given the substantial uncertainty still attached to projections of money growth consistent with the Committee's basic objectives for monetary policy, the members agreed that there was no firm basis for changing the tentative ranges set in July 1996.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The associated range for growth of total domestic nonfinancial sector debt was provisionally set at 3 to 7 percent for 1999.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"While accommodative financial conditions and reduced income tax rates should continue to undergird consumer spending and the data on retail sales for July displayed relatively impressive gains, negative wealth effects from falling stock market prices, declining payrolls, and sluggish income gains--should they persist--might well depress consumer expenditures over coming months.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"In addition, contacts reported that softer export sales, weaker economic activity abroad, and elevated levels of uncertainty regarding the global outlook were weighing on business sentiment and leading firms to reassess plans for investment spending.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The pace of job gains slowed and the unemployment rate held steady.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Some participants believed that considerable labor market slack remained, especially when indicators other than the unemployment rate were taken into account, including the unusually large fraction of the labor force working part time for economic reasons.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"When the Committee decides to begin to remove policy accommodation, it will take a balanced approach consistent with its longer-run goals of maximum employment and inflation of 2 percent. \"",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Despite further declines in vacancy rates and rising real estate prices, business spending on nonresidential construction also seemed to have been lackluster, with such activity not having changed much since last summer.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The expansion in economic activity was anticipated to slowly reduce the slack in labor and product markets over the projection period, and progress in reducing the unemployment rate was expected to be gradual.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In the absence of such shocks, and assuming appropriate monetary policy, participants' economic projections generally showed growth picking up to a moderate pace and the unemployment rate declining somewhat next year.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Total nonfarm payroll employment increased at a solid pace in October and November, and the unemployment rate declined, reaching 4.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Much of the current spending for equipment and software reportedly represented replacement demand largely associated with the short useful lives of various types of equipment, and there appeared to be little spending that would entail capital deepening.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Mr. Broaddus dissented because he continued to believe that a modest tightening of policy would be prudent in light of the apparent persisting strength in aggregate demand for goods and services.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"In their discussion of monetary policy for the intermeeting period, Committee members agreed that the Federal Reserve's large-scale securities purchases were providing financial stimulus that would contribute to the gradual resumption of sustainable economic growth in a context of price stability.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Following these swings, inflation was expected to finish the year at just below 2 percent.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Moreover, if, as some members thought likely, productivity growth slowed as employment picked up, the result could be reductions in slack accompanied by higher unit labor costs and associated pressures on prices.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"thought that potential output growth was likely to be a bit higher than forecast by the staff.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Most projected somewhat slower growth through next year, and a smaller reduction in unemployment, than they had projected in April.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Household spending was projected to grow at a fairly solid rate, supported by higher employment and somewhat lower energy prices but damped somewhat by lessened stimulus from gains in wealth and the need for households to rebuild savings.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Market-based measures of inflation compensation remained low",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Risks to the inflation projection also were seen as balanced.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Some participants mentioned upside risks around the inflation outlook that could arise if temporary factors influencing inflation turned out to be more persistent than expected.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Participants marked up their inflation projections, as they assessed that supply constraints in product and labor markets were larger and likely to be longer lasting than previously anticipated.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Participants' forecasts for economic growth for 2012 and 2013 were largely unchanged from their January projections and continued to indicate expectations that the recovery will strengthen somewhat over time.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"A few members expressed interest in using language specifying a period of time during which the federal funds rate was expected to remain exceptionally low, rather than a calendar date, arguing that such language might be better to indicate a constant stance of monetary policy over time.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"With the risks to the forecast for economic activity tilted to the downside, the risks to the inflation projection were also viewed as having a downward skew.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Indeed, some expressed the concern that, with the persistence of considerable resource slack, inflation might run below mandate-consistent levels for some time.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Several participants noted that the unseasonably warm weather of recent months added one more element of uncertainty to the interpretation of incoming data, and that this factor might account for a portion of the recent improvement in indicators of employment and housing.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Most believed that downside risks to economic growth had diminished somewhat since the April meeting, but were still significant.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Participants expected that fiscal policy would continue to be a drag on economic growth over coming quarters.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"However, other measures of labor utilization--including the labor force participation rate and the numbers of discouraged workers and those working part time for economic reasons--suggested more modest improvement, and other indicators of labor demand, such as rates of hiring and quits, remained low.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"This assessment will take into account a wide range of information, including measures of labor market conditions, indicators of inflation pressures and inflation expectations, and readings on financial and international developments.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Nonetheless, on balance, most members currently considered the upside risks to inflation to be a bit less pressing than those on the downside for the next few quarters.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Nonfarm payroll employment rose substantially further in October.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"They noted that the realization of such a development could make it harder for the Committee to achieve 2 percent inflation over the longer run.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Notwithstanding these developments, some participants cautioned that progress toward the Committee's inflation objective should not be overstated",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Nonetheless, the Committee judged that some inflation risks remained.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Participants judged that it would be appropriate to move the stance of monetary policy toward a neutral posture expeditiously.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Although productivity growth had slowed from the extraordinarily rapid pace that prevailed earlier in the expansion, data for the fourth quarter of 2004, as well as preliminary indications for the first quarter of this year, suggested that gains from efficiency remained substantial.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"One participant suggested that the Committee could announce an additional, lower set of thresholds for inflation and unemployment",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"However, waiting was an acceptable alternative given the favorable economic news and the persisting uncertainties surrounding the relationship of output to prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"In their comments about the external sector of the economy, members referred to indications of strengthening economic activity abroad that in conjunction with a weaker dollar was fostering some improvement in exports.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Total nonfarm payroll employment rose solidly in July and August, with strong gains in private-sector jobs and declines in government employment.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The trimmed mean measure of 12-month PCE price inflation constructed by the Federal Reserve Bank of Dallas remained at or near 2 percent in recent months.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In connection with the risks associated with an early start to policy normalization, many participants observed that a premature increase in rates might damp the apparent solid recovery in real activity and labor market conditions, undermining progress toward the Committee's objectives of maximum employment and 2 percent inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Rather, members agreed that inflation was likely to moderate in coming quarters,",
+    "label":1,
+    "true":"hawkish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"While overall employment conditions, the buildup of household net worth, and access to financing would bolster consumer expendi- tures, members also cited a number of limiting factors.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"such developments underlined persisting uncertainties about behavior in labor markets and the level and growth of the economy's sustainable potential.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The staff viewed the extent of uncertainty around its March projections for real GDP growth, the unemployment rate, and inflation as similar to the average over the past 20 years.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Equity prices in most foreign countries were up moderately since the January FOMC meeting.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In any case, however, the assessment of the adverse effects of the increase in longer-term rates on financial conditions and ultimately on economic activity would depend importantly upon the extent to which rates stabilized at current levels or instead continued to rise.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"By the same token, the rate of price inflation was lower than had been reported, consistent with the findings of a number of studies of distortions in published price data.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"With longer-run inflation expectations assumed to remain stable, changes in commodity and import prices expected to be modest, and significant resource slack persisting over the forecast period, inflation was forecast to be subdued through 2015.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Several participants observed that the trimmed mean measure of PCE price inflation constructed by the Federal Reserve Bank of Dallas had stayed near 2 percent recently, underscoring the view that the recent low readings on inflation will prove transitory.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The risks to the forecast for real GDP growth and inflation were seen as tilted to the downside, reflecting recent financial developments and concerns about the foreign economic outlook, as well as the staff's assessment that neither monetary policy nor fiscal policy appeared well positioned to help the economy withstand adverse shocks.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Businesses added a bit to their inventory positions after an extended period of sizable declines, but final sales changed little: business capital spending weakened somewhat further while growth in consumer spending, residential housing expenditures, and government outlays slowed.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Members commented that the continued strong increases in energy and other commodity prices would prompt a difficult adjustment process involving both lower growth and higher rates of inflation in the near term.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"In the view of one member, however, aggregate final demand was so strong that, with economic activity and the associated demand for labor having expanded at an unsustainable pace for some time, one could be reasonably confident that inflation would most likely pick up in the absence of policy action.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Indeed, the members did not rule out the emergence of appreciably lower inflation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Nevertheless, most participants agreed that, although the level of inventories of unsold homes that homebuilders desired was uncertain, the correction of the housing sector was likely to continue to weigh heavily on economic activity through most of this year--somewhat longer than previously expected.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Although inflation remained remarkably subdued and any increase in inflationary pressures likely would tend to emerge only slowly, the strength in demand had developed against the backdrop of financial conditions that, broadly considered, were not substantially different from those now prevailing.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Housing demand and consumer spending firmed toward the end of the year, but capital spending remained quite weak in an environment of substantial business uncertainty and pessimism.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The weakness in labor market conditions remained an important concern to meeting participants, with unemployment expected to remain elevated for some time.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"In the circumstances, most members endorsed a proposal to delete as no longer necessary the previous summary statement relating to the risks to growth and inflation taken together.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"However, household spending had been relatively robust during the cyclical downturn and likely had only limited room for a pickup over coming quarters, and intense competitive pressures could well constrain profits, investment, and equity prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The recent decline in the dollar was another factor that could add to inflation pressures,",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"still being clear about the Committee's intention to provide the monetary accommodation needed to support a return to maximum employment and stable prices.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Recent data suggested that growth of household spending had moderated from its strong fourth-quarter pace, while business fixed investment continued to grow strongly.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"These included a decline in the cost of business capital, a recent rise in orders and backlogs of nondefense capital goods, persisting gains in productivity that undoubtedly pointed to growing profit opportunities, progress in strengthening business balance sheets, and reduced capital overhangs.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"they rebounded late in the period in response to the release of firmer economic data and growing concerns regarding the sustainability of current domestic asset prices.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Looking ahead, an abatement or reversal of some of the temporary factors reducing prices was likely to raise measured inflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Looking ahead, reports from retailer contacts were somewhat mixed; many anticipated relatively depressed holiday sales and where possible were making efforts to limit buildups of holiday merchandise, while other retailers were confident that sales would be reasonably well maintained, albeit generally somewhat below levels or growth rates experienced in previous holiday seasons.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Participants discussed the open market operations that the Federal Reserve had undertaken since September to implement monetary policy, as well as forthcoming operational measures.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"With inflation low and resource use slack, the Committee saw no need for tightening policy in the near future.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"the effect of prior changes in the foreign exchange value of the dollar on core consumer prices had apparently been limited.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In keeping with the practice at meetings when the Committee establishes its long-run ranges for growth of the money and debt aggregates, the members of the Committee and the Federal Reserve Bank presidents not currently serving as members had prepared individual projections of economic activity, the rate of unemployment, and inflation for the year 1996.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"For 2000, the Committee agreed on a tentative basis in June to retain the same ranges for growth of the monetary aggregates and debt, measured from the fourth quarter of 1999 to the fourth quarter of 2000.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"This policy preference was based on expectations of growth in business activity at a pace averaging in the vicinity of the economy's potential, a perception among the members that the risks to such an outlook were more balanced than earlier, and anticipations that under these circumstances inflation would remain constrained.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The staff also reduced slightly its forecast of growth next year",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Recent declines in payroll employment and industrial production, while still sizable, were smaller than those registered earlier in 2009.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Nonfarm payroll employment increased sharply further in January and February, and the civilian unemployment rate, at 4.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"In furtherance of these objectives, the Committee at its meeting in July reaffirmed the ranges it had established in January for growth of M2 and M3 of 1 to 5 percent and 2 to 6 percent respectively, measured from the fourth quarter of 1995 to the fourth quarter of 1996.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"At the conclusion of the discussion, the Committee voted to authorize and direct the Federal Reserve Bank of New York, until it was instructed otherwise, to execute transactions in the SOMA in accordance with the following domestic policy directive: \"Consistent with its statutory mandate, the Federal Open Market Committee seeks monetary and financial conditions that will foster maximum employment and price stability.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Near-term risks to the economic outlook appear roughly balanced, but the Committee is monitoring inflation developments closely.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"the prices of some key commodities had increased recently.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Consumer price inflation remained subdued in November, with both the overall index and the index excluding food and energy items rising at the same relatively low rates as in October.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Labor demand remained strong, and the labor market continued to be very tight.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"These members expected that the target range would be maintained at this level until they were confident that the economy had weathered recent events and was on track to achieve the Committee's maximum employment and price stability goals.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"With inflation running persistently below this longer-run goal, the Committee will aim to achieve inflation moderately above 2 percent for some time so that inflation averages 2 percent over time and longer-term inflation expectations remain well anchored at 2 percent.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"as a result, headline PCE price inflation was expected to substantially exceed core PCE price inflation in 2008.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Those indicators were mixed regarding the pace of economic activity within the manufacturing sector.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Increase the System Open Market Account holdings of Treasury securities, agency mortgage-backed securities (MBS), and agency commercial mortgage-backed securities (CMBS) at least at the current pace to sustain smooth functioning of markets for these securities, thereby fostering effective transmission of monetary policy to broader financial conditions.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"In particular, the Committee decided today to keep the target range for the federal funds rate at 0 to 1\/4 percent and currently anticipates that economic conditions--including low rates of resource utilization and a subdued outlook for inflation over the medium run--are likely to warrant exceptionally low levels for the federal funds rate at least through late 2014.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The slowdown would reflect factors that were expected to damp the growth of overall business investment spending and a greater saturation of potential computer markets that might lead to more emphasis on replacement demand rather than the further expansion of capacity.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Persistently strong demand and increasingly supportive conditions in debt and equity markets suggested the possibility of rising inflation pressures.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"A number of participants noted that continued high unemployment, particularly with large numbers of workers suffering very long spells of unemployment, would lead to an erosion of workers' skills that would have adverse consequences for those workers and for the economy's potential level of output in the longer term.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Although a spike in energy prices eroded real income growth in the second quarter, there were solid gains in wages and salaries.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In their assessment of the outlook for inflation, members agreed that",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In the staff forecast prepared for this meeting, the economy was seen as likely to expand at a moderate pace, supported by accommodative monetary policy and financial conditions.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The recent decline in mortgage rates had sparked some refinancing and purchase activity, but the extent of the longer-term impact of lower rates on housing demand remained uncertain.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Members also expressed concern about the potential for an increase in inflation expectations given highly stimulative macroeconomic policies and economic growth that seemed to be gathering momentum.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"With the boost from these factors fading, real GDP growth was projected to step down noticeably in 2023 and to be roughly equal to potential output growth in 2023 and 2024.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Although the unemployment rate has declined somewhat since the summer, it remains elevated.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Committee decided to keep the target range for the federal funds rate at 0 to 1\/4 percent and expects it will be appropriate to maintain this target range until labor market conditions have reached levels consistent with the Committee's assessments of maximum employment and inflation has risen to 2 percent and is on track to moderately exceed 2 percent for some time.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Inflation compensation for 2007 declined modestly, perhaps reflecting the further drop in spot energy prices, but was largely unchanged at longer maturities.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Housing starts and the demand for new homes had declined further, house prices in many parts of the country were falling faster than they had towards the end of 2007, and inventories of unsold homes remained quite elevated.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Broad equity price indexes were higher over the intermeeting period, amid heightened volatility.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"However, asset purchases are not on a preset course, and the Committee's decisions about their pace will remain contingent on the Committee's outlook for the labor market and inflation as well as its assessment of the likely efficacy and costs of such purchases.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Crude oil prices continued to rise, reaching record levels in nominal terms over the intermeeting period.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The Committee directs the Desk to purchase agency debt, agency MBS, and longer-term Treasury securities during the intermeeting period with the aim of providing support to private credit markets and economic activity.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Several saw that outlook as depending importantly on continued strengthening of the labor market or on an above-trend pace of economic activity.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"At longer maturities, yields drifted lower over most of the intermeeting period in response to incoming data that suggested economic growth would remain moderate and inflation subdued,",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Pressures on resources would rise as the anticipated upturn and possible above-trend growth brought the economy closer to full capacity utilization.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The contemplated reserve conditions are expected to be consistent with considerable moderation in the growth in M2 and M3 over coming months.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Price inflation had picked up a little but, abstracting from energy, had remained relatively subdued.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The absence of further large gains in stock prices, should recent trends persist, would remove this stimulus and probably induce some moderation in the growth of consumer spending.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Mr. Kocherlakota dissented because, in his view, the new forward guidance in the fifth paragraph of the statement would weaken the credibility of the Committee's commitment to its inflation goal by failing to communicate purposeful steps to more rapidly increase inflation to the 2 percent target and by suggesting that the Committee views inflation persistently below 2 percent as an acceptable outcome.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"In furtherance of these objectives, the Committee at its meeting in February established ranges for growth of M2 and M3 of 1 to 5 percent and 2 to 6 percent respectively, measured from the fourth quarter of 1998 to the fourth quarter of 1999.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"With underlying inflation expected to be relatively low, the Committee believes that policy accommodation can be removed at a pace that is likely to be measured.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Measures of inflation compensation were little changed on net.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"These participants concluded that the Committee should wait to take another step in removing accommodation until the data on economic activity provided a greater level of confidence that economic growth was strong enough to withstand a possible downward shock to demand.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The gains in employment over July and August were generally seen as larger than anticipated.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"In contrast to price inflation, labor costs appeared to have remained quiescent.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Participants' Views and Committee Policy ActionIn conjunction with this FOMC meeting, all meeting participants--the five members of the Board of Governors and the presidents of the 12 Federal Reserve Banks--provided projections for economic growth, the unemployment rate, and consumer price inflation for each year from 2009 through 2011 and over a longer horizon.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Output was forecast to expand at a rate a little above the staff's estimate of its potential rate of growth in 2019 through 2021 and then to slow to a pace slightly below potential output growth in 2022.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"With appropriate firming in the stance of monetary policy, participants expected inflation to return to the Committee's 2 percent objective over time and the labor market to remain strong.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The staff continued to view the uncertainty around its projections for real GDP growth, the unemployment rate, and inflation as generally similar to the average of the past 20 years.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Readings on consumer price inflation had picked up somewhat mainly because of increases in oil and gasoline prices earlier in the year.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"To a considerable extent, however, any uptick in inflation expectations likely represented a reversal of anticipated declines in inflation earlier this year when economic prospects had seemed weaker and survey data did not confirm any increase in long-term inflation expectations.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Committee continues to view changes in the target range for the federal funds rate as its primary means of adjusting the stance of monetary policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Nonfarm payroll employment continued to expand through July and the civilian unemployment rate was unchanged at 4.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"In their discussion of forward guidance about the target federal funds rate, a few members suggested that lowering the unemployment threshold to 6 percent could effectively convey the Committee's intention to keep the target federal funds rate low for an extended period.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Despite a large increase in the overall consumer price index for September, measures of inflation compensation calculated using yields on nominal and inflation-protected Treasury securities were about unchanged over the intermeeting period, although they remained a bit above the levels seen before Hurricane Katrina.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In the context of the Committee's long-run objectives for price stability and sustainable economic growth, and giving careful consider- ation to economic, financial, and monetary developments, a somewhat higher federal funds rate would or a slightly lower federal funds rate might be acceptable in the intermeeting period.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Recent data pointed to little change in underlying inflation trends.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Residential construction activity remained at a high level, evidently supported in part by recent declines in mortgage interest rates.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Similarly, measures of underlying inflation continued to be somewhat low relative to levels seen as consistent with the dual mandate over the longer run.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Some contacts indicated that while input costs were higher, it appeared that the pass-through of these higher costs to consumer prices was limited.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The near-term forecast again entailed a marked downshift in headline inflation as energy prices fall back consistent with readings from futures markets.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Inflation has been running somewhat below the Committee's longer-run objective, apart from temporary variations that largely reflect fluctuations in energy prices.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"However, with monetary policy assumed to remain highly accommodative, the staff continued to anticipate that real GDP growth would outpace that of potential over much of this period, leading to a decline in the unemployment rate to historically low levels.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Compared with the baseline, the disruption to economic activity was more severe and protracted in this scenario, with real GDP and inflation lower and the unemployment rate higher by the end of the medium-term projection.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Although many participants remained concerned about downside risks attending the outlook for inflation, a majority of participants saw the risks to the outlook for inflation as balanced.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Nonetheless, with fiscal policy assumed to be tighter next year than this year, the staff anticipated that real GDP growth would not materially exceed increases in potential output in 2013.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Indicators of longer-term inflation expectations are little changed, on balance.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Expansion of these two monetary aggregates was supported by further rapid expansion in the demand for currency and stronger inflows to retail money market funds at a time of weakness in U. S. bond and equity markets.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Participants judged that an appropriate firming of the stance of monetary policy, along with an eventual waning of supply–demand imbalances, would help to keep longer-term inflation expectations anchored and bring inflation down over time to levels consistent with the Committee's 2 percent longer-run goal.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Total nonfarm payroll employment expanded at a solid pace in July and August.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Real outlays for office and computing equipment continued to grow rapidly as prices of personal computers and networking equipment remained on a steep downtrend.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The December employment report showed that job growth had slowed appreciably, and other indicators also pointed to emerging weakness in the labor market in the intermeeting period.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"This increase was slower than a year earlier, as core PCE price inflation (which excludes changes in consumer food and energy prices) moved down to 1.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Most other interest rates in short-term markets were little changed over the period.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"An upside risk was that inflation could increase more than expected in an economy that was projected to move further above its potential.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"In these circumstances, an easing at some point of current uncertainties and strengthening confidence should induce inventory rebuilding, with positive implications, at least for a time, for the expansion of economic activity.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The Committee would be prepared to adjust the stance of monetary policy as appropriate if risks emerge that could impede the attainment of the Committee's goals.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"PCE price inflation was forecast to still be well above 2 percent at the end of this year.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Discussion of Communications Regarding Economic Projections As a follow-up to the FOMC's discussion in October about providing more information on the Committee's collective judgment regarding the economic outlook and appropriate monetary policy, the staff presented several options for enhancing the Summary of Economic Projections (SEP).",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"On balance, most participants still expected inflation to moderate later this year and in 2009.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The weakness in commodity prices and the appreciation of the dollar also continued to weigh on activity in the energy and agricultural sectors.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"sustained outsized gains in productivity could further damp hiring.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Auctions of GSE debt following the conservatorship announcement reportedly attracted heavy demand, but market participants indicated that liquidity in the secondary market for GSE debt remained somewhat lower than normal.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Market-based measures of inflation compensation have declined somewhat",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"They noted that the economy had entered the new year with considerable momentum and very few indications that growth was moderating from what appeared to be an unsustainable rate.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"It was possible, though, that investors' uncertainty regarding inflation prospects, not just inflation expectations themselves, had risen.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Subsequently, investors revised down the expected policy path after the June employment report and the Chairman's semiannual monetary policy testimony.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Participants' Views on Current Conditions and the Economic Outlook In their discussion of the economic situation and the outlook, meeting participants saw the information received over the intermeeting period as suggesting that labor market conditions had improved further in late 2015 even as economic growth slowed.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Some price increases had been noted",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Indeed, most anticipated that inflation will slow for a time to rates somewhat lower than those they judge consistent with the dual goals of price stability and maximum employment, initially reflecting the recent declines in the prices of energy and other commodities and later responding to several years of substantial economic slack.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"These indicators suggested that the financial system was fairly resilient, as did the absence of a significant increase in funding stresses or margin calls earlier this year when prices of risky assets fell and volatility rose sharply.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Risks to the inflation projection also were seen as balanced.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  }
+]

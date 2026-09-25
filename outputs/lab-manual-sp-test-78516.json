@@ -1,0 +1,1196 @@
+[
+  {
+    "sentence":"A substantial increase in lending to nonprime borrowers contributed to the bulge in residential investment in 2004 and 2005, and the tightening of credit conditions for these borrowers likely accounts for some of the continued softening in demand we have seen this year.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Global growth estimates continue to be marked down, and global disinflationary pressures cloud the outlook for U.S. inflation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"With respect to the new framework itself, the statement now notes that the neutral level of the federal funds rate has declined relative to its historical average and therefore that the policy rate is more likely than in the past to be constrained by its ELB, and, moreover, that this binding ELB constraint is likely to impart downside risks to inflation and employment that the Committee needs to consider in implementing its monetary policy strategy.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Overall, though shifts in business attitudes are difficult to measure, I believe that markets reward businesses that outperform their competitors and that, as demand picks up, companies will respond to opportunities to incorporate technological advances in production, communication, and organization.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"To achieve its mandated objectives, the FOMC must influence the course of the U.S. economy, helping it to grow rapidly enough to make full use of available resources but not so rapidly as to stoke inflation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Proponents of this strategy sometimes describe this approach as reducing inflation cycle-to-cycle or describe the economy as being one recession from price stability.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"However, we also believe now is a good time to step back and assess whether, and in what possible ways, we can refine our strategy, tools, and communication practices to achieve and maintain our goals as consistently and robustly as possible.2 With the U.S. economy operating at or close to maximum employment and price stability, now is an especially opportune time to conduct this review.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"There are, however, some problems with this story as the principal explanation for the favorable inflation performance.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"What I do want to share with you is how the equity market fits into my thinking about monetary policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It will be a while before we can be sure that a self-sustaining expansion is underway of sufficient strength and persistence to put the economy back on a path toward full employment.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"This is the scenario from which we draw the lesson that timely, typically preemptive, policy restraint to avoid the excesses of a boom results in longer expansions and avoids unnecessary fluctuations in both output and inflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Indeed, the National Bureau of Economic Research's Business Cycle Dating Committee determined in July that the recession that began in March of last year ended in April, making it not only the deepest recession on record, but also the briefest.2 The recovery that commenced in the summer of 2020 was quite robust, and, with one quarter to go, GDP growth in 2021 is projected by the Fed and many outside forecasters to be the fastest since 1983.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But this belief will persist only as long as we on the Federal Open Market Committee continue to ratify the publicâ€™s expectations that inflation will remain low and stable.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Indeed, the website of the Central Bank of Brazil explicitly acknowledges the role of inflation in driving financial innovations that enabled firms and households to economize on cash balances in that country.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"During expansions, equity prices tend to rise, although they often decline before a downturn in the economy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"For example, the Stock-Watson indicator and other indicators based on interest rates and spreads signaled the 1990-91 recession very weakly and rather late.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"By the same token, the effect of the interest rate channel on overall economic activity may be diminished by greater trade integration as changes in domestic demand are offset by induced changes in imports.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Committee took these actions to provide a somewhat more accommodative policy in response to muted inflation pressures and the risks to the outlook I mentioned earlier.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"While each of the Asian economies is unique in many important respects, the sources of their spectacular growth in recent years, in some cases decades, and the problems that have emerged are relevant to a greater or lesser extent to nearly all of them.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In April, prices of core goods and services--that is, consumer prices excluding food and energy--were unchanged for a second month.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Because long-term interest rates can remain low only in a stable macroeconomic environment, these goals are often referred to as the dual mandate; that is, the Federal Reserve seeks to promote the two coequal objectives of maximum employment and price stability.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Today, just nine months later, the unemployment rate is 7.6 percent--a larger decline than most FOMC participants expected in September.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Expectations of price increases over the near-term--specifically, over the next year--have, in fact, risen noticeably on the heels of the actual increase in inflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"First, insofar as recent productivity growth is concerned, I have a serious question about the quality of the data that we employ to measure output in today's economy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"However, in the past two decades, what constitutes money has been obscured by the introduction of technologies that have facilitated the proliferation of financial products and have altered the empirical relationship between economic activity and what we define as money, and in doing so has inhibited the keying of monetary policy to the control of the measured money stock.1 Another example of ongoing structural change relates to innovations in mortgage finance.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And the equity market itself has been the subject of analysis as we attempt to assess the implications for financial and economic stability of the extraordinary rise in equity prices--a rise based apparently on continuing upward revisions in estimates of our corporations' already robust long-term earning prospects.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"As illustrated by the left-hand panel of figure 6, since 2000, both FOMC participants and respondents to the Blue Chip survey have markedly reduced their projections of the level of real short-term interest rates expected to prevail in the longer run.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Inflation continued to climb in June, reaching 9.1 percent as measured by the consumer price index.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"One branch of economists holds the view that monetary policy should not be influenced by any perceived financial market bubbles.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The events of the last two years come on top of a huge expansion of global trade, competition and productive capacity--all of which have given American businesses less control over prices in the face of rising costs and benefited American consumers through low prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Ultimately inflation is determined by the policy actions of the central bank.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And as reserves reach durably ample levels, we intend to slow the pace of purchases such that our balance sheet grows in line with trend demand for our liabilities.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"We also expect it will be appropriate to maintain the current target range for the federal funds rate at 0 to 1\/4 percent until labor market conditions have reached levels consistent with the Committee's assessments of maximum employment, until inflation has risen to 2 percent, and until inflation is on track to moderately exceed 2 percent for some time.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"I look forward, as always, to my conversation with Tim, but first, please allow me to offer a few remarks on the economic outlook, Federal Reserve monetary policy, and our new monetary policy framework.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Current Economic Situation and Outlook While the coronavirus (COVID-19) pandemic has taken a tragic human toll measured in terms of lives lost and suffering inflicted, as a direct result of the necessary public health policies put in place to mitigate and control the spread of the virus, the pandemic has also inflicted a heavy toll on the levels of activity and employment in the U.S. economy.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I believe the current move can be justified in a forward-looking variant of the Taylor Rule, where today's policy depends on the forecast of future output gaps and inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In fact, the Federal Reserveâ€™s upcoming Community Affairs Research Conference will feature several papers that explore these issues.5 Homeownership The important issue of loan pricing aside, expanded access to mortgage credit has helped fuel substantial growth in homeownership.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"During the period examined, the rate of overall consumer inflation was 2.78 percent, as measured by the regular CPI-U for All Items.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We are not seeing any evidence to date that a strong labor market is putting excessive cost-push pressure on price inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"With the economic outlook held constant, changes in the net demand for long-term securities have their largest effect on the term premium.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We should first recognize that the form of the U.S. government is different than that of most inflation-targeting countries.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The cutback in residential construction has directly reduced the annual rate of U.S. economic growth about 3\/4 percentage point on average over the past year and a half.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"One prominent example is with semiconductor producers and their need to dramatically alter the mix of production to meet demands of the high-tech and automotive industries.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Many potential inflation targeters ask, \"Why not zero?\"",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Business Caution As I discussed earlier, regression analysis suggests that the robust growth in profits and the comparatively modest recovery in capital expenditures leaves a good part of the extraordinary cash buildup unexplained.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Household spending stepped up in mid-April, coinciding with the first disbursement of stimulus payments to households and a ramp-up in the payout of unemployment benefits, and showed the most pronounced increases in the states that received more benefits.9 With some of the fiscal support measures either provided as one-off payments or slated to come to an end in July, the strength of the recovery will depend importantly on the timing, magnitude, and distribution of additional fiscal support.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Despite the prevalence and importance of committees in modern central banking, the role of committees in the formulation of policy has not attracted nearly as much academic attention as has the research on monetary policy rules.3 The literature on monetary policy rules stretches back to at least Adam Smith and includes important contributions from David Ricardo, Knut Wicksell, and Milton Friedman.More recently, John Taylor has moved the research agenda forward with his eponymous rule, and a large number of academic papers have been written examining the effectiveness and robustness of policy rules.4 In contrast, as noted, study of the role of committees in making monetary policy has been fairly light, notwithstanding the insightful work of Alan Blinder and others.5 Committees and rules may appear to be in opposition as approaches to policymaking.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Funding of our current account deficit likely will become more difficult when home bias approaches its practical minimum.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"First, longer-maturity obligations may be more attractive because of more stable inflation, better-anchored inflation expectations, and a reduction in economic volatility more generally.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But, in the interim, the absence of increasing inflation pressures meant that the Federal Reserve did not need to tighten to bring demand back in line with the potential as soon as it otherwise might have needed to.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"These concerns were centered around the fact that corporate borrowers could no longer raise funds in the bond or commercial paper markets at reasonable prices or, at some times and for some borrowers, at all.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"In the modal outlook, monetary policy tightening to temper demand, in combination with improvements in supply, is expected to reduce demandâ€“supply imbalances and reduce inflation over time.10 The real yield curve is now in solidly positive territory at all but the very shortest maturities, and with the additional tightening and deceleration in inflation that is expected over coming quarters, the entire real curve will soon move into positive territory.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Notably, if people feel sure that inflation will remain well controlled, they will be more restrained in their wage-setting and pricing behavior, which (in something of a virtuous circle) makes it easier for the Federal Reserve to confirm their expectations by keeping inflation low.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But low rates are not solely or even primarily a result of the Federal Reserve's accommodative monetary policies; they are rooted in the market's expectations of low inflation and the weakness of the economic recovery, factors weighing on rates not just in the United States but throughout the advanced economies.7 Given low real rates and low inflation, expected nominal returns should be low across all asset classes.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"They would account for the effects of higher energy prices on the real disposable income and spending demands of the household sector.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Monetary Policy in a World without Treasuries Today, monetary policy decisions are implemented through a mix of outright purchases and sales of assets held in the Fed's portfolio, temporary operations through repurchase agreements, and discount window loans.2 It seems to me that the same three operations, though perhaps in different proportions, could be used in the absence of Treasury securities.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Financial conditions continue to pose a downside risk to the outlook for growth.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"That's particularly important, because the lags in the effect of policy on economic activity and prices mean that policy decisions are necessarily based on a view of the likely path for the economy over several years, relative to the Federal Reserve's legislated objectives of maximum employment and stable prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In particular, we are closely monitoring the emergence of the coronavirus, which is likely to have a noticeable impact on Chinese growth, at least in the first quarter of this year.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"For these reasons, I have been interested in exploring approaches that expand the space for targeting interest rates in a more continuous fashion as an extension of our conventional policy space and in a way that reinforces forward guidance on the policy rate.18 In particular, there may be advantages to an approach that caps interest rates on Treasury securities at the short-to-medium range of the maturity spectrumâ€”yield curve capsâ€”in tandem with forward guidance that conditions liftoff from the ELB on employment and inflation outcomes.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Flexible inflation averaging could bring some of the benefits of a formal average inflation targeting rule, but it would be simpler to communicate.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Developments during the Second Period: 1998-2007 Research during the past ten years has been very fruitful in expanding the profession's understanding of the implications of uncertainty for the design and conduct of monetary policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"One involves the so-called zero bound on nominal interest rates; the other involves labor markets.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"This supports the view that there has been an increase in trend productivity growth.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The remarkable coming together of technologies that we label IT has allowed us to move beyond efficiency gains in routine manual tasks to achieve new levels of productivity in routine information-processing tasks that previously depended upon other facets of human input--computing, sorting and retrieving information, and acting on pieces of information.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The corresponding depreciation in other countries currencies will result in a gradual increase in the foreign currency price of U.S. exports, compared to the prices of foreign produced goods.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In the real world, there are two reasons why central bankers still prize credibility, even if it cannot be shown to reduce the costs of disinflation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Although the unemployment rate is at a 50-year low, wages are rising broadly in line with productivity growth and underlying inflation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Central bank actions are designed in the first instance to influence asset prices and yields, which in turn affect economic decisions and thus the evolution of the economy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Overall, research indicates that trade with developing economies in particular has slowed the rate of growth of import prices faced by industrialized countries, with estimates of the reduction ranging widely from 1\/2 to 2 percentage points.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But what if the Fed were actually to propose a soft form of inflation targeting?",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Deflation, like inflation, would distort resource allocation and interfere with the economy's ability to reach its full potential.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The number of black-owned firms increased nearly 50 percent and the number of Hispanic-owned firms jumped 80 percent between 1987 and 1992--between two and three times the rate of growth of non-minority-owned firms.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Eventually, financial markets may develop the instruments and associated analytical techniques for unearthing these implicit changes in the general price level with some precision.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Moreover, the resulting robust gains in labor productivity have been well ahead of compensation growth and have dramatically boosted corporate profits.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Comparing the Theoretical Prediction to Recent Experience The swing from budget deficit to surplus has been much more dramatic than was expected when the fiscal year 1994 budget was adopted.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In contrast, the past few cycles did not see this kind of behavior, and in each case, financial imbalances, rather than goods and services inflation, were notably elevated at the onset of the downturn.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The September FOMC meeting was the first since the Committee approved in August our new Statement on Longer-Run Goals and Monetary Policy Strategy and adopted a new policy framework.3 The changes we made in our September FOMC statement bring our policy guidance in line with this new framework.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But change is hard and not everyone is willing or able to pay the price.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Higher and more stable growth combined with better ability to undertake long-term plans can help to improve the fiscal outlook for a country.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Survey of Market Participants conducted by the Federal Reserve Bank of New York indicates a shift in expectations following the release of the new monetary policy framework.17 The median expected rate of unemployment at the time of liftoff moved down from 4.5 percent in the July survey, before the release of the framework, to 4.0 percent in the September and subsequent surveys, following the release of the new framework.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Already, various trimmed price indexes are running much closer to 2 percent.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"My general point is that inflation is much too high, and the outlook for inflation remains significantly uncertain.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"For example, given the starting point for the outlook, the forecasts will trace out a path for the economy to preserve or reestablish maximum employment and price stability that will reflect FOMC participants' views of the relative variation in output and inflation that is possible in the short run.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"August 26, 2022 Monetary Policy and Price Stability Chair Jerome H. Powell At â€œReassessing Constraints on the Economy and Policy,â€ an economic policy symposium sponsored by the Federal Reserve Bank of Kansas City, Jackson Hole, Wyoming Share Watch Live Thank you for the opportunity to speak here today.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But in the shorter run, we must also develop strategies to overcome the education deficiencies of all too many of our young people, and to renew the skills of workers who have not kept up with the changing demands of the workplace.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Therefore, maximum employment (at least if interpreted as full employment or being at NAIRU) and price stability, the statutory mandate of the Federal Reserve, are compatible in the long run.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And it may generally take longer still for a policy change to alter the course of inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Of the 1,700 Washington employees, roughly 250 are Ph.D. economists, the majority of whom support the Board's monetary policy responsibilities.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"As you can see, transforming the information available from published statistics into concepts useful for assessing the consequences of monetary policy is, in fact, quite complex.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"To the extent that these producers are foreign, there should be a corresponding drop in domestic demand.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"With regard to our price-stability mandate, while the new statement maintains our definition that the longer-run goal for inflation is 2 percent, it elevates the importanceâ€”and the challengeâ€”of keeping inflation expectations well anchored at 2 percent in a world in which an effective-lower-bound constraint is, in downturns, binding on the federal funds rate.5 To this end, the new statement conveys the Committee's judgment that, in order to anchor expectations at the 2 percent level consistent with price stability, it will conduct policy to achieve inflation outcomes that keep long-run inflation expectations anchored at our 2 percent longer-run goal.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But dividing that nominal value change into components representing changes in real quantity versus price requires that one define a unit of output that is to remain constant in all transactions over time.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"When anticipations of Fed tapering led to higher U.S. interest rates and higher market volatility, these trades may have been quickly unwound, engendering particularly sharp declines in EME exchange rates and asset prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Finally, while my assessment of maximum employment incorporates a wide range of indicators to assess the state of the labor marketâ€”including indicators of labor compensation, productivity, and price-cost markupsâ€”the employment data I look at, such as the Kansas City Fed's Labor Market Conditions Indicators, are historically highly correlated with the unemployment rate.8 My expectation today is that the labor market by the end of 2022 will have reached my assessment of maximum employment if the unemployment rate has declined by then to the SEP median of modal projections of 3.8 percent.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Unfortunately, from the point of view of both the analyst and the policymaker, the link between an asset's price and the structure of its return is hard to pin down, as it typically embodies complex factors that are inherently difficult to measure, such as expected future earnings, riskiness, and risk aversion.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Companies can keep their focus on cutting costs and increasing productivity; they can foster research and innovation; they can offer training and employee incentives to acquire more education and skills.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Although we cannot ascertain the precise rates of resource utilization that the economy can sustain, we can have little doubt that, after three years of above-trend growth, slack has been substantially reduced.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Case studies of individual industries show that, in some cases, the planning for technological modernization has not always been adequate, with the result that some purchases of high-tech equipment and software have not added much to productivity or profits.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"That said, our model accords the greatest roles to increased productivity growth, which has made the United States a magnet for foreign saving, and to the slump in foreign domestic demand, which has led to an excess of saving in those economies.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"First, the expansion of trade may cause domestic inflation to depend to a greater extent on the prices of imported goods--not only because imported goods enter the consumer basket or (in the case of imported intermediate goods) affect the costs of domestic production, but because competition with imports affects the pricing power of domestic producers.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"During the first stage, the inflation rate would exceed the long-term desired inflation rate, as the price-level gap was eliminated and the effects of previous deflation undone.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Here in the United States, my colleague Governor Mike Kelley has stated that we are likely to see some disruptions to economic activity because of Year 2000 problems but the effects are likely to be temporary and quickly reversed.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"However, in my judgment, reliance on these two approaches is not symmetric; instead, the forecast-based approach has become increasingly dominant in the monetary policymaking of leading central banks.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"These authors point out (as have many others) that, when nominal interest rates are at or near zero, the central bank can lower the real rate of interest only by creating expectations of inflation on the part of the public.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"As a result, deregulation, globalization, and innovation have made it easier for citizens to move their wealth out of nominal assets in their local currency and thereby avoid any inflation tax should their government show signs that it might resort to inflationary tactics to finance spending.6 At the same time, the publicâ€™s understanding of the costs of inflation has increased, in part because of experiences of high inflation in many countries in the 1980s.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Moreover, to the extent that more-rapid growth of productivity shows through to faster gains in nominal wages, there will be fewer instances in which nominal wages will be pressured to fall.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Moreover, investing in EMEs has become more attractive as many EMEs have improved their macroeconomic policies and institutional frameworks over recent decades; growth differentials may partly be reflecting these improvements.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Federal Open Market Committee (FOMC) has been responsible for monetary policy decisions in the United States since it was established by the Banking Act of 1935, two decades after the founding of the Fed itself.2 The movement toward committees reflects the advantages of committees in aggregating a wide range of information, perspectives, and models.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It is important to note, however, that although sound policy undoubtedly helped create the conditions for growth, macroeconomic policy cannot create growth itself.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"China has eased some of its most stringent COVID containment measures but recently revived travel restrictions in some areas, and its approach to the pandemic remains an upside risk for inflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The International Monetary Fund projects that global economic growth in 2019 will be the slowest since the financial crisis.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Though widely anticipated even before the actions of October, the recession and retrenchment in employment that followed those actions resulted in pressures on the Federal Reserve to reverse course.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Going forward, the question is not only whether inflation will fall in the coming months, but also how far it will fall and if it will fall soon enough to avoid spurring a concerning rise in longer-term inflation expectations.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The ultimate responsibility for price stability rests with the Federal Reserve.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"This direction of causality may obscure the negative relationship, running from higher inflation to lower growth, presumed to hold in the longer term.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The presidents' reports often include anecdotal updates from businesses or other sources to provide real-time information on regional economic activity.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Microeconomic studies provide corroborating information to the macroeconomic evidence of a post-1995 acceleration in productivity growth.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The dual mandate seems proper and fitting, given that economic costs are incurred both by having inflation stray from its long-run goal and by having output deviate from the economy's potential to produce; and it seems to produce results not too different in practice from those associated with central banks that are flexible inflation targeters.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In fact, the low funds rate has been necessary to promote growth that, to date, has been just sufficient to begin reducing substantial margins of slack in resource utilization.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"While the current episode has not yet concluded, it appears that, responding vigorously in a relatively flexible economy to the aftermath of bubbles, as traumatic as that may be, is less inhibiting to long-term growth than chronic high-inflation monetary policy.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"This conclusion is buttressed by recent sizable increases estimated for labor productivity for the manufacturing sector, derived from a data system that, for the most part, is independent of the national accounts.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"If the prices are wrong -- built on the base on an incorrect view of the economy or Federal Reserve intentions -- we will prove them wrong and provide an anchor for the market to adjust to.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The unmooring of inflation expectations greatly complicated the process of making monetary policy; in particular, the Fed's loss of credibility significantly increased the cost of achieving disinflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The evidence suggests that new technology often results in more growth in employment in innovating industries.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Does the rapid growth in cross-border capital flows limit or even eliminate the ability of domestic monetary policy to affect domestic interest rates?",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Obviously, productivity growth generated through this rationalization process will not have the direct demand-augmenting effect of productivity increases realized through more rapid investment spending.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"However, I can provide you with some insight into the way the FOMC functions and the impact of monetary policy on the U.S. and global economies.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The price of a ton of cold rolled steel sheet, or a linear yard of cotton broad-woven fabrics, could be reasonably compared over a period of years.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Accelerating productivity poses a significant complication for economic forecasting.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"By reducing our scope to support the economy by cutting interest rates, the lower bound increases downward risks to employment and inflation.22 To counter these risks, we are prepared to use our full range of tools to support the economy.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Although the Fed hasn't started raising rates or reducing the balance sheet, interest rates have moved up notably.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"While a constant rate of money growth will not always be optimal, if money demand is sufficiently stable, and not particularly interest sensitive, it will pin down inflation in the long run and help smooth the business cycle in the short run.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Higher productivity is unambiguously good.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Consumer sentiment remains solid, and the employment picture is positive.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"A considerable literature suggests that successful monetary policies should stabilize, or \"anchor,\" inflation expectations so as to prevent them from becoming a source of instability in their own right (Goodfriend, 1993; Evans and Honkapohja, 2003).",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Most FOMC participants anticipate that inflation will gradually move up to the FOMC's 2 percent target over coming years.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"While these studies allow for differences in the weighting of price indexes across different income groups, they rely on the same elementary price indexes for subcategories of goods and services.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"By definition, this excess of U.S. payments to foreigners over payments received in a given period equals the U.S. current account deficit, which, as I have already noted, was $666 billion in 2004--close to the $617 billion by which the value of U.S. imports exceeded that of exports.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The first driver is the long-term increase in the demand for currency and reserves.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Federal Reserve and ECB Framework Reviews The monetary policy framework reviews conducted by the Federal Reserve and the ECB provide another example of monetary policy correlation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In these circumstances, I believe, it is appropriate to put greater weight on incoming data to determine whether the stance of monetary policy should be changed.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"First, I will discuss the available empirical evidence from the United States on the effect of changes in asset prices on household consumption and business investment.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The rapid pace of investment also helped to hold down inflationary pressures by increasing the growth of productive capacity.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Together these structural changes would imply that the economy can now operate at a lower unemployment rate and at a higher growth rate than previously without inflationary consequences.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Given recent developments, the medium-term outlook for inflation will receive particular scrutiny.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Second, the correction in equity prices points to a downward revision to consumer spending and to business fixed investment and residential construction as well.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Historically, recessions often occurred when the Fed tightened to control inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And, of course, despite the improvements seen in the May jobs report, the unemployment rate, at 13.3 percent, remains historically high.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"For example, in the mid-1970s, just when the FOMC began to specify money growth targets, econometric estimates of M1 money demand relationships began to break down, predicting faster money growth than was actually observed.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"These communications were, as you would expect, biased--they were all in response to decisions to raise interest rates and most often occurred when those increases came shortly before an election.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Stock prices and existing home sales are somewhat correlated, a not altogether unexpected result, because each is affected by interest rates and presumably the gains from each help finance the other.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"These productivity gains result from many forces, including business investment that has increased the amount and quality of capital available to the workforce, business process innovations, and the growth of innovative, research-intensive industries such as information technology and biotechnology.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The boom was fueled by a sustained acceleration of productivity and an accompanying rise in corporate profits--fundamental changes that justified a major rise in equity prices.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Inflation in 1996, measured by the chain price index for GDP or the core CPI, was the lowest in 30 years.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Their key finding, illustrated in figure 3, is that Federal Reserve policy rate surprises attributed to stronger U.S. growth generally have only moderate spillovers to EM financial conditions, whereas U.S. policy rate changes attributed to U.S. inflationary pressures trigger more substantial spillovers to EM financial conditions.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Economic Outlook and Monetary Policy Now I would like to turn to the current economic scene and this week's FOMC decision.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Indeed, the discrepancy between actual and predicted money growth was sufficiently large that the P* model, if not subjected to judgmental adjustments, would have predicted deflation for 1991 and 1992.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"This is a tangible recent example of the need both to judge how the equilibrium real interest rate that is relevant for policy might have changed from a perceived long-run level and to set policy against the background of such an understanding.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"May 21, 2020 U.S. Economic Outlook and Monetary Policy Vice Chair Richard H. Clarida At the New York Association for Business Economics, New York, New York (via webcast) Share Accessible Keys for Video [Space Bar] toggles play\/pause; [Right\/Left Arrows] seeks the video forwards and back (5 sec ); [Up\/Down Arrows] increase\/decrease volume; [M] toggles mute on\/off; [F] toggles fullscreen on\/off (Except IE 11); The [Tab] key may be used in combination with the [Enter\/Return] key to navigate and activate control buttons, such as caption on\/off.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Another reason for the reliance on judgment in the forecasting process is the practical requirement that the forecast for inflation be consistent with the staff's overall view of the economy, including the forecasts for key economic variables such as wages, interest rates, and consumption spending.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And, in my judgment, we may have to rely more on measures other than apparent excess demand to get reliable indications of pending changes in inflationary pressures.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"There are a variety of versions of this basic approach, depending on measures of utilization and inflation rates and depending on whether the adjustment is made in response to past and current movements in utilization and inflation rates or in response to forecasts of these variables.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"If the FOMC were to tie mechanically our actions to market prices, then we would be placed in the sorry position of validating whatever whim that currently struck investors' fancy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"September 01, 2020 Bringing the Statement on Longer-Run Goals and Monetary Policy Strategy into Alignment with Longer-Run Changes in the Economy Governor Lael Brainard At \"How the Fed Will Respond to the COVID-19 Recession in an Era of Low Rates and Low Inflation,\" an event hosted by the Hutchins Center on Fiscal and Monetary Policy at the Brookings Institution, Washington, D.C. (via webcast) Share Watch Live I want to thank David Wessel for hosting this event.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Models of the term structure of interest rates better fit the data under the assumption that both inflation expectations and beliefs about the central bank's reaction function are evolving (Kozicki and Tinsley, 2001; Rudebusch and Wu, 2003; Cogley, 2005).",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"To summarize these international data, one might say that something brought inflation down in the 1980s and 1990s, but success was fairly uniform across both the inflation-targeting and nontargeting countries.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"At the same time, an acceleration in productivity also appears to have a direct disinflationary effect.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The increase in upside risks to domestic demand and the diminution of foreign risks together suggest that risks to the outlook are more balanced today than they had been for the preceding two years.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Back then, the unemployment rate was 8.1percent and nonfarm payrolls were reported to have increased at a monthly rate of 97,000 over the prior six months; today, those figures are 7.6 percent and 194,000, respectively.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"January 13, 2021 Full Employment in the New Monetary Policy Framework Governor Lael Brainard At the Inaugural Mike McCracken Lecture on Full Employment Sponsored by the Canadian Association for Business Economics (via webcast) Share I want to thank the Canadian Association for Business Economics for inviting me to join you today, particularly president Bonnie Lemcke and past president Armine Yalnizyan.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We said that we would \"aim to achieve inflation moderately above 2 percent for some time\" to ensure that it averages 2 percent over time and that inflation expectations stay anchored.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Workers in the lowest-wage quartile face an extremely elevated rate of unemployment of around 23 percent.7 The advent of widespread vaccinations should revive in-person schooling and childcare along with demand for the in-person services that employ a significant fraction of the lower-wage workforce.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In such an environment, a central bank mandated to pursue price stability can be flexible according to the circumstances, while one with a numerical target may need to obtain formal modification of its objectives.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"When interest rates increase, prices will undoubtedly adjust to some extent--in some cases simply by rising less rapidly than they would otherwise--and debt-service obligations will move up.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"What does this suggest about monetary policy strategy going forward?",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We must keep in mind that, difficult as the problem seems, consistently measured prices do exist in principle.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Given stable prices, savers and investors have more confidence about the ultimate value of their investments.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The combination of a commitment to condition liftoff on the sustained achievement of our employment and inflation objectives with yield curve caps targeted at the same horizon has the potential to work well in many circumstances.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Econometric methods were also refined to improve estimation and to accommodate more-complex dynamics in money demand equations.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"While great uncertainty regarding the path of fiscal policy and its economic effects will remain for some time, with the economy getting closer to full employment, the prospect of a material increase in fiscal stimulus over a sustained period could reasonably be expected to shift somewhat greater probability toward stronger inflation outcomes.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Global factors may have put downward pressure on term premiums because of anxiety about the foreign outlook, which may have increased demand for U.S. assets, or because low rates abroad have depressed U.S. term premiums through a global portfolio balance channel.5 And real rates are quite low globally, reflecting the step-down of productivity growth over the past 10 years as well as shifts in savings and investment demand due to demographic change.6 The Core of the Financial System Is Much Stronger Before turning to the interplay between low rates and the financial system, I will simply point out that both improved risk management at the largest, most systemically important financial institutions (SIFIs) and stronger regulation have made the core of the system much stronger and more resilient than before the crisis.7 The SIFIs have more stable funding, hold much more capital and liquidity, are more conscious of their risks, and are far more resolvable should they fail.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"After a short coffee break, we have a staff presentation on the alternatives we face in setting monetary policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Some also argue that resistance to nominal wage cuts will impart an upward bias to real wages as price stability approaches or outright deflation occurs, leaving the economy with a potentially higher level of unemployment in equilibrium.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We can best promote a progressive credit climate by maintaining an environment of low inflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"For instance, in countries where sovereign or corporate debt levels are high, higher interest rates could increase debt-servicing burdens and concerns about debt sustainability, which could be exacerbated by currency depreciation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In these models, each asset price contains a risk premium that represents the additional return demanded by risk-averse investors for bearing risk.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Over time, spot prices are inexorably drawn back to the long-term equilibrium price, as the balance between underlying supply and demand is restored.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Under pure monetary targeting, interest rates would fluctuate with shocks in spending.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The flow of macrodata received since May has been surprisingly strong, and GDP growth in the third quarter is estimated by many forecasters to have rebounded at roughly a 30 percent annual rate.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The idea is that providing more information about the Committee's views of the economic outlook may allow financial market prices to reflect more accurately the likely future stance of monetary policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Indeed, scattered evidence dating back to ancient Rome and before reflects the same order of interest rate magnitude, not a one percent interest rate nor 200 percent.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Monetary Policy But it is monetary policy--and the Fed's principal monetary lever, the federal funds rate, which is the interest rate on overnight loans of reserves between depository institutions--that earns the Federal Reserve all that ink and airtime.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Conclusion: The Challenge Facing Monetary Policy This analysis suggests that monetary policy does face a challenge--rebalancing aggregate supply and demand to contain the risk of higher inflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Conclusion To sum up, none of us, obviously, can see the future, and instead we shall have to monitor incoming data closely for evidence of any shifts in recent productivity trends.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"About two years after the onset of the financial crisis, the ECI moved up slightly in 2010 and then remained essentially flat at an annual growth rate of 2 percent over a five-year period between 2010 and 2015.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Implications for Monetary Policy In summary, there appears to be some possibility that the recent trend toward disinflation will continue, primarily because of the potentially large amount of economic slack in the system.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"To abstract from the potential effects of cyclical factors on the yield curve, consider the pattern of forward rates many years into the future, at which point the effects of current cyclical shocks would be expected to no longer be important.2 Such forward rates reflect not only market expectations of future short-term interest rates but also term premiums to compensate for the risk associated with commitments to extend credit so far in the future, including the risk of future inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Because good forecasts are so crucial to good monetary policy, I hope and expect to see a great deal more work exploring the robustness of alternative forecasting methods.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  }
+]

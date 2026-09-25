@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "experiment_id": "2026-09-24_15-12-02_predict_all_test_gpt-5-nano_5_shot_lab-manual-split-combine-test-5768",
+    "model_name": "openai/gpt-5-nano",
+    "model_type": "llm",
+    "classification_type": "single_label",
+    "timestamp": "2026-09-24T15:13:17.491529",
+    "dataset_name": "test",
+    "dataset_hash": "56d20dcd42c1",
+    "num_predictions": 2,
+    "git_commit": "7736af7562551d176aa804a0bfc60c09bde4b192"
+  },
+  "predictions": [
+    "neutral",
+    "neutral"
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {
+    "accuracy": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "auc": NaN
+  }
+}
