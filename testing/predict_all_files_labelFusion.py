@@ -25,9 +25,9 @@ on the pair: RoBERTa on train, fusion MLP on the full validation split, predicti
 
 --tune-scope decides how many studies there are (each trial is a CPU fine-tune, so this is the
 main cost knob):
-  group   (default) one study per dataset (mm, pc, sp, combine, ...) on its seed-5768 pair;
+  group           one study per dataset (mm, pc, sp, combine, ...) on its seed-5768 pair;
                     the best parameters are reused for the other seeds of that dataset.
-  shared            one study (--tune-file) whose best parameters are used for every pair.
+  shared  (default) one study (--tune-file) whose best parameters are used for every pair.
   pair              a separate study for every pair (most expensive).
 Caveat for group/shared: the seeds are different resamples of the same data, so a sentence in
 another seed's test file may have been in the tuning pair's validation half. Only
@@ -405,7 +405,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--files", nargs="*", help="only test files whose name contains one of these")
     parser.add_argument("--trials", type=int, default=10, help="Optuna trials per study (0 = no tuning, defaults)")
-    parser.add_argument("--tune-scope", choices=["group", "shared", "pair"], default="group")
+    parser.add_argument("--tune-scope", choices=["group", "shared", "pair"], default="shared")
     parser.add_argument("--tune-file", default="lab-manual-mm-test-5768", help="test file stem tuned on with --tune-scope shared")
     parser.add_argument("--tune-seed", default="5768", help="seed of the pair a group is tuned on")
     parser.add_argument("--tune-minutes", type=float, help="time cap per study (finished trials are kept)")
