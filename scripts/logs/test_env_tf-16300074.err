@@ -1,3 +1,0 @@
-[2026-09-28T21:21:23.346] error: execve(): /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/env_labelFusion/bin: Permission denied
-srun: error: ggpu135: task 0: Exited with exit code 13
-srun: Terminating StepId=16300074.0
