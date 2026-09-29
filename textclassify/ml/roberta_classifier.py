@@ -622,6 +622,33 @@ class RoBERTaClassifier(BaseMLClassifier):
         """
         return self._predict_texts_internal(texts, true_labels)
     
+    def embed_texts_for_training(self, texts: List[str]) -> torch.Tensor:
+        """[CLS] embeddings for texts WITH gradients enabled, for FusionEnsemble's joint
+        training mode (joint_training=True), which fine-tunes RoBERTa jointly with the
+        fusion MLP instead of treating it as a frozen feature extractor. Mirrors the TS
+        branch's _get_ts_embeddings_for_training: unlike predict_without_saving /
+        _predict_texts_internal, this does NOT wrap the forward pass in torch.no_grad()
+        and does NOT detach/move to numpy, so backprop can flow into self.model. Gradient
+        tracking follows the ambient context (train loop: enabled; eval loop under
+        torch.no_grad(): disabled), same convention as the TS branch.
+        """
+        processed_texts = []
+        for text in texts:
+            cleaned = clean_text(text)
+            normalized = normalize_text(cleaned)
+            preprocessed = self.preprocessor.preprocess_text(normalized)
+            processed_texts.append(preprocessed if preprocessed else text)
+
+        encoded = self.tokenizer(
+            processed_texts, truncation=True, padding='max_length', max_length=self.max_length, return_tensors='pt'
+        )
+        input_ids = self._to_device(encoded['input_ids'], name='input_ids')
+        attention_mask = self._to_device(encoded['attention_mask'], name='attention_mask')
+
+        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
+        hidden_states = outputs.hidden_states[-1]
+        return hidden_states[:, 0, :]  # [CLS] token embeddings, shape [batch_size, 768]
+
     def _predict_texts_internal(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Internal method to predict labels for a list of texts.
         

@@ -64,6 +64,7 @@ def tune_epochs(train_df, val_df, llm, name, args) -> tuple[dict, dict]:
         rob, fus = default_params(args)
         rob["num_epochs"] = trial.suggest_int("roberta_epochs", 10, 100, step=10)
         fus["num_epochs"] = trial.suggest_int("fusion_epochs", 0, 20)
+        fus["joint_training"] = args.joint_training
         preds, _ = fit_predict(rob, fus, train_df, fit_df, eval_df, eval_llm, llm, name,
                                f"trial{trial.number}", save=False, verbose=False)
         return f1_score(eval_true, preds, average="macro")
@@ -92,6 +93,10 @@ def main() -> None:
     parser.add_argument("--fusion-epochs", type=int, default=30, help="fusion MLP epochs of the default configuration")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     parser.add_argument("--trials", type=int, default=0, help="Optuna trials tuning only the epoch counts (0 = defaults)")
+    parser.add_argument("--joint-training", action="store_true",
+                         help="fine-tune RoBERTa jointly with the fusion MLP (gradients flow through both, "
+                              "two param groups at ml_lr/fusion_lr) instead of freezing RoBERTa after its "
+                              "own separate training stage")
     args = parser.parse_args()
 
     out_dir = FUSION_DIR / "single"
@@ -120,6 +125,7 @@ def main() -> None:
         rob, fus = tune_epochs(train_df, val_df, llm, name, args)
     else:
         rob, fus = default_params(args)
+    fus["joint_training"] = args.joint_training
     fusion_preds, roberta_preds = fit_predict(
         rob, fus, train_df, val_df, test_df, llm_test_preds, llm, name, "single", save=True, verbose=True
     )
