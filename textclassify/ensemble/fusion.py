@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.utils.data
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from typing import Dict, List, Union, Optional, Tuple, Any
 from sklearn.model_selection import train_test_split
 from sklearn.isotonic import IsotonicRegression
@@ -79,7 +80,7 @@ class FusionWrapper(nn.Module):
     
     def __init__(self, ml_model, num_labels: int, task: str = "multiclass",
                  hidden_dims: List[int] = [64, 32], embedding_dim: int = 768,
-                 ts_output_dim: int = 0):
+                 ts_output_dim: int = 0, freeze_ml: bool = True):
         """Initialize Fusion Wrapper.
 
         Args:
@@ -90,6 +91,11 @@ class FusionWrapper(nn.Module):
             embedding_dim: Dimension of ML embeddings (default 768 for RoBERTa)
             ts_output_dim: Dimension of the timeseries branch embedding
                            (e.g. CrossTSTransformer.output_dim). 0 disables it.
+            freeze_ml: If True (default), ml_embeddings are detached in forward() so no
+                       gradient flows back into the ML model -- the classic frozen-feature-
+                       extractor setup. If False (FusionEnsemble's joint_training=True),
+                       ml_embeddings are NOT detached, so the ML model gets fine-tuned
+                       jointly with the fusion MLP (see FusionEnsemble._train_fusion_mlp_on_val).
         """
         super().__init__()
         self.ml_model = ml_model
@@ -97,6 +103,7 @@ class FusionWrapper(nn.Module):
         self.task = task
         self.embedding_dim = embedding_dim
         self.ts_output_dim = ts_output_dim
+        self.freeze_ml = freeze_ml
 
         # Fusion MLP takes ML embeddings + LLM scores (+ optional TS embedding)
         fusion_input_dim = embedding_dim + num_labels + ts_output_dim
@@ -124,8 +131,12 @@ class FusionWrapper(nn.Module):
         Returns:
             Dict containing ML embeddings, LLM predictions, and fused logits
         """
-        # ML/LLM branches stay frozen: no gradient flow back to RoBERTa or the LLM.
-        ml_embeddings = ml_embeddings.detach()
+        # LLM branch always stays frozen (not differentiable -- it's an API call / cached
+        # class vector). ML branch stays frozen too UNLESS self.freeze_ml is False
+        # (joint_training=True), in which case ml_embeddings must arrive with grad tracking
+        # enabled (see RoBERTaClassifier.embed_texts_for_training) and are left untouched.
+        if self.freeze_ml:
+            ml_embeddings = ml_embeddings.detach()
         llm_predictions = llm_predictions.detach()
 
         # Concatenate ML embeddings, LLM predictions, and optional TS embedding.
@@ -177,6 +188,12 @@ class FusionEnsemble(BaseEnsemble):
         self.fusion_hidden_dims = ensemble_config.parameters.get('fusion_hidden_dims', [64, 32])
         self.ml_lr = ensemble_config.parameters.get('ml_lr', 1e-5)  # Small LR for ML backbone
         self.fusion_lr = ensemble_config.parameters.get('fusion_lr', 1e-3)  # Larger LR for fusion MLP
+        # If True, the ML model (e.g. RoBERTa) is fine-tuned jointly with the fusion MLP
+        # (gradients flow through both, two param groups at ml_lr / fusion_lr) instead of
+        # being frozen after its own separate training stage. Default False keeps the
+        # original frozen-feature-extractor behaviour. Not supported together with a TS
+        # branch (add_ts_model) -- see _train_fusion_mlp_on_val.
+        self.joint_training = ensemble_config.parameters.get('joint_training', False)
         self.num_epochs = ensemble_config.parameters.get('num_epochs', 10)
         self.batch_size = ensemble_config.parameters.get('batch_size', 16)
         self.save_intermediate_llm_predictions = save_intermediate_llm_predictions
@@ -389,7 +406,6 @@ class FusionEnsemble(BaseEnsemble):
         if not self.ml_model.is_trained:
             # Compute dataset hash to find cached model
             import hashlib
-            from pathlib import Path
             
             text_column = self.ml_model.text_column or 'text'
             text_series = train_df[text_column] if text_column in train_df.columns else train_df.iloc[:, 0]
@@ -626,7 +642,8 @@ class FusionEnsemble(BaseEnsemble):
             task=task,
             hidden_dims=self.fusion_hidden_dims,
             embedding_dim=embedding_dim,
-            ts_output_dim=ts_output_dim
+            ts_output_dim=ts_output_dim,
+            freeze_ml=not self.joint_training
         )
 
         # Step 5: Train fusion MLP on validation set predictions. If a TS branch is
@@ -930,7 +947,6 @@ class FusionEnsemble(BaseEnsemble):
                         self.llm_model._skip_batch_cache_write = False  # Enable batch writing
                         
                         # Manually initialize the cache file with FULL dataset hash
-                        from pathlib import Path
                         cache_dir = Path("cache")
                         cache_dir.mkdir(parents=True, exist_ok=True)
                         cache_file_path = cache_dir / f"{mode}_{dataset_hash}.json"
@@ -1358,7 +1374,6 @@ class FusionEnsemble(BaseEnsemble):
         try:
             import json
             import os
-            from pathlib import Path
             
             # Calculate current dataset hash
             current_hash = self._create_dataset_hash(df)
@@ -1413,7 +1428,6 @@ class FusionEnsemble(BaseEnsemble):
         try:
             import json
             from datetime import datetime
-            from pathlib import Path
             
             # Extract mode from base_cache_path (e.g., 'cache/val' -> 'val')
             mode = base_cache_path.split('/')[-1]
@@ -1763,7 +1777,6 @@ class FusionEnsemble(BaseEnsemble):
         """
         import glob
         import os
-        from pathlib import Path
         
         summary = {
             "validation_cache": {
@@ -1890,7 +1903,6 @@ class FusionEnsemble(BaseEnsemble):
         """
         import glob
         import os
-        from pathlib import Path
         
         cache_dir = Path(cache_directory)
         if not cache_dir.exists():
@@ -2025,10 +2037,22 @@ class FusionEnsemble(BaseEnsemble):
 
         has_ts = self.ts_transformer is not None
 
+        if self.joint_training and has_ts:
+            raise EnsembleError(
+                "joint_training=True is not supported together with a TS branch (add_ts_model)",
+                "FusionEnsemble"
+            )
+
         # Dates for the TS branch (aligned 1:1 with the ml/llm prediction slices above),
         # used to compute fresh, gradient-tracked TS embeddings per mini-batch below.
         fusion_train_ts_dates = fusion_train_df[self.ts_date_column].tolist() if has_ts else None
         fusion_val_ts_dates = fusion_val_df[self.ts_date_column].tolist() if has_ts else None
+
+        # Raw texts for joint_training (aligned 1:1 with the slices above), used to
+        # compute fresh, gradient-tracked RoBERTa embeddings per mini-batch below instead
+        # of the precomputed/frozen ones in fusion_train_ml_predictions.
+        fusion_train_texts = fusion_train_df[text_column].tolist() if self.joint_training else None
+        fusion_val_texts = fusion_val_df[text_column].tolist() if self.joint_training else None
 
         print(f"    Fusion training: {len(fusion_train_df)} samples")
         print(f"    Fusion validation: {len(fusion_val_df)} samples")
@@ -2039,31 +2063,38 @@ class FusionEnsemble(BaseEnsemble):
             fusion_train_df[label_columns].values.tolist(),
             fusion_train_ml_predictions,
             fusion_train_llm_predictions,
-            ts_dates=fusion_train_ts_dates
+            ts_dates=fusion_train_ts_dates,
+            texts_for_training=fusion_train_texts
         )
         val_dataset = self._create_fusion_dataset(
             fusion_val_df[text_column].tolist(),
             fusion_val_df[label_columns].values.tolist(),
             fusion_val_ml_predictions,
             fusion_val_llm_predictions,
-            ts_dates=fusion_val_ts_dates
+            ts_dates=fusion_val_ts_dates,
+            texts_for_training=fusion_val_texts
         )
 
         train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=self.batch_size, shuffle=False)
 
-        # Freeze ML model parameters - only optimize the fusion MLP (+ TS branch, if registered)
+        # Freeze ML model parameters, UNLESS joint_training -- then it gets fine-tuned
+        # jointly with the fusion MLP instead (own param group at self.ml_lr below).
         for param in self.fusion_wrapper.ml_model.model.parameters():
-            param.requires_grad = False
+            param.requires_grad = not self.joint_training
 
-        # Setup optimizer: fusion MLP always; TS embedders + CrossTSTransformer too, so
-        # they get fine-tuned jointly with the fusion loss instead of staying frozen.
-        fusion_params = list(self.fusion_wrapper.fusion_mlp.parameters())
+        # Setup optimizer: fusion MLP always (at fusion_lr); TS embedders + CrossTSTransformer
+        # (at fusion_lr) if a TS branch is registered; the ML model (at the smaller ml_lr) if
+        # joint_training -- so it fine-tunes jointly with the fusion loss instead of staying frozen.
+        param_groups = [{"params": list(self.fusion_wrapper.fusion_mlp.parameters()), "lr": self.fusion_lr}]
         if has_ts:
-            fusion_params += list(self.ts_transformer.parameters())
+            ts_params = list(self.ts_transformer.parameters())
             for embedder in self.ts_embedders.values():
-                fusion_params += list(embedder.parameters())
-        optimizer = torch.optim.AdamW(fusion_params, lr=self.fusion_lr)
+                ts_params += list(embedder.parameters())
+            param_groups.append({"params": ts_params, "lr": self.fusion_lr})
+        if self.joint_training:
+            param_groups.append({"params": list(self.fusion_wrapper.ml_model.model.parameters()), "lr": self.ml_lr})
+        optimizer = torch.optim.AdamW(param_groups)
 
         # Loss function
         if self.classification_type == ClassificationType.MULTI_CLASS:
@@ -2077,6 +2108,8 @@ class FusionEnsemble(BaseEnsemble):
             self.ts_transformer.train()
             for embedder in self.ts_embedders.values():
                 embedder.train()
+        if self.joint_training:
+            self.fusion_wrapper.ml_model.model.train()
         best_val_loss = float('inf')
 
         for epoch in range(self.num_epochs):
@@ -2086,6 +2119,10 @@ class FusionEnsemble(BaseEnsemble):
                 if has_ts:
                     ml_predictions, llm_predictions, dates_batch, labels = batch
                     ts_predictions = self._get_ts_embeddings_for_training(list(dates_batch))
+                elif self.joint_training:
+                    _, llm_predictions, texts_batch, labels = batch
+                    ml_predictions = self.fusion_wrapper.ml_model.embed_texts_for_training(list(texts_batch))
+                    ts_predictions = None
                 else:
                     ml_predictions, llm_predictions, labels = batch
                     ts_predictions = None
@@ -2113,12 +2150,18 @@ class FusionEnsemble(BaseEnsemble):
                 self.ts_transformer.eval()
                 for embedder in self.ts_embedders.values():
                     embedder.eval()
+            if self.joint_training:
+                self.fusion_wrapper.ml_model.model.eval()
             total_val_loss = 0
             with torch.no_grad():
                 for batch in val_loader:
                     if has_ts:
                         ml_predictions, llm_predictions, dates_batch, labels = batch
                         ts_predictions = self._get_ts_embeddings_for_training(list(dates_batch))
+                    elif self.joint_training:
+                        _, llm_predictions, texts_batch, labels = batch
+                        ml_predictions = self.fusion_wrapper.ml_model.embed_texts_for_training(list(texts_batch))
+                        ts_predictions = None
                     else:
                         ml_predictions, llm_predictions, labels = batch
                         ts_predictions = None
@@ -2150,11 +2193,14 @@ class FusionEnsemble(BaseEnsemble):
                 self.ts_transformer.train()
                 for embedder in self.ts_embedders.values():
                     embedder.train()
-    
+            if self.joint_training:
+                self.fusion_wrapper.ml_model.model.train()
+
     def _create_fusion_dataset(self, texts: List[str], labels: List[List[int]],
                               ml_predictions: List, llm_predictions: List,
                               ts_embeddings: Optional[torch.Tensor] = None,
-                              ts_dates: Optional[List[str]] = None):
+                              ts_dates: Optional[List[str]] = None,
+                              texts_for_training: Optional[List[str]] = None):
         """Create dataset for fusion training using hash-based embedding/prediction matching.
 
         This method uses text hashes to match embeddings and predictions with texts, making it
@@ -2172,13 +2218,22 @@ class FusionEnsemble(BaseEnsemble):
                       during training so TS embeddings are computed fresh (with gradients)
                       per mini-batch instead of a stale precomputed tensor. Mutually
                       exclusive with ts_embeddings.
+            texts_for_training: Optional list of raw text strings, aligned 1:1 with texts
+                      order. Used when joint_training=True so RoBERTa embeddings are
+                      computed fresh (with gradients) per mini-batch, instead of the
+                      precomputed/frozen ones baked into ml_predictions. Mutually
+                      exclusive with ts_dates/ts_embeddings (reuses the same
+                      _FusionDatasetWithDates carrier, which just stores a List[str]
+                      alongside the tensors regardless of whether it holds dates or texts).
 
         Returns:
-            TensorDataset (or _FusionDatasetWithDates if ts_dates is given) with matched
-            embeddings and predictions
+            TensorDataset (or _FusionDatasetWithDates if ts_dates/texts_for_training is
+            given) with matched embeddings and predictions
         """
-        if ts_embeddings is not None and ts_dates is not None:
-            raise EnsembleError("ts_embeddings and ts_dates are mutually exclusive", "FusionEnsemble")
+        if sum(x is not None for x in (ts_embeddings, ts_dates, texts_for_training)) > 1:
+            raise EnsembleError(
+                "ts_embeddings, ts_dates and texts_for_training are mutually exclusive", "FusionEnsemble"
+            )
         
         # Check if predictions have hash information (new format)
         ml_has_hashes = (len(ml_predictions) > 0 and 
@@ -2303,6 +2358,14 @@ class FusionEnsemble(BaseEnsemble):
                     "FusionEnsemble"
                 )
             return _FusionDatasetWithDates(ml_tensor, llm_tensor, ts_dates, labels_tensor)
+
+        if texts_for_training is not None:
+            if len(texts_for_training) != len(texts):
+                raise EnsembleError(
+                    f"texts_for_training length ({len(texts_for_training)}) doesn't match texts length ({len(texts)})",
+                    "FusionEnsemble"
+                )
+            return _FusionDatasetWithDates(ml_tensor, llm_tensor, texts_for_training, labels_tensor)
 
         if ts_embeddings is not None:
             ts_tensor = ts_embeddings if isinstance(ts_embeddings, torch.Tensor) else torch.tensor(ts_embeddings, dtype=torch.float)
