@@ -87,8 +87,8 @@ def tune_epochs(train_df, val_df, llm, name, args) -> tuple[dict, dict]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--test", default="lab-manual-mm-test-5768", help="test file stem (in data/test_data)")
-    parser.add_argument("--epochs", type=int, default=30, help="RoBERTa epochs of the default configuration")
-    parser.add_argument("--fusion-epochs", type=int, default=3, help="fusion MLP epochs of the default configuration")
+    parser.add_argument("--epochs", type=int, default=50, help="RoBERTa epochs of the default configuration")
+    parser.add_argument("--fusion-epochs", type=int, default=5, help="fusion MLP epochs of the default configuration")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     parser.add_argument("--trials", type=int, default=0, help="Optuna trials tuning only the epoch counts (0 = defaults)")
     args = parser.parse_args()
