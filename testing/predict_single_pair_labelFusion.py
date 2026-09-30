@@ -61,7 +61,7 @@ def tune_epochs(train_df, val_df, llm, name, args) -> tuple[dict, dict]:
 
     def objective(trial: optuna.Trial) -> float:
         rob, fus = default_params(args)
-        rob["num_epochs"] = trial.suggest_int("roberta_epochs", 10, 100, step=10)
+        rob["num_epochs"] = trial.suggest_int("roberta_epochs", 0, 100, step=10)
         fus["num_epochs"] = trial.suggest_int("fusion_epochs", 0, 20)
         fus["joint_training"] = args.joint_training
         preds, _ = fit_predict(rob, fus, train_df, fit_df, eval_df, eval_llm, llm, name,
@@ -88,7 +88,7 @@ def tune_epochs(train_df, val_df, llm, name, args) -> tuple[dict, dict]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--test", default="lab-manual-mm-test-5768", help="test file stem (in data/test_data)")
-    parser.add_argument("--epochs", type=int, default=50, help="RoBERTa epochs of the default configuration")
+    parser.add_argument("--epochs", type=int, default=8, help="RoBERTa epochs of the default configuration")
     parser.add_argument("--fusion-epochs", type=int, default=5, help="fusion MLP epochs of the default configuration")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     parser.add_argument("--trials", type=int, default=0, help="Optuna trials tuning only the epoch counts (0 = defaults)")
