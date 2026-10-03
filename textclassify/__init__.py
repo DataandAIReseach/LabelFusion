@@ -28,10 +28,12 @@ from .llm.openrouter_classifier import OpenRouterClassifier
 # Traditional ML Classifiers (optional - require transformers/torch)
 try:
     from .ml.roberta_classifier import RoBERTaClassifier
+    from .ml.roberta_large_classifier import RoBERTaLargeClassifier
     _HAS_ML = True
 except ImportError:
     _HAS_ML = False
     RoBERTaClassifier = None
+    RoBERTaLargeClassifier = None
 
 # Ensemble Methods
 from .ensemble.voting import VotingEnsemble
@@ -98,7 +100,7 @@ __all__ = [
 
 # Add optional exports based on available dependencies
 if _HAS_ML:
-    __all__.append("RoBERTaClassifier")
+    __all__.extend(["RoBERTaClassifier", "RoBERTaLargeClassifier"])
 
 if _HAS_AUTO_FUSION:
     __all__.append("AutoFusionClassifier")
