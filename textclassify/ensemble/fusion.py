@@ -429,6 +429,17 @@ class FusionEnsemble(BaseEnsemble):
                 if model_path.exists():
                     # Check for either pytorch_model.bin or model.safetensors
                     has_model = (model_path / "pytorch_model.bin").exists() or (model_path / "model.safetensors").exists()
+                    # The cache name only encodes the training data, so a model trained on the same
+                    # texts with another backbone (e.g. roberta-base vs roberta-large) lands in the
+                    # same directory -- only reuse it if it was trained with this model.
+                    metadata_path = model_path / "model_metadata.json"
+                    if has_model and metadata_path.exists():
+                        import json
+                        cached_name = json.loads(metadata_path.read_text()).get("model_name")
+                        wanted_name = getattr(self.ml_model, "model_name", None)
+                        if cached_name and wanted_name and cached_name != wanted_name:
+                            print(f"  Skipping cached ML model at {model_path}: trained with {cached_name}, not {wanted_name}")
+                            has_model = False
                     if has_model:
                         try:
                             print(f"📦 Loading cached ML model from: {model_path}")
