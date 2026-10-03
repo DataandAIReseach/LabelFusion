@@ -544,7 +544,8 @@ class AutoFusionClassifier(BaseClassifier):
                 ml_model=classifier.ml_model,
                 num_labels=fusion_data['num_labels'],
                 task=task,
-                hidden_dims=fusion_data['fusion_hidden_dims']
+                hidden_dims=fusion_data['fusion_hidden_dims'],
+                embedding_dim=getattr(classifier.ml_model, 'embedding_dim', 768)
             )
             
             # Load the trained weights

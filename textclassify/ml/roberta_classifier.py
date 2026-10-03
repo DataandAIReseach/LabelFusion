@@ -25,6 +25,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 try:
     # Use Auto* classes which are the recommended approach for modern transformers
     from transformers import (
+        AutoConfig,
         AutoTokenizer,
         AutoModelForSequenceClassification,
         get_linear_schedule_with_warmup
@@ -258,10 +259,13 @@ class RoBERTaClassifier(BaseMLClassifier):
             self.classification_type = ClassificationType.MULTI_CLASS
         
         # Initialize model
+        # ignore_mismatched_sizes: a checkpoint that already has a classification head for a
+        # different number of labels gets a freshly initialised head instead of an error.
         self.model = AutoModelForSequenceClassification.from_pretrained(
             self.model_name,
             num_labels=self.num_labels,
-            problem_type="multi_label_classification" if self.multi_label else "single_label_classification"
+            problem_type="multi_label_classification" if self.multi_label else "single_label_classification",
+            ignore_mismatched_sizes=True,
         )
         # Move model to device with explicit OOM handling
         try:
@@ -622,6 +626,14 @@ class RoBERTaClassifier(BaseMLClassifier):
         """
         return self._predict_texts_internal(texts, true_labels)
     
+    @property
+    def embedding_dim(self) -> int:
+        """Size of the [CLS] embedding handed to FusionEnsemble: the backbone's hidden size,
+        e.g. 768 for roberta-base and 1024 for roberta-large."""
+        if self.model is not None:
+            return self.model.config.hidden_size
+        return AutoConfig.from_pretrained(self.model_name).hidden_size
+
     def embed_texts_for_training(self, texts: List[str]) -> torch.Tensor:
         """[CLS] embeddings for texts WITH gradients enabled, for FusionEnsemble's joint
         training mode (joint_training=True), which fine-tunes RoBERTa jointly with the
@@ -647,7 +659,7 @@ class RoBERTaClassifier(BaseMLClassifier):
 
         outputs = self.model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
         hidden_states = outputs.hidden_states[-1]
-        return hidden_states[:, 0, :]  # [CLS] token embeddings, shape [batch_size, 768]
+        return hidden_states[:, 0, :]  # [CLS] token embeddings, shape [batch_size, embedding_dim]
 
     def _predict_texts_internal(self, texts: List[str], true_labels: Optional[List[List[int]]] = None) -> ClassificationResult:
         """Internal method to predict labels for a list of texts.
@@ -697,7 +709,7 @@ class RoBERTaClassifier(BaseMLClassifier):
                 hidden_states = outputs.hidden_states[-1]  # Last layer hidden states
                 
                 # Extract [CLS] token embeddings (first token)
-                cls_embeddings = hidden_states[:, 0, :]  # Shape: [batch_size, 768]
+                cls_embeddings = hidden_states[:, 0, :]  # Shape: [batch_size, embedding_dim]
                 all_embeddings.extend(cls_embeddings.cpu().numpy())
                 
                 if self.classification_type == ClassificationType.MULTI_CLASS:
