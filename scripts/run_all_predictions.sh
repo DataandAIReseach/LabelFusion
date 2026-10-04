@@ -3,7 +3,7 @@
 #SBATCH -p scc-gpu
 #SBATCH -G 1
 #SBATCH -c 4
-#SBATCH --mem 16G
+#SBATCH --mem 32G
 #SBATCH -t 48:00:00
 #SBATCH -o /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.out
 #SBATCH -e /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.err

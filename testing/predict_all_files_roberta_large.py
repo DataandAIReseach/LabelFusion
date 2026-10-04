@@ -27,6 +27,10 @@ All summaries are rewritten after every pair, so a stopped run keeps its progres
 Fine-tuned models are never kept (~1.4 GB each): they are written to LABELFUSION_MODEL_CACHE
 (default ~/.cache/labelfusion) by RoBERTaClassifier.fit() and deleted right after.
 
+The pretrained roberta-large is read from the project-local Hugging Face cache
+(<project>/hf_cache) in offline mode, because the compute nodes have no internet access.
+Download it once on a machine with internet (see the README / chat notes).
+
     python testing/predict_all_files_roberta_large.py                                   # every dataset, every seed
     python testing/predict_all_files_roberta_large.py --datasets mm-test pc-split-test  # datasets containing these
     python testing/predict_all_files_roberta_large.py --datasets pc-test --limit-train 40 --trials 0 --epochs 1  # smoke test
@@ -38,6 +42,7 @@ import argparse
 import gc
 import json
 import math
+import os
 import re
 import sys
 import time
@@ -45,6 +50,14 @@ from pathlib import Path
 
 TESTING_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTING_DIR))
+
+# Use the project-local Hugging Face cache and never touch the network (compute nodes have no
+# internet). Must be set before transformers / huggingface_hub are imported. Values exported
+# in the sbatch script take precedence because of setdefault.
+PROJECT_DIR = TESTING_DIR.parent
+os.environ.setdefault("HF_HOME", str(PROJECT_DIR / "hf_cache"))
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 
 from predict_all_files_labelFusion import (  # noqa: E402
     LABEL_COLUMNS, LABEL_MAP, MODEL_CACHE, OUT_DIR, RANDOM_STATE, TEST_DIR, TEXT_COLUMN,
