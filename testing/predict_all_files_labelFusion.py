@@ -221,8 +221,8 @@ def build_fusion(ml_model, llm_model, fus: dict, name: str, tag: str, save: bool
         ensemble_method="fusion",
         models=[ml_model, llm_model],
         parameters={
+            "ml_lr": 1e-5,  # RoBERTa's lr in the fusion stage (joint_training only); fus may override it
             **fus,
-            "ml_lr": 1e-5,
             "classification_type": "multi_class",
             "output_dir": str(FUSION_DIR),
             "experiment_name": f"fusion_{name}_{tag}",
