@@ -212,6 +212,31 @@ class RoBERTaClassifier(BaseMLClassifier):
         """
         self.mode = mode
     
+    def load_pretrained(self) -> None:
+        """Load the pretrained backbone without any fine-tuning and freeze it, for use as a
+        frozen embedding extractor (e.g. a FusionEnsemble that trains only its fusion MLP on the
+        [CLS] embeddings). The classification head is freshly initialised and never trained, so
+        the class predictions of this model are meaningless -- only its embeddings are useful."""
+        if not self.label_columns:
+            raise ValueError("label_columns must be specified in constructor")
+        self.classes_ = self.label_columns
+        self.num_labels = len(self.label_columns)
+        self.classification_type = (
+            ClassificationType.MULTI_LABEL if self.multi_label else ClassificationType.MULTI_CLASS
+        )
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            self.model_name,
+            num_labels=self.num_labels,
+            problem_type="multi_label_classification" if self.multi_label else "single_label_classification",
+            ignore_mismatched_sizes=True,
+        )
+        self.model.to(self.device)
+        self.model.eval()
+        for param in self.model.parameters():
+            param.requires_grad = False
+        self.is_trained = True
+
     def fit(
         self,
         train_df: pd.DataFrame,

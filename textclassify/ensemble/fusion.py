@@ -2092,7 +2092,7 @@ class FusionEnsemble(BaseEnsemble):
         # Freeze ML model parameters, UNLESS joint_training -- then it gets fine-tuned
         # jointly with the fusion MLP instead (own param group at self.ml_lr below).
         for param in self.fusion_wrapper.ml_model.model.parameters():
-            param.requires_grad = not self.joint_training
+            param.requires_grad = self.joint_training
 
         # Setup optimizer: fusion MLP always (at fusion_lr); TS embedders + CrossTSTransformer
         # (at fusion_lr) if a TS branch is registered; the ML model (at the smaller ml_lr) if
