@@ -1,10 +1,12 @@
-"""LabelFusion on frozen roberta-large embeddings + LLM labels for every train/test pair; F1 averaged over seeds.
+"""LabelFusion: roberta-large trained end-to-end with the LLM labels on every train/test pair; F1 averaged over seeds.
 
 Every data/test_data/<dataset>-<seed>.xlsx (e.g. lab-manual-mm-test-5768) is paired with its
-data/training_data/<dataset with -train->-<seed>.xlsx. roberta-large is NOT fine-tuned: it is
-loaded once, frozen, and only used to extract the [CLS] embedding (1024) of every sentence. The
-only trained part is textclassify's fusion MLP, which learns from that embedding together with
-the LLM's label for the sentence:
+data/training_data/<dataset with -train->-<seed>.xlsx. roberta-large is NOT fine-tuned on its own
+first: starting from the pretrained model, it is trained jointly with textclassify's fusion MLP
+(FusionEnsemble, joint_training=True). The MLP's input is the roberta-large [CLS] embedding (1024)
+concatenated with the LLM's label for the sentence, and the fusion loss is backpropagated through
+the MLP and roberta-large together (two parameter groups: roberta_lr for roberta-large,
+fusion_lr for the MLP).
 
   - The LLM expert is NOT called again: its labels come from the files written by
     predict_all_files_llm.py (./outputs/predictions/...):
@@ -12,22 +14,22 @@ the LLM's label for the sentence:
       test file rows   <- GPT-5 nano, 5-shot      (test_gpt-5-nano_5_shot)
     The LLM only returns a hard class choice, so its fusion input is a one-hot class vector
     (dovish / hawkish / neutral), not real logits.
-  - Because roberta-large never changes, every sentence is embedded only once per run, however
-    many trials and pairs it appears in.
 
 Per pair:
   1. The train file is split 80/20 (stratified) into train / validation.
-  2. Optuna (--trials, default 5) tunes the fusion MLP's epochs (0-20) and learning rate
-     (1e-4..1e-2, log): every trial trains the MLP on the train split and is scored by macro-F1
-     on the validation split. The default configuration (20 epochs, lr 1e-3) is always the first
-     trial; everything else stays at its default (hidden layers 64-32, batch 16).
-  3. The fusion MLP is trained with the best parameters on the whole train file and predicts the
-     test file. The test file is never used for tuning.
-  The fusion MLP holds back 10% of whatever it is trained on to monitor its loss
-  (FusionEnsemble's internal split), so it effectively learns from 90% of that data.
+  2. Optuna (--trials, default 5) tunes the number of joint epochs (0-20), the roberta-large
+     learning rate (5e-6..3e-5, log) and the fusion MLP learning rate (1e-4..1e-2, log): every
+     trial trains a fresh pretrained roberta-large + MLP on the train split and is scored by
+     macro-F1 on the validation split. The default configuration (3 epochs, roberta lr 1e-5,
+     MLP lr 1e-3) is always the first trial; everything else stays at its default (MLP hidden
+     layers 64-32, batch 16, max_length 128). 0 epochs means nothing is trained.
+  3. A fresh roberta-large + MLP is trained with the best parameters on the whole train file
+     and predicts the test file. The test file is never used for tuning.
+  FusionEnsemble holds back 10% of whatever it is trained on to monitor the loss, so the model
+  effectively learns from 90% of that data.
 
-There is no "RoBERTa alone" score here: the frozen model's classification head is untrained.
-For roberta-large on its own, see predict_all_files_roberta_large.py.
+There is no "RoBERTa alone" score here: roberta-large's own classification head is never
+trained. For roberta-large on its own, see predict_all_files_roberta_large.py.
 
 The pairs of one dataset differ only in the seed of the resampling, so per dataset the macro-F1
 (and accuracy) of the LLM and of the fusion are averaged over the seeds, with the standard
@@ -35,14 +37,14 @@ deviation (sample std, ddof=1, i.e. the usual "mean +- std over N runs").
 
 Writes to ./outputs/labelfusion_roberta_large/:
     <test file name>.csv / .json   per pair: sentence, label, true, llm_pred, fusion_pred
-    summary_seeds.csv              one row per pair (dataset, seed, metrics, chosen epochs + lr)
+    summary_seeds.csv              one row per pair (dataset, seed, metrics, chosen epochs + lrs)
     summary.csv                    one row per dataset: <metric>_mean / <metric>_std over its seeds
     <dataset>_summary.json         per dataset: run settings, every seed's run, mean and std per metric
 All summaries are rewritten after every pair, so a stopped run keeps its progress.
 
     python testing/predict_all_labelFusion.py                                   # every dataset, every seed
     python testing/predict_all_labelFusion.py --datasets mm-test pc-split-test  # datasets containing these
-    python testing/predict_all_labelFusion.py --datasets pc-test --limit-train 40 --trials 0 --fusion-epochs 1  # smoke test
+    python testing/predict_all_labelFusion.py --datasets pc-test --limit-train 40 --trials 0 --epochs 1  # smoke test
 """
 
 from __future__ import annotations
@@ -81,8 +83,8 @@ SEED_RE = re.compile(r"^(?P<dataset>.+)-(?P<seed>\d+)$")
 METRICS = [f"{who}_{m}" for who in ("llm", "fusion") for m in ("f1_macro", "accuracy")]
 
 
-def load_frozen_roberta_large() -> RoBERTaLargeClassifier:
-    """Pretrained roberta-large, frozen, with its embeddings memoised per sentence for the whole run."""
+def load_pretrained_roberta_large() -> tuple[RoBERTaLargeClassifier, EmbeddingMemo]:
+    """A fresh pretrained roberta-large (no fine-tuning yet) for one joint training run."""
     config = ModelConfig(model_name="roberta-large", model_type=ModelType.TRADITIONAL_ML,
                          parameters={"max_length": 128, "batch_size": 16})
     model = RoBERTaLargeClassifier(
@@ -92,61 +94,70 @@ def load_frozen_roberta_large() -> RoBERTaLargeClassifier:
         multi_label=False,
         auto_save_results=False,
     )
-    model.load_pretrained()
-    EmbeddingMemo(model)
-    return model
+    model.load_pretrained()  # joint training unfreezes it again inside FusionEnsemble
+    return model, EmbeddingMemo(model)
 
 
 def default_params(args) -> dict:
-    return {"fusion_hidden_dims": [64, 32], "fusion_lr": 1e-3, "num_epochs": args.fusion_epochs, "batch_size": 16}
+    return {"num_epochs": args.epochs, "ml_lr": 1e-5, "fusion_lr": 1e-3,
+            "fusion_hidden_dims": [64, 32], "batch_size": 16}
 
 
-def fit_predict(roberta, fus, mlp_df, pred_df, pred_llm, llm, name, tag, verbose) -> list[str]:
-    """Train the fusion MLP on mlp_df (frozen roberta-large embeddings + LLM labels), predict pred_df."""
+def fit_predict(fus, train_df, pred_df, pred_llm, llm, name, tag, verbose) -> list[str]:
+    """Train a fresh roberta-large jointly with the fusion MLP on train_df, predict pred_df."""
     def run(fn, *a, **kw):
         if verbose:
             return fn(*a, **kw)
         with contextlib.redirect_stdout(io.StringIO()):  # the library's progress prints
             return fn(*a, **kw)
 
-    fusion = build_fusion(roberta, llm, fus, name, tag, save=False)
-    # FusionEnsemble trains its MLP on the val_df argument; roberta-large is already "trained"
-    # (frozen), so train_df is only used to look up LLM labels -- pass the same rows to both.
-    run(fusion.fit, mlp_df, mlp_df)
-    preds = run(fusion.predict, pred_df, train_df=mlp_df, test_llm_predictions=pred_llm).predictions
-    del fusion
+    roberta, memo = load_pretrained_roberta_large()
+    fusion = build_fusion(roberta, llm, {**fus, "joint_training": True}, name, tag, save=False)
+    # FusionEnsemble trains on its val_df argument; roberta-large counts as "trained" (no separate
+    # stage), so train_df is only used to look up LLM labels -- pass the same rows to both.
+    run(fusion.fit, train_df, train_df)
+    # Embeddings memoised before/while training come from older weights: predict with the trained ones.
+    memo.cache.clear()
+    preds = run(fusion.predict, pred_df, train_df=train_df, test_llm_predictions=pred_llm).predictions
+    del fusion, roberta, memo
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     return preds
 
 
-def tune_params(roberta, train_df, val_df, llm, name, args) -> dict:
-    """Optuna over the fusion MLP's epochs and learning rate: MLP on train_df, macro-F1 on val_df."""
+def tune_params(train_df, val_df, llm, name, args) -> dict:
+    """Optuna over the joint epochs and both learning rates: train on train_df, macro-F1 on val_df."""
     val_llm, val_true = llm.lookup(val_df), val_df["label"].map(LABEL_MAP).tolist()
-    print(f"### tuning fusion epochs + learning rate on {name}: train {len(train_df)} / val {len(val_df)}")
+    print(f"### tuning epochs + learning rates on {name}: train {len(train_df)} / val {len(val_df)}")
+
+    def apply(params: dict) -> dict:
+        fus = default_params(args)
+        fus["num_epochs"], fus["ml_lr"], fus["fusion_lr"] = params["epochs"], params["roberta_lr"], params["fusion_lr"]
+        return fus
 
     def objective(trial: optuna.Trial) -> float:
-        fus = default_params(args)
-        fus["num_epochs"] = trial.suggest_int("fusion_epochs", 0, 20)
-        fus["fusion_lr"] = trial.suggest_float("fusion_lr", 1e-4, 1e-2, log=True)
-        preds = fit_predict(roberta, fus, train_df, val_df, val_llm, llm, name, f"trial{trial.number}", verbose=False)
+        fus = apply({
+            "epochs": trial.suggest_int("epochs", 0, 20),
+            "roberta_lr": trial.suggest_float("roberta_lr", 5e-6, 3e-5, log=True),
+            "fusion_lr": trial.suggest_float("fusion_lr", 1e-4, 1e-2, log=True),
+        })
+        preds = fit_predict(fus, train_df, val_df, val_llm, llm, name, f"trial{trial.number}", verbose=False)
         return f1_score(val_true, preds, average="macro")
 
     study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=RANDOM_STATE))
     d = default_params(args)
     # The defaults are always the first candidate, clamped into the tuned epoch range.
-    study.enqueue_trial({"fusion_epochs": min(max(d["num_epochs"], 0), 20), "fusion_lr": d["fusion_lr"]})
+    study.enqueue_trial({"epochs": min(max(d["num_epochs"], 0), 20), "roberta_lr": d["ml_lr"], "fusion_lr": d["fusion_lr"]})
     study.optimize(objective, n_trials=args.trials)
 
-    fus = default_params(args)
-    fus["num_epochs"], fus["fusion_lr"] = study.best_trial.params["fusion_epochs"], study.best_trial.params["fusion_lr"]
-    print(f"### best macro-F1 {study.best_value:.3f} after {len(study.trials)} trials: "
-          f"fusion_epochs={fus['num_epochs']} fusion_lr={fus['fusion_lr']:.2e}")
+    fus = apply(study.best_trial.params)
+    print(f"### best macro-F1 {study.best_value:.3f} after {len(study.trials)} trials: epochs={fus['num_epochs']} "
+          f"roberta_lr={fus['ml_lr']:.2e} fusion_lr={fus['fusion_lr']:.2e}")
     return fus
 
 
-def run_pair(roberta, train_path: Path, test_path: Path, args) -> dict:
+def run_pair(train_path: Path, test_path: Path, args) -> dict:
     name = test_path.stem
     t0 = time.time()
     train_df, val_df = split_pair(train_path, args)
@@ -157,9 +168,9 @@ def run_pair(roberta, train_path: Path, test_path: Path, args) -> dict:
     llm_test = llm_predictions(LLM_TEST_DIR / f"{test_path.stem}.csv")
     llm_test_preds = [llm_test[t] for t in test_df[TEXT_COLUMN]]
 
-    fus = tune_params(roberta, train_df, val_df, llm, name, args) if args.trials > 0 else default_params(args)
+    fus = tune_params(train_df, val_df, llm, name, args) if args.trials > 0 else default_params(args)
     full_train_df = pd.concat([train_df, val_df], ignore_index=True)
-    fusion_preds = fit_predict(roberta, fus, full_train_df, test_df, llm_test_preds, llm, name, "final", verbose=True)
+    fusion_preds = fit_predict(fus, full_train_df, test_df, llm_test_preds, llm, name, "final", verbose=True)
 
     out = pd.DataFrame({
         TEXT_COLUMN: test_df[TEXT_COLUMN],
@@ -177,7 +188,7 @@ def run_pair(roberta, train_path: Path, test_path: Path, args) -> dict:
            "seconds": round(time.time() - t0)}
     for who in ("llm", "fusion"):
         row.update({f"{who}_{k}": v for k, v in scores(out["true"].tolist(), out[f"{who}_pred"].tolist()).items()})
-    row["fusion_epochs"], row["fusion_lr"] = fus["num_epochs"], fus["fusion_lr"]
+    row["epochs"], row["roberta_lr"], row["fusion_lr"] = fus["num_epochs"], fus["ml_lr"], fus["fusion_lr"]
     print({k: round(v, 3) if isinstance(v, float) else v for k, v in row.items()})
     return row
 
@@ -206,11 +217,10 @@ def write_dataset_json(dataset: str, seed_rows: pd.DataFrame, args) -> Path:
     summary = aggregate(runs).iloc[0]
     payload = {
         "dataset": dataset,
-        "model": "labelfusion: frozen roberta-large embeddings + gpt-5-nano labels",
+        "model": "labelfusion: roberta-large trained jointly with gpt-5-nano labels",
         "seeds": summary["seeds"].split(),
         "n_seeds": int(summary["n_seeds"]),
-        "settings": {"trials": args.trials, "limit_train": args.limit_train,
-                     "default_fusion_epochs": args.fusion_epochs},
+        "settings": {"trials": args.trials, "limit_train": args.limit_train, "default_epochs": args.epochs},
         "mean": {metric: clean(summary[f"{metric}_mean"]) for metric in METRICS},
         "std": {metric: clean(summary[f"{metric}_std"]) for metric in METRICS},
         "runs": [{k: clean(v) for k, v in run.items()} for run in runs.to_dict(orient="records")],
@@ -223,10 +233,10 @@ def write_dataset_json(dataset: str, seed_rows: pd.DataFrame, args) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="*", help="only datasets (test file name without seed) containing one of these")
-    parser.add_argument("--fusion-epochs", type=int, default=20, help="fusion MLP epochs of the default configuration")
+    parser.add_argument("--epochs", type=int, default=3, help="joint training epochs of the default configuration")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     parser.add_argument("--trials", type=int, default=5,
-                        help="Optuna trials per pair tuning the fusion MLP's epochs + learning rate (0 = defaults)")
+                        help="Optuna trials per pair tuning epochs + both learning rates (0 = defaults)")
     args = parser.parse_args()
 
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
@@ -246,10 +256,9 @@ def main() -> None:
         raise SystemExit("no matching train/test pairs found")
     print(f"{len(pairs)} pairs: {', '.join(p.stem for _, p in pairs)}")
 
-    roberta = load_frozen_roberta_large()
     rows = []
     for train_path, test_path in pairs:
-        row = run_pair(roberta, train_path, test_path, args)
+        row = run_pair(train_path, test_path, args)
         rows.append(row)
         seed_rows = pd.DataFrame(rows)
         seed_rows.to_csv(RESULT_DIR / "summary_seeds.csv", index=False)
