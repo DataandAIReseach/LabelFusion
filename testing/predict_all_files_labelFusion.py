@@ -10,7 +10,7 @@ For each data/training_data/<name>-train-<seed>.xlsx and its data/test_data/<nam
        train + validation rows  <- GPT-5 nano, zero-shot   (train_gpt-5-nano_zero_shot)
        test rows                <- GPT-5 nano, 5-shot      (test_gpt-5-nano_5_shot)
   4. textclassify's FusionEnsemble (FusionWrapper + FusionMLP) concatenates the RoBERTa
-     [CLS] embedding (768) with the LLM's class vector and trains the fusion MLP on the
+     [CLS] embedding (1024 for roberta-large) with the LLM's class vector and trains the fusion MLP on the
      validation split; RoBERTa and the LLM stay frozen at that point.
   5. The fused model predicts the test file.
 
@@ -95,7 +95,7 @@ FUSION_DIR = OUT_DIR / "fusion"
 # Fine-tuned models are written here (outside the repo / ownCloud) and deleted right away.
 MODEL_CACHE = Path(os.getenv("LABELFUSION_MODEL_CACHE", Path.home() / ".cache" / "labelfusion"))
 
-ROBERTA_MODEL = os.getenv("TEXTCLASSIFY_ROBERTA_MODEL", "roberta-base")
+ROBERTA_MODEL = os.getenv("TEXTCLASSIFY_ROBERTA_MODEL", "roberta-large")
 HIDDEN_DIMS = {"32": [32], "64-32": [64, 32], "128-64": [128, 64], "256-128-64": [256, 128, 64]}
 
 
