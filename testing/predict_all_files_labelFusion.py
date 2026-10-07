@@ -260,7 +260,8 @@ def fit_predict(rob, fus, train_df, fit_df, pred_df, pred_llm, llm, name, tag, s
 
 
 def scores(true: list[str], pred: list[str]) -> dict:
-    return {"accuracy": accuracy_score(true, pred), "f1_macro": f1_score(true, pred, average="macro")}
+    return {"accuracy": accuracy_score(true, pred), "f1_macro": f1_score(true, pred, average="macro"),
+            "f1_weighted": f1_score(true, pred, average="weighted")}
 
 
 def study_key(test_stem: str, scope: str, args) -> str:

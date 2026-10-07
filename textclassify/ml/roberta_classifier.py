@@ -347,6 +347,16 @@ class RoBERTaClassifier(BaseMLClassifier):
             # faulthandler may already be enabled or not available in some envs
             pass
 
+        # Class-weighted cross-entropy (config.parameters["class_weights"] = True): every class is
+        # weighted n_samples / (n_classes * n_samples_of_class) of the training labels, like
+        # sklearn's "balanced". Only for the training loss, and only for single-label problems.
+        class_weight_tensor = None
+        if self.config.parameters.get('class_weights', False) and not self.multi_label:
+            label_counts = np.maximum(np.asarray(train_labels).sum(axis=0), 1)
+            weights = len(train_labels) / (len(label_counts) * label_counts)
+            class_weight_tensor = torch.tensor(weights, dtype=torch.float, device=self.device)
+            print(f"Class-weighted loss, weights per class: {np.round(weights, 3).tolist()}")
+
         # Training loop
         for epoch in range(self.num_epochs):
             print(f"Epoch {epoch + 1}/{self.num_epochs}")
@@ -374,13 +384,16 @@ class RoBERTaClassifier(BaseMLClassifier):
 
                     optimizer.zero_grad()
 
-                    outputs = self.model(
-                        input_ids=input_ids,
-                        attention_mask=attention_mask,
-                        labels=labels
-                    )
-
-                    loss = outputs.loss
+                    if class_weight_tensor is None:
+                        outputs = self.model(
+                            input_ids=input_ids,
+                            attention_mask=attention_mask,
+                            labels=labels
+                        )
+                        loss = outputs.loss
+                    else:
+                        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+                        loss = nn.functional.cross_entropy(outputs.logits, labels, weight=class_weight_tensor)
                     loss.backward()
                     optimizer.step()
                     scheduler.step()
