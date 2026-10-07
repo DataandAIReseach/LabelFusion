@@ -4,22 +4,26 @@ Every data/test_data/<dataset>-<seed>.xlsx (e.g. lab-manual-mm-test-5768) is pai
 data/training_data/<dataset with -train->-<seed>.xlsx. Per pair:
 
   1. The train file is split 80/20 (stratified) into train / validation.
-  2. Optuna (--trials, default 5) tunes the number of epochs (1-20) and the learning rate
-     (5e-6..3e-5, log) of textclassify's RoBERTaLargeClassifier: every trial fine-tunes a fresh
-     roberta-large on the train split and is scored by macro-F1 on the validation split. The
-     default configuration (3 epochs, lr 1e-5) is always the first trial. Everything else stays
-     at its default (batch 16, max_length 128, weight decay 0.01). The learning-rate range sits
-     lower than for roberta-base because roberta-large diverges more easily; 0 epochs is left
-     out because without fine-tuning the classification head is untrained.
+  2. Optuna tunes the learning rate (1e-7..1e-4, log), the batch size (4, 8, 16, 32) and the
+     number of epochs (1-20) of textclassify's RoBERTaLargeClassifier: every trial fine-tunes a
+     fresh roberta-large on the train split and is scored by weighted F1 on the validation split.
+     The first 16 trials are always the full grid of learning rate {1e-4, 1e-5, 1e-6, 1e-7} x
+     batch size {32, 16, 8, 4} at the default epoch count (--epochs, 3), so the search covers at
+     least that grid search; --trials above 16 lets Optuna's sampler explore further (including
+     the epochs). Everything else stays at its default (max_length 128, weight decay 0.01).
+     0 epochs is left out because without fine-tuning the classification head is untrained.
+     The splits give 64/16/20 train/validation/test, e.g. 1522 / 381 / 476 rows for combine.
   3. RoBERTa-large is trained with the best parameters and predicts the test file. The test
      file is never used for tuning.
 
 The pairs of one dataset differ only in the seed of the resampling, so per dataset accuracy and
-macro-F1 are averaged over the seeds, with the standard deviation (sample std, ddof=1).
+weighted F1 (and macro-F1) are averaged over the seeds, with the standard deviation (sample std, ddof=1).
 
 Writes to ./outputs/roberta_large/:
     <test file name>.csv / .json   per pair: sentence, label, true, roberta_pred
-    summary_seeds.csv              one row per pair (dataset, seed, metrics, chosen epochs + lr)
+    summary_seeds.csv              one row per pair (dataset, seed, metrics, chosen epochs + lr + batch size,
+                                   val_f1_weighted = the best trial's validation score)
+    trials/<test file name>_trials.csv   every Optuna trial of the pair: parameters + validation weighted F1
     summary.csv                    one row per dataset: <metric>_mean / <metric>_std over its seeds
     <dataset>_summary.json         per dataset: run settings, every seed's run, mean and std per metric
 All summaries are rewritten after every pair, so a stopped run keeps its progress.
@@ -27,7 +31,8 @@ All summaries are rewritten after every pair, so a stopped run keeps its progres
 Fine-tuned models are never kept (~1.4 GB each): they are written to LABELFUSION_MODEL_CACHE
 (default ~/.cache/labelfusion) by RoBERTaClassifier.fit() and deleted right after.
 
-    python testing/predict_all_files_roberta_large.py                                   # every dataset, every seed
+    python testing/predict_all_files_roberta_large.py                                   # every dataset, every seed: 16-point grid + 8 sampler trials
+    python testing/predict_all_files_roberta_large.py --trials 16                       # grid only, no refinement
     python testing/predict_all_files_roberta_large.py --datasets mm-test pc-split-test  # datasets containing these
     python testing/predict_all_files_roberta_large.py --datasets pc-test --limit-train 40 --trials 0 --epochs 1  # smoke test
 """
@@ -61,11 +66,14 @@ from textclassify.core.types import ModelConfig, ModelType  # noqa: E402
 
 RESULT_DIR = OUT_DIR / "roberta_large"
 SEED_RE = re.compile(r"^(?P<dataset>.+)-(?P<seed>\d+)$")
-METRICS = ["roberta_accuracy", "roberta_f1_macro"]
+METRICS = ["roberta_f1_weighted", "roberta_f1_macro", "roberta_accuracy"]
+GRID_LEARNING_RATES = [1e-4, 1e-5, 1e-6, 1e-7]
+GRID_BATCH_SIZES = [32, 16, 8, 4]
 
 
 def default_params(args) -> dict:
-    return {"learning_rate": 1e-5, "num_epochs": args.epochs, "batch_size": 16, "weight_decay": 0.01, "max_length": 128}
+    return {"learning_rate": 1e-5, "num_epochs": args.epochs, "batch_size": 16, "weight_decay": 0.01, "max_length": 128,
+            "class_weights": True}
 
 
 def fit_predict(params: dict, train_df: pd.DataFrame, val_df: pd.DataFrame, pred_df: pd.DataFrame) -> list[str]:
@@ -89,28 +97,43 @@ def fit_predict(params: dict, train_df: pd.DataFrame, val_df: pd.DataFrame, pred
     return preds
 
 
-def tune(train_df: pd.DataFrame, val_df: pd.DataFrame, name: str, args) -> dict:
-    """Optuna over num_epochs and learning_rate; every trial is scored by macro-F1 on val_df."""
+def save_trials(study: optuna.Study, name: str) -> None:
+    """All trials of one pair's study (parameters + validation weighted F1) -> trials/<name>_trials.csv.
+    `source` tells the 16 enqueued grid points apart from the trials Optuna proposed itself."""
+    df = study.trials_dataframe(attrs=("number", "value", "params", "state", "duration"))
+    df = df.rename(columns={"value": "val_f1_weighted"})
+    df.insert(1, "source", ["grid" if n < len(GRID_LEARNING_RATES) * len(GRID_BATCH_SIZES) else "optuna" for n in df["number"]])
+    path = RESULT_DIR / "trials" / f"{name}_trials.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(path, index=False)
+
+
+def tune(train_df: pd.DataFrame, val_df: pd.DataFrame, name: str, args) -> tuple[dict, float]:
+    """Optuna over learning_rate, batch_size and num_epochs; every trial is scored by weighted F1 on
+    val_df. The 16 points of the learning-rate x batch-size grid always run first."""
     val_true = val_df["label"].map(LABEL_MAP).tolist()
-    print(f"### tuning epochs + learning rate on {name}: train {len(train_df)} / val {len(val_df)}")
+    print(f"### tuning learning rate + batch size + epochs on {name}: train {len(train_df)} / val {len(val_df)}")
 
     def objective(trial: optuna.Trial) -> float:
         params = default_params(args)
+        params["learning_rate"] = trial.suggest_float("learning_rate", 1e-7, 1e-4, log=True)
+        params["batch_size"] = trial.suggest_categorical("batch_size", GRID_BATCH_SIZES)
         params["num_epochs"] = trial.suggest_int("num_epochs", 1, 20)
-        params["learning_rate"] = trial.suggest_float("learning_rate", 5e-6, 3e-5, log=True)
-        return f1_score(val_true, fit_predict(params, train_df, val_df, val_df), average="macro")
+        return f1_score(val_true, fit_predict(params, train_df, val_df, val_df), average="weighted")
 
     study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=RANDOM_STATE))
-    d = default_params(args)
-    # The defaults are always the first candidate, clamped into the tuned epoch range.
-    study.enqueue_trial({"num_epochs": min(max(d["num_epochs"], 1), 20), "learning_rate": d["learning_rate"]})
-    study.optimize(objective, n_trials=args.trials)
+    epochs = min(max(args.epochs, 1), 20)
+    for lr in GRID_LEARNING_RATES:
+        for batch_size in GRID_BATCH_SIZES:
+            study.enqueue_trial({"learning_rate": lr, "batch_size": batch_size, "num_epochs": epochs})
+    study.optimize(objective, n_trials=max(args.trials, len(GRID_LEARNING_RATES) * len(GRID_BATCH_SIZES)))
 
+    save_trials(study, name)
     params = default_params(args)
     params.update(study.best_trial.params)
-    print(f"### best macro-F1 {study.best_value:.3f} after {len(study.trials)} trials: "
-          f"num_epochs={params['num_epochs']} learning_rate={params['learning_rate']:.2e}")
-    return params
+    print(f"### best weighted F1 {study.best_value:.3f} after {len(study.trials)} trials: learning_rate="
+          f"{params['learning_rate']:.2e} batch_size={params['batch_size']} num_epochs={params['num_epochs']}")
+    return params, study.best_value
 
 
 def run_pair(train_path: Path, test_path: Path, args) -> dict:
@@ -120,7 +143,7 @@ def run_pair(train_path: Path, test_path: Path, args) -> dict:
     test_df = load(test_path)
     print(f"\n=== {name}: train {len(train_df)} / val {len(val_df)} / test {len(test_df)} ===")
 
-    params = tune(train_df, val_df, name, args) if args.trials > 0 else default_params(args)
+    params, val_f1 = tune(train_df, val_df, name, args) if args.trials > 0 else (default_params(args), None)
     preds = fit_predict(params, train_df, val_df, test_df)
 
     out = pd.DataFrame({
@@ -137,6 +160,8 @@ def run_pair(train_path: Path, test_path: Path, args) -> dict:
            "seconds": round(time.time() - t0)}
     row.update({f"roberta_{k}": v for k, v in scores(out["true"].tolist(), preds).items()})
     row["num_epochs"], row["learning_rate"] = params["num_epochs"], params["learning_rate"]
+    row["batch_size"] = params["batch_size"]
+    row["val_f1_weighted"] = val_f1  # best trial on the validation split; compare with roberta_f1_weighted on test
     print({k: round(v, 3) if isinstance(v, float) else v for k, v in row.items()})
     return row
 
@@ -183,8 +208,9 @@ def main() -> None:
     parser.add_argument("--datasets", nargs="*", help="only datasets (test file name without seed) containing one of these")
     parser.add_argument("--epochs", type=int, default=3, help="epochs of the default configuration")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
-    parser.add_argument("--trials", type=int, default=5,
-                        help="Optuna trials per pair tuning epochs + learning rate (0 = no tuning, defaults)")
+    parser.add_argument("--trials", type=int, default=24,
+                        help="Optuna trials per pair: the 16 grid points first, the rest is free refinement "
+                             "(0 = no tuning, defaults)")
     args = parser.parse_args()
 
     RESULT_DIR.mkdir(parents=True, exist_ok=True)

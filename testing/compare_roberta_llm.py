@@ -3,8 +3,8 @@
 For every data/test_data/<dataset>-<seed>.xlsx:
   1. roberta-large predictions: taken from ./outputs/roberta_large/<test file name>.csv, written by
      predict_all_files_roberta_large.py. A pair without that file is trained here first, with the
-     same procedure (roberta-large alone, Optuna --trials over epochs + learning rate, see that
-     script); --retrain trains every pair again.
+     same procedure (roberta-large alone, Optuna over the learning-rate x batch-size grid and
+     epochs, see that script); --retrain trains every pair again.
   2. LLM predictions: GPT-5 nano, 5-shot, from ./outputs/predictions/test_gpt-5-nano_5_shot/.
   3. Both are compared with each other and with the ground truth, sentence by sentence.
 
@@ -123,7 +123,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="*", help="only datasets (test file name without seed) containing one of these")
     parser.add_argument("--retrain", action="store_true", help="train roberta-large again even if predictions exist")
-    parser.add_argument("--trials", type=int, default=5, help="Optuna trials when roberta-large has to be trained")
+    parser.add_argument("--trials", type=int, default=24,
+                        help="Optuna trials when roberta-large has to be trained (16-point grid first, the rest is free)")
     parser.add_argument("--epochs", type=int, default=3, help="epochs of roberta-large's default configuration")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     args = parser.parse_args()
