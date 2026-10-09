@@ -125,7 +125,8 @@ def main() -> None:
     parser.add_argument("--retrain", action="store_true", help="train roberta-large again even if predictions exist")
     parser.add_argument("--trials", type=int, default=24,
                         help="Optuna trials when roberta-large has to be trained (16-point grid first, the rest is free)")
-    parser.add_argument("--epochs", type=int, default=3, help="epochs of roberta-large's default configuration")
+    parser.add_argument("--epochs", type=int, default=10, help="(maximum) epochs of roberta-large's default configuration")
+    parser.add_argument("--retries", type=int, default=2, help="repeat a collapsed final training with another seed up to N times")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     args = parser.parse_args()
 

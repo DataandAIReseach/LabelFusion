@@ -8,13 +8,22 @@ data/training_data/<dataset with -train->-<seed>.xlsx. Per pair:
      number of epochs (1-20) of textclassify's RoBERTaLargeClassifier: every trial fine-tunes a
      fresh roberta-large on the train split and is scored by weighted F1 on the validation split.
      The first 16 trials are always the full grid of learning rate {1e-4, 1e-5, 1e-6, 1e-7} x
-     batch size {32, 16, 8, 4} at the default epoch count (--epochs, 3), so the search covers at
+     batch size {32, 16, 8, 4} at the default epoch count (--epochs, 10), so the search covers at
      least that grid search; --trials above 16 lets Optuna's sampler explore further (including
      the epochs). Everything else stays at its default (max_length 128, weight decay 0.01).
      0 epochs is left out because without fine-tuning the classification head is untrained.
      The splits give 64/16/20 train/validation/test, e.g. 1522 / 381 / 476 rows for combine.
   3. RoBERTa-large is trained with the best parameters and predicts the test file. The test
      file is never used for tuning.
+
+Training aids against the one-class collapses of fine-tuning on small data (every run):
+  - class-weighted cross-entropy (class_weights) for the training loss;
+  - learning-rate warmup over the first 10% of the steps (warmup_ratio);
+  - the epoch count is a maximum: after every epoch the validation weighted F1 is scored and the
+    weights of the best epoch are restored (select_best_epoch), as in the paper;
+  - the final training is repeated with another seed (--retries, default 2) if it predicts only one
+    class on the validation split. Tuning trials are not repeated: a collapse there is a valid
+    (bad) score for those parameters. The check only looks at the validation split.
 
 The pairs of one dataset differ only in the seed of the resampling, so per dataset accuracy and
 weighted F1 (and macro-F1) are averaged over the seeds, with the standard deviation (sample std, ddof=1).
@@ -73,22 +82,44 @@ GRID_BATCH_SIZES = [32, 16, 8, 4]
 
 def default_params(args) -> dict:
     return {"learning_rate": 1e-5, "num_epochs": args.epochs, "batch_size": 16, "weight_decay": 0.01, "max_length": 128,
-            "class_weights": True}
+            "class_weights": True, "warmup_ratio": 0.1, "select_best_epoch": True}
 
 
-def fit_predict(params: dict, train_df: pd.DataFrame, val_df: pd.DataFrame, pred_df: pd.DataFrame) -> list[str]:
+def collapsed(preds: list[str], truth: list[str]) -> bool:
+    """A degenerate run: every prediction is the same class although the truth has several."""
+    return len(set(preds)) == 1 and len(set(truth)) > 1
+
+
+def train_model(params: dict, train_df: pd.DataFrame, val_df: pd.DataFrame, retries: int = 0):
+    """Fine-tune a fresh roberta-large on train_df (validating on val_df). A run that collapses to a
+    single class on val_df is repeated with another seed, at most `retries` times (only the validation
+    split is looked at, never the test file). Returns the model."""
+    val_truth = val_df["label"].map(LABEL_MAP).tolist()
+    for attempt in range(retries + 1):
+        torch.manual_seed(RANDOM_STATE + attempt)
+        config = ModelConfig(model_name="roberta-large", model_type=ModelType.TRADITIONAL_ML, parameters=dict(params))
+        model = RoBERTaLargeClassifier(
+            config=config,
+            text_column=TEXT_COLUMN,
+            label_columns=LABEL_COLUMNS,
+            multi_label=False,
+            auto_save_results=False,
+            cache_dir=str(MODEL_CACHE),
+        )
+        model.fit(train_df, val_df)
+        delete_saved_model(train_df)
+        if attempt == retries or not collapsed(model.predict_without_saving(val_df).predictions, val_truth):
+            return model
+        print(f"### run collapsed to one class on the validation split (attempt {attempt + 1}/{retries + 1}), retrying with another seed")
+        del model
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+
+def fit_predict(params: dict, train_df: pd.DataFrame, val_df: pd.DataFrame, pred_df: pd.DataFrame, retries: int = 0) -> list[str]:
     """Fine-tune a fresh roberta-large on train_df (validating on val_df), predict pred_df."""
-    config = ModelConfig(model_name="roberta-large", model_type=ModelType.TRADITIONAL_ML, parameters=dict(params))
-    model = RoBERTaLargeClassifier(
-        config=config,
-        text_column=TEXT_COLUMN,
-        label_columns=LABEL_COLUMNS,
-        multi_label=False,
-        auto_save_results=False,
-        cache_dir=str(MODEL_CACHE),
-    )
-    model.fit(train_df, val_df)
-    delete_saved_model(train_df)
+    model = train_model(params, train_df, val_df, retries)
     preds = model.predict_without_saving(pred_df).predictions
     del model
     gc.collect()
@@ -144,7 +175,7 @@ def run_pair(train_path: Path, test_path: Path, args) -> dict:
     print(f"\n=== {name}: train {len(train_df)} / val {len(val_df)} / test {len(test_df)} ===")
 
     params, val_f1 = tune(train_df, val_df, name, args) if args.trials > 0 else (default_params(args), None)
-    preds = fit_predict(params, train_df, val_df, test_df)
+    preds = fit_predict(params, train_df, val_df, test_df, retries=getattr(args, "retries", 2))
 
     out = pd.DataFrame({
         TEXT_COLUMN: test_df[TEXT_COLUMN],
@@ -206,7 +237,10 @@ def write_dataset_json(dataset: str, seed_rows: pd.DataFrame, args) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="*", help="only datasets (test file name without seed) containing one of these")
-    parser.add_argument("--epochs", type=int, default=3, help="epochs of the default configuration")
+    parser.add_argument("--epochs", type=int, default=10,
+                        help="(maximum) epochs of the default configuration and of the 16 grid points")
+    parser.add_argument("--retries", type=int, default=2,
+                        help="repeat the final training with another seed up to N times if it collapses to one class")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     parser.add_argument("--trials", type=int, default=24,
                         help="Optuna trials per pair: the 16 grid points first, the rest is free refinement "
