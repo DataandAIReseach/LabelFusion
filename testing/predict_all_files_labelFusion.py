@@ -10,7 +10,7 @@ For each data/training_data/<name>-train-<seed>.xlsx and its data/test_data/<nam
        train + validation rows  <- GPT-5 nano, zero-shot   (train_gpt-5-nano_zero_shot)
        test rows                <- GPT-5 nano, 5-shot      (test_gpt-5-nano_5_shot)
   4. textclassify's FusionEnsemble (FusionWrapper + FusionMLP) concatenates the RoBERTa
-     [CLS] embedding (768) with the LLM's class vector and trains the fusion MLP on the
+     [CLS] embedding (1024 for roberta-large) with the LLM's class vector and trains the fusion MLP on the
      validation split; RoBERTa and the LLM stay frozen at that point.
   5. The fused model predicts the test file.
 
@@ -95,7 +95,7 @@ FUSION_DIR = OUT_DIR / "fusion"
 # Fine-tuned models are written here (outside the repo / ownCloud) and deleted right away.
 MODEL_CACHE = Path(os.getenv("LABELFUSION_MODEL_CACHE", Path.home() / ".cache" / "labelfusion"))
 
-ROBERTA_MODEL = os.getenv("TEXTCLASSIFY_ROBERTA_MODEL", "roberta-base")
+ROBERTA_MODEL = os.getenv("TEXTCLASSIFY_ROBERTA_MODEL", "roberta-large")
 HIDDEN_DIMS = {"32": [32], "64-32": [64, 32], "128-64": [128, 64], "256-128-64": [256, 128, 64]}
 
 
@@ -185,7 +185,7 @@ def split_pair(train_path: Path, args) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def default_params(args) -> tuple[dict, dict]:
-    roberta = {"learning_rate": 2e-5, "num_epochs": args.epochs, "batch_size": 16, "weight_decay": 0.01, "max_length": 128}
+    roberta = {"learning_rate": 1e-5, "num_epochs": args.epochs, "batch_size": 16, "weight_decay": 0.01, "max_length": 128}
     fusion = {"fusion_hidden_dims": [64, 32], "fusion_lr": 1e-3, "num_epochs": args.fusion_epochs, "batch_size": 16}
     return roberta, fusion
 
@@ -260,7 +260,8 @@ def fit_predict(rob, fus, train_df, fit_df, pred_df, pred_llm, llm, name, tag, s
 
 
 def scores(true: list[str], pred: list[str]) -> dict:
-    return {"accuracy": accuracy_score(true, pred), "f1_macro": f1_score(true, pred, average="macro")}
+    return {"accuracy": accuracy_score(true, pred), "f1_macro": f1_score(true, pred, average="macro"),
+            "f1_weighted": f1_score(true, pred, average="weighted")}
 
 
 def study_key(test_stem: str, scope: str, args) -> str:
@@ -286,16 +287,16 @@ def tuning_pair(test_stem: str, scope: str, args) -> tuple[Path, Path]:
 
 def suggest(trial: optuna.Trial) -> tuple[dict, dict]:
     rob = {
-        "learning_rate": trial.suggest_float("roberta_lr", 1e-5, 5e-5, log=True),
-        "num_epochs": trial.suggest_int("roberta_epochs", 1, 4),
-        "batch_size": trial.suggest_categorical("roberta_batch_size", [8, 16, 32]),
-        "weight_decay": trial.suggest_categorical("roberta_weight_decay", [0.0, 0.01, 0.1]),
-        "max_length": trial.suggest_categorical("roberta_max_length", [64, 96, 128]),
+        "learning_rate": trial.suggest_float("roberta_lr", 5e-6, 2e-5, log=True),
+        "num_epochs": trial.suggest_int("roberta_epochs", 3, 10),
+        "batch_size": trial.suggest_categorical("roberta_batch_size", [16, 32]),
+        "weight_decay": trial.suggest_categorical("roberta_weight_decay", [0.0, 0.01]),
+        "max_length": trial.suggest_categorical("roberta_max_length", [96, 128]),
     }
     fus = {
         "fusion_hidden_dims": HIDDEN_DIMS[trial.suggest_categorical("hidden_dims", list(HIDDEN_DIMS))],
         "fusion_lr": trial.suggest_float("fusion_lr", 1e-4, 1e-2, log=True),
-        "num_epochs": trial.suggest_int("fusion_epochs", 10, 80, step=10),
+        "num_epochs": trial.suggest_int("fusion_epochs", 10, 30, step=10),
         "batch_size": trial.suggest_categorical("fusion_batch_size", [8, 16, 32]),
     }
     return rob, fus
@@ -344,7 +345,7 @@ def tune(key: str, train_path: Path, test_path: Path, args) -> tuple[dict, dict,
     if not study.trials:  # the default configuration is always one of the candidates
         rob, fus = default_params(args)
         study.enqueue_trial({
-            "roberta_lr": rob["learning_rate"], "roberta_epochs": min(max(rob["num_epochs"], 1), 4),
+            "roberta_lr": rob["learning_rate"], "roberta_epochs": min(max(rob["num_epochs"], 3), 10),
             "roberta_batch_size": rob["batch_size"], "roberta_weight_decay": rob["weight_decay"],
             "roberta_max_length": rob["max_length"], "hidden_dims": "64-32", "fusion_lr": fus["fusion_lr"],
             "fusion_epochs": fus["num_epochs"], "fusion_batch_size": fus["batch_size"],
@@ -410,7 +411,7 @@ def main() -> None:
     parser.add_argument("--tune-seed", default="5768", help="seed of the pair a group is tuned on")
     parser.add_argument("--tune-minutes", type=float, help="time cap per study (finished trials are kept)")
     parser.add_argument("--baseline", action="store_true", help="also run the default parameters on each pair")
-    parser.add_argument("--epochs", type=int, default=3, help="RoBERTa epochs of the default configuration")
+    parser.add_argument("--epochs", type=int, default=8, help="RoBERTa epochs of the default configuration")
     parser.add_argument("--fusion-epochs", type=int, default=30, help="fusion MLP epochs of the default configuration")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     parser.add_argument("--force", action="store_true", help="redo pairs that already have results")
