@@ -17,6 +17,7 @@ Two colour columns per sentence:
                         white  = both are wrong
 
 Writes to ./outputs/roberta_vs_llm/:
+    predictions/<test file name>.csv   one file per test set: text, ground_truth, llm_prediction, roberta_prediction
     comparison.csv    every test sentence of every pair, colours as text
     comparison.xlsx   the same table with the two colour columns filled in those colours
     summary.csv       per pair and per dataset: share of agreement / only roberta / only LLM / both / neither
@@ -146,6 +147,11 @@ def main() -> None:
 
     table = pd.concat(tables, ignore_index=True)
     table.to_csv(RESULT_DIR / "comparison.csv", index=False)
+    (RESULT_DIR / "predictions").mkdir(exist_ok=True)
+    for file, group in table.groupby("file"):
+        group[[TEXT_COLUMN, "true", "llm_pred", "roberta_pred"]].rename(columns={
+            TEXT_COLUMN: "text", "true": "ground_truth", "llm_pred": "llm_prediction", "roberta_pred": "roberta_prediction",
+        }).to_csv(RESULT_DIR / "predictions" / f"{file}.csv", index=False)
     write_xlsx(table, RESULT_DIR / "comparison.xlsx")
     summary = summarize(table)
     summary.to_csv(RESULT_DIR / "summary.csv", index=False)
