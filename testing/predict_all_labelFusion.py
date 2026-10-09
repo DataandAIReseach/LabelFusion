@@ -9,9 +9,12 @@ data/training_data/<dataset with -train->-<seed>.xlsx. Per pair:
   Stage 1  roberta-large alone, on the train split. Optuna (--trials, default 24) searches the
            learning rate (1e-7..1e-4, log), the batch size (4, 8, 16, 32) and the epochs (1-20);
            the first 16 trials are always the full grid learning rate {1e-4, 1e-5, 1e-6, 1e-7} x
-           batch size {32, 16, 8, 4} (3 epochs), the rest is free refinement around it. Every
+           batch size {32, 16, 8, 4} (--epochs, 10), the rest is free refinement around it. Every
            trial fine-tunes a fresh roberta-large and is scored by weighted F1 on the validation
-           split. The best parameters train the final roberta-large on the train split.
+           split. The best parameters train the final roberta-large on the train split. As in
+           predict_all_files_roberta_large.py, training uses class weights, learning-rate warmup and
+           best-epoch selection on the validation split (epochs = maximum), and the final training
+           is repeated with another seed (--retries, default 2) if it collapses to one class.
 
   Stage 2  roberta-large is frozen; only its [CLS] embedding (1024) is used. textclassify's fusion
            MLP learns from that embedding concatenated with the LLM's label for the sentence,
@@ -92,19 +95,10 @@ SEED_RE = re.compile(r"^(?P<dataset>.+)-(?P<seed>\d+)$")
 METRICS = [f"{who}_{m}" for who in ("llm", "roberta", "fusion") for m in ("f1_weighted", "f1_macro", "accuracy")]
 
 
-def train_roberta(params: dict, train_df: pd.DataFrame, val_df: pd.DataFrame):
-    """Fine-tune roberta-large on train_df (monitored on val_df), then freeze it and memoise its embeddings."""
-    config = ModelConfig(model_name="roberta-large", model_type=ModelType.TRADITIONAL_ML, parameters=dict(params))
-    model = RoBERTaLargeClassifier(
-        config=config,
-        text_column=TEXT_COLUMN,
-        label_columns=LABEL_COLUMNS,
-        multi_label=False,
-        auto_save_results=False,
-        cache_dir=str(MODEL_CACHE),
-    )
-    model.fit(train_df, val_df)
-    delete_saved_model(train_df)
+def train_roberta(params: dict, train_df: pd.DataFrame, val_df: pd.DataFrame, retries: int = 0):
+    """Fine-tune roberta-large on train_df (monitored on val_df; a run collapsing to one class is retried
+    with another seed, see stage 1's train_model), then freeze it and memoise its embeddings."""
+    model = stage1.train_model(params, train_df, val_df, retries)
     model.model.eval()
     for param in model.model.parameters():
         param.requires_grad = False
@@ -189,7 +183,7 @@ def run_pair(train_path: Path, test_path: Path, args) -> dict:
         rob, roberta_val_f1 = stage1.tune(train_df, val_df, name, args)
     else:
         rob, roberta_val_f1 = stage1.default_params(args), None
-    roberta, memo = train_roberta(rob, train_df, val_df)
+    roberta, memo = train_roberta(rob, train_df, val_df, retries=args.retries)
     roberta_preds = roberta.predict_without_saving(test_df).predictions
 
     # Stage 2: frozen roberta-large embeddings + LLM labels -> fusion MLP, trained on the validation split.
@@ -256,7 +250,7 @@ def write_dataset_json(dataset: str, seed_rows: pd.DataFrame, args) -> Path:
         "seeds": summary["seeds"].split(),
         "n_seeds": int(summary["n_seeds"]),
         "settings": {"trials": args.trials, "mlp_trials": args.mlp_trials, "limit_train": args.limit_train,
-                     "default_roberta_epochs": args.epochs},
+                     "default_roberta_epochs": args.epochs, "retries": args.retries},
         "mean": {metric: clean(summary[f"{metric}_mean"]) for metric in METRICS},
         "std": {metric: clean(summary[f"{metric}_std"]) for metric in METRICS},
         "runs": [{k: clean(v) for k, v in run.items()} for run in runs.to_dict(orient="records")],
@@ -269,7 +263,10 @@ def write_dataset_json(dataset: str, seed_rows: pd.DataFrame, args) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="*", help="only datasets (test file name without seed) containing one of these")
-    parser.add_argument("--epochs", type=int, default=3, help="roberta-large epochs of the default configuration / grid")
+    parser.add_argument("--epochs", type=int, default=10,
+                        help="roberta-large (maximum) epochs of the default configuration and of the 16 grid points")
+    parser.add_argument("--retries", type=int, default=2,
+                        help="repeat the final roberta-large training with another seed up to N times if it collapses to one class")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     parser.add_argument("--trials", type=int, default=24,
                         help="stage-1 Optuna trials per pair: the 16 grid points first, the rest is free refinement "

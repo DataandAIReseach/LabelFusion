@@ -334,11 +334,18 @@ class RoBERTaClassifier(BaseMLClassifier):
         )
         
         total_steps = len(train_loader) * self.num_epochs
+        # warmup_steps wins if set; otherwise config.parameters["warmup_ratio"] (e.g. 0.1) of all
+        # steps. Warmup is the usual guard against degenerate (one-class) fine-tuning runs.
+        warmup_steps = self.warmup_steps or int(self.config.parameters.get('warmup_ratio', 0) * total_steps)
         scheduler = get_linear_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=self.warmup_steps,
+            num_warmup_steps=warmup_steps,
             num_training_steps=total_steps
         )
+        # config.parameters["select_best_epoch"] = True: after every epoch score the validation split
+        # (weighted F1) and, at the end, restore the weights of the best epoch instead of the last.
+        select_best_epoch = bool(self.config.parameters.get('select_best_epoch', False)) and val_loader is not None
+        best_val_f1, best_state, self.best_epoch = -1.0, None, None
         
         # Ensure faulthandler is enabled to get Python-level tracebacks on crashes
         try:
@@ -424,26 +431,41 @@ class RoBERTaClassifier(BaseMLClassifier):
                 self.model.eval()
                 total_val_loss = 0
                 val_steps = 0
-                
+                epoch_preds, epoch_labels = [], []
+
                 with torch.no_grad():
                     for batch in val_loader:
                         input_ids = self._to_device(batch['input_ids'], name='input_ids')
                         attention_mask = self._to_device(batch['attention_mask'], name='attention_mask')
                         labels = self._to_device(batch['labels'], name='labels')
-                        
+
                         outputs = self.model(
                             input_ids=input_ids,
                             attention_mask=attention_mask,
                             labels=labels
                         )
-                        
+
                         loss = outputs.loss
                         total_val_loss += loss.item()
                         val_steps += 1
-                
+                        if select_best_epoch:
+                            epoch_preds.extend(outputs.logits.argmax(dim=-1).cpu().tolist())
+                            epoch_labels.extend(labels.cpu().tolist())
+
                 avg_val_loss = total_val_loss / val_steps
                 print(f"  Average validation loss: {avg_val_loss:.4f}")
-        
+
+                if select_best_epoch and not self.multi_label:
+                    val_f1 = f1_score(epoch_labels, epoch_preds, average='weighted')
+                    print(f"  Validation weighted F1: {val_f1:.4f}")
+                    if val_f1 > best_val_f1:
+                        best_val_f1, self.best_epoch = val_f1, epoch + 1
+                        best_state = {k: v.detach().cpu().clone() for k, v in self.model.state_dict().items()}
+
+        if best_state is not None:
+            self.model.load_state_dict(best_state)
+            print(f"  Restored the best epoch: {self.best_epoch} (validation weighted F1 {best_val_f1:.4f})")
+
         self.is_trained = True
         print(" Model training completed!")
         
