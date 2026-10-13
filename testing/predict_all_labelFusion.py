@@ -105,8 +105,11 @@ def train_roberta(params: dict, train_df: pd.DataFrame, val_df: pd.DataFrame, re
     return model, EmbeddingMemo(model)
 
 
-def default_mlp_params() -> dict:
-    return {"fusion_hidden_dims": [64, 32], "fusion_lr": 1e-3, "num_epochs": 20, "batch_size": 16}
+def default_mlp_params(args) -> dict:
+    mlp = {"fusion_hidden_dims": [64, 32], "fusion_lr": 1e-3, "num_epochs": 20, "batch_size": 16}
+    if args.ml_proj_dim:
+        mlp["ml_proj_dim"] = args.ml_proj_dim
+    return mlp
 
 
 def mlp_fit_predict(roberta, llm, mlp, rob_train_df, mlp_train_df, pred_df, pred_llm, name, tag, verbose) -> list[str]:
@@ -137,8 +140,11 @@ def tune_mlp(roberta, llm, rob_train_df, val_df, name, args) -> tuple[dict, floa
     print(f"### tuning the fusion MLP on {name}: fit {len(fit_df)} / eval {len(eval_df)}")
 
     def apply(params: dict) -> dict:
-        return {"fusion_lr": params["fusion_lr"], "num_epochs": params["epochs"], "batch_size": params["batch_size"],
-                "fusion_hidden_dims": HIDDEN_DIMS[params["hidden_dims"]]}
+        mlp = {"fusion_lr": params["fusion_lr"], "num_epochs": params["epochs"], "batch_size": params["batch_size"],
+               "fusion_hidden_dims": HIDDEN_DIMS[params["hidden_dims"]]}
+        if args.ml_proj_dim:
+            mlp["ml_proj_dim"] = args.ml_proj_dim
+        return mlp
 
     def objective(trial: optuna.Trial) -> float:
         mlp = apply({
@@ -152,7 +158,7 @@ def tune_mlp(roberta, llm, rob_train_df, val_df, name, args) -> tuple[dict, floa
         return f1_score(eval_true, preds, average="weighted")
 
     study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=RANDOM_STATE))
-    d = default_mlp_params()
+    d = default_mlp_params(args)
     study.enqueue_trial({"fusion_lr": d["fusion_lr"], "epochs": d["num_epochs"], "batch_size": d["batch_size"],
                          "hidden_dims": "64-32"})
     study.optimize(objective, n_trials=args.mlp_trials)
@@ -190,7 +196,7 @@ def run_pair(train_path: Path, test_path: Path, args) -> dict:
     if args.mlp_trials > 0:
         mlp, mlp_val_f1 = tune_mlp(roberta, llm, train_df, val_df, name, args)
     else:
-        mlp, mlp_val_f1 = default_mlp_params(), None
+        mlp, mlp_val_f1 = default_mlp_params(args), None
     fusion_preds = mlp_fit_predict(roberta, llm, mlp, train_df, val_df, test_df, llm_test_preds, name, "final", verbose=True)
     del roberta, memo
     gc.collect()
@@ -273,6 +279,9 @@ def main() -> None:
                              "(0 = defaults)")
     parser.add_argument("--mlp-trials", type=int, default=30,
                         help="stage-2 Optuna trials per pair tuning the fusion MLP (0 = defaults)")
+    parser.add_argument("--ml-proj-dim", type=int, default=768,
+                        help="project roberta-large's 1024-dim [CLS] embedding down to this size with a "
+                             "trainable Linear+ReLU before the fusion MLP; 0 disables the projection")
     args = parser.parse_args()
 
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
