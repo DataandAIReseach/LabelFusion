@@ -187,6 +187,8 @@ def split_pair(train_path: Path, args) -> tuple[pd.DataFrame, pd.DataFrame]:
 def default_params(args) -> tuple[dict, dict]:
     roberta = {"learning_rate": 1e-5, "num_epochs": args.epochs, "batch_size": 16, "weight_decay": 0.01, "max_length": 128}
     fusion = {"fusion_hidden_dims": [64, 32], "fusion_lr": 1e-3, "num_epochs": args.fusion_epochs, "batch_size": 16}
+    if args.ml_proj_dim:
+        fusion["ml_proj_dim"] = args.ml_proj_dim
     return roberta, fusion
 
 
@@ -331,6 +333,8 @@ def tune(key: str, train_path: Path, test_path: Path, args) -> tuple[dict, dict,
 
     def objective(trial: optuna.Trial) -> float:
         rob, fus = suggest(trial)
+        if args.ml_proj_dim:
+            fus["ml_proj_dim"] = args.ml_proj_dim
         preds, _ = fit_predict(rob, fus, train_df, fit_df, eval_df, eval_llm, llm, name,
                                f"trial{trial.number}", save=False, verbose=False)
         return f1_score(eval_true, preds, average="macro")
@@ -357,6 +361,8 @@ def tune(key: str, train_path: Path, test_path: Path, args) -> tuple[dict, dict,
     (FUSION_DIR / "optuna").mkdir(exist_ok=True)
     study.trials_dataframe().to_csv(FUSION_DIR / "optuna" / f"{key}_trials.csv", index=False)
     rob, fus = params_from(study.best_trial.params)
+    if args.ml_proj_dim:
+        fus["ml_proj_dim"] = args.ml_proj_dim
     print(f"### best macro-F1 {study.best_value:.3f} after {len(study.trials)} trials: {rob} {fus}")
     return rob, fus, study
 
@@ -413,6 +419,7 @@ def main() -> None:
     parser.add_argument("--baseline", action="store_true", help="also run the default parameters on each pair")
     parser.add_argument("--epochs", type=int, default=8, help="RoBERTa epochs of the default configuration")
     parser.add_argument("--fusion-epochs", type=int, default=30, help="fusion MLP epochs of the default configuration")
+    parser.add_argument("--ml-proj-dim", type=int, help="project RoBERTa's [CLS] embedding (1024 for roberta-large) down to this size with a trainable Linear+ReLU before the fusion MLP; omit to use the raw embedding")
     parser.add_argument("--limit-train", type=int, help="subsample the train file to N rows (smoke test)")
     parser.add_argument("--force", action="store_true", help="redo pairs that already have results")
     args = parser.parse_args()

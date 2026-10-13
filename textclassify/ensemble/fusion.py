@@ -80,7 +80,8 @@ class FusionWrapper(nn.Module):
     
     def __init__(self, ml_model, num_labels: int, task: str = "multiclass",
                  hidden_dims: List[int] = [64, 32], embedding_dim: int = 768,
-                 ts_output_dim: int = 0, freeze_ml: bool = True):
+                 ts_output_dim: int = 0, freeze_ml: bool = True,
+                 ml_proj_dim: Optional[int] = None):
         """Initialize Fusion Wrapper.
 
         Args:
@@ -96,6 +97,12 @@ class FusionWrapper(nn.Module):
                        extractor setup. If False (FusionEnsemble's joint_training=True),
                        ml_embeddings are NOT detached, so the ML model gets fine-tuned
                        jointly with the fusion MLP (see FusionEnsemble._train_fusion_mlp_on_val).
+            ml_proj_dim: If set, ml_embeddings are passed through a trainable
+                         Linear(embedding_dim, ml_proj_dim) + ReLU before being
+                         concatenated into the fusion MLP -- e.g. 1024-dim roberta-large
+                         embeddings projected down to 768 to cut the fusion MLP's input
+                         size (and so its parameter count) on small training sets.
+                         None (default) skips the projection, using the raw embedding.
         """
         super().__init__()
         self.ml_model = ml_model
@@ -104,9 +111,17 @@ class FusionWrapper(nn.Module):
         self.embedding_dim = embedding_dim
         self.ts_output_dim = ts_output_dim
         self.freeze_ml = freeze_ml
+        self.ml_proj_dim = ml_proj_dim
 
-        # Fusion MLP takes ML embeddings + LLM scores (+ optional TS embedding)
-        fusion_input_dim = embedding_dim + num_labels + ts_output_dim
+        if ml_proj_dim is not None:
+            self.ml_proj = nn.Sequential(nn.Linear(embedding_dim, ml_proj_dim), nn.ReLU())
+            ml_output_dim = ml_proj_dim
+        else:
+            self.ml_proj = nn.Identity()
+            ml_output_dim = embedding_dim
+
+        # Fusion MLP takes (optionally projected) ML embeddings + LLM scores (+ optional TS embedding)
+        fusion_input_dim = ml_output_dim + num_labels + ts_output_dim
         self.fusion_mlp = FusionMLP(fusion_input_dim, num_labels, hidden_dims)
 
         # Device management
@@ -138,6 +153,9 @@ class FusionWrapper(nn.Module):
         if self.freeze_ml:
             ml_embeddings = ml_embeddings.detach()
         llm_predictions = llm_predictions.detach()
+
+        # Project ml_embeddings down to ml_proj_dim if configured (nn.Identity() otherwise).
+        ml_embeddings = self.ml_proj(ml_embeddings)
 
         # Concatenate ML embeddings, LLM predictions, and optional TS embedding.
         # ts_embeddings is intentionally NOT detached -- see docstring above.
@@ -186,6 +204,9 @@ class FusionEnsemble(BaseEnsemble):
         
         # Fusion-specific parameters
         self.fusion_hidden_dims = ensemble_config.parameters.get('fusion_hidden_dims', [64, 32])
+        # If set, ML embeddings (e.g. 1024-dim for roberta-large) are projected down to this
+        # size before the fusion MLP -- see FusionWrapper.ml_proj_dim. None keeps the raw embedding.
+        self.ml_proj_dim = ensemble_config.parameters.get('ml_proj_dim', None)
         self.ml_lr = ensemble_config.parameters.get('ml_lr', 1e-5)  # Small LR for ML backbone
         self.fusion_lr = ensemble_config.parameters.get('fusion_lr', 1e-3)  # Larger LR for fusion MLP
         # If True, the ML model (e.g. RoBERTa) is fine-tuned jointly with the fusion MLP
@@ -654,7 +675,8 @@ class FusionEnsemble(BaseEnsemble):
             hidden_dims=self.fusion_hidden_dims,
             embedding_dim=embedding_dim,
             ts_output_dim=ts_output_dim,
-            freeze_ml=not self.joint_training
+            freeze_ml=not self.joint_training,
+            ml_proj_dim=self.ml_proj_dim
         )
 
         # Step 5: Train fusion MLP on validation set predictions. If a TS branch is
