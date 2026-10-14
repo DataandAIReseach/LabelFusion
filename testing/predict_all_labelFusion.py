@@ -92,6 +92,8 @@ from textclassify.core.types import ModelConfig, ModelType  # noqa: E402
 RESULT_DIR = OUT_DIR / "labelfusion_roberta_large"
 stage1.RESULT_DIR = RESULT_DIR  # stage 1's trials/<pair>_trials.csv go into this script's folder
 SEED_RE = re.compile(r"^(?P<dataset>.+)-(?P<seed>\d+)$")
+MODEL_DESCRIPTION = "labelfusion: roberta-large fine-tuned alone, then fusion MLP on frozen embeddings + gpt-5-nano labels"
+SETTINGS_EXTRA: dict = {}  # extra run settings that variants of this script (e.g. the time series one) add to the json
 METRICS = [f"{who}_{m}" for who in ("llm", "roberta", "fusion") for m in ("f1_weighted", "f1_macro", "accuracy")]
 
 
@@ -252,11 +254,11 @@ def write_dataset_json(dataset: str, seed_rows: pd.DataFrame, args) -> Path:
     summary = aggregate(runs).iloc[0]
     payload = {
         "dataset": dataset,
-        "model": "labelfusion: roberta-large fine-tuned alone, then fusion MLP on frozen embeddings + gpt-5-nano labels",
+        "model": MODEL_DESCRIPTION,
         "seeds": summary["seeds"].split(),
         "n_seeds": int(summary["n_seeds"]),
         "settings": {"trials": args.trials, "mlp_trials": args.mlp_trials, "limit_train": args.limit_train,
-                     "default_roberta_epochs": args.epochs, "retries": args.retries},
+                     "default_roberta_epochs": args.epochs, "retries": args.retries, **SETTINGS_EXTRA},
         "mean": {metric: clean(summary[f"{metric}_mean"]) for metric in METRICS},
         "std": {metric: clean(summary[f"{metric}_std"]) for metric in METRICS},
         "runs": [{k: clean(v) for k, v in run.items()} for run in runs.to_dict(orient="records")],
