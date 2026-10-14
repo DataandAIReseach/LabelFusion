@@ -26,6 +26,16 @@ then comparable to the run without time series: the only difference is the TS br
 
 Writes to ./outputs/labelfusion_roberta_large_ts_fixed_window/ (same files as predict_all_labelFusion.py).
 
+Several runs (e.g. one sbatch job per group of datasets) can run at the same time without influencing each other.
+Every run has its own work folder for the library's prediction caches (.work/<job id>) and its own folder for the
+saved roberta-large models, and every result file carries the model and the start time of the run in its name
+(<name>_ts_fixed_window_<YYYYMMDD_HHMMSS>.csv / .json), so no run overwrites the files of another:
+    <test file>_ts_fixed_window_<date_time>.csv / .json        per pair
+    <dataset>_summary_ts_fixed_window_<date_time>.json         per dataset
+    summary_ts_fixed_window_<date_time>.csv, summary_seeds_ts_fixed_window_<date_time>.csv   per run
+    trials/<test file>_trials_... .csv and _mlp_trials_... .csv
+Each run's summary only holds the pairs of that run.
+
     python testing/predict_all_labelFusion_TS_fixed_window.py                                   # every dataset, every seed
     python testing/predict_all_labelFusion_TS_fixed_window.py --datasets mm-test pc-split-test
     python testing/predict_all_labelFusion_TS_fixed_window.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv
@@ -35,14 +45,29 @@ Writes to ./outputs/labelfusion_roberta_large_ts_fixed_window/ (same files as pr
 from __future__ import annotations
 
 import argparse
+import atexit
 import copy
 import os
+import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 TESTING_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTING_DIR))
 
+# Everything this script writes lives in RESULT_DIR. Runs must not influence each other's results: the library names
+# its saved roberta-large models after the train texts, so two runs on the same pair would write and delete the same
+# directory. Every run therefore gets its own work folder (.work/<job id>) in RESULT_DIR for the models and the
+# library's prediction caches; the folder is removed when the run ends. (Set before the modules below read it.)
+RESULT_DIR = TESTING_DIR.parent / "outputs" / "labelfusion_roberta_large_ts_fixed_window"
+RUN_ID = os.environ.get("SLURM_JOB_ID") or f"pid{os.getpid()}"
+WORK_DIR = RESULT_DIR / ".work" / RUN_ID
+os.environ["LABELFUSION_MODEL_CACHE"] = str(WORK_DIR / "models")
+atexit.register(shutil.rmtree, WORK_DIR, ignore_errors=True)
+SUFFIX = f"ts_fixed_window_{datetime.now():%Y%m%d_%H%M%S}"  # <model>_<date_time> of this run, part of every result file name
+
+import predict_all_files_labelFusion as files  # noqa: E402
 import predict_all_labelFusion as base  # noqa: E402
 
 import pandas as pd  # noqa: E402
@@ -60,7 +85,6 @@ TS_FILE = REPO_ROOT / "data" / "3 Ts" / "daily_series.csv"
 TS_SERIES = ["DGS10", "T10Y2Y", "VIXCLS"]
 DATE_COLUMN = "date"
 
-RESULT_DIR = base.OUT_DIR / "labelfusion_roberta_large_ts_fixed_window"
 
 
 class DailySeries(TS):
@@ -125,6 +149,16 @@ def split_dated(train_path: Path, args) -> tuple[pd.DataFrame, pd.DataFrame]:
     return train_df.reset_index(drop=True), val_df.reset_index(drop=True)
 
 
+def publish(staging: Path) -> None:
+    """Move what the run wrote into its staging folder to RESULT_DIR, with the model and the start time of the run
+    in every file name: <name>_ts_fixed_window_<YYYYMMDD_HHMMSS>.<ext>. Runs never write the same file."""
+    for path in sorted(staging.rglob("*")):
+        if path.is_file():
+            target_dir = RESULT_DIR / path.parent.relative_to(staging)
+            target_dir.mkdir(parents=True, exist_ok=True)
+            shutil.move(path, target_dir / f"{path.stem}_{SUFFIX}{path.suffix}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="*", help="only datasets (test file name without seed) containing one of these")
@@ -152,8 +186,16 @@ def main() -> None:
     args = parser.parse_args()
 
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
-    os.chdir(RESULT_DIR)  # FusionEnsemble writes its prediction caches to ./cache
-    base.RESULT_DIR = stage1.RESULT_DIR = RESULT_DIR
+    # FusionEnsemble writes its prediction caches to ./cache: every run works in its own folder, so a
+    # parallel run (or the leftovers of an aborted one) can never serve or delete this run's cache files.
+    work_dir = WORK_DIR
+    shutil.rmtree(work_dir, ignore_errors=True)
+    work_dir.mkdir(parents=True)
+    os.chdir(work_dir)
+    # the scripts write into a staging folder of this run; publish() moves the files to RESULT_DIR under their final names
+    staging = work_dir / "out"
+    staging.mkdir()
+    base.RESULT_DIR = stage1.RESULT_DIR = files.FUSION_DIR = staging  # FUSION_DIR: where the library would save its own jsons
     base.MODEL_DESCRIPTION = ("labelfusion + time series: roberta-large fine-tuned alone, then fusion MLP on frozen embeddings "
                               f"+ gpt-5-nano labels + TimesFM/CrossTSTransformer embedding of {', '.join(TS_SERIES)}")
     base.SETTINGS_EXTRA.update({"ts_series": TS_SERIES, "ts_window_days": args.ts_window, "ts_dim": args.ts_dim,
@@ -166,8 +208,12 @@ def main() -> None:
     # predict_all_labelFusion.run_pair, with dated data and a fusion MLP that also gets the TS branch.
     plain_build_fusion = base.build_fusion
 
+    ts_tag = f"ts{args.ts_window}d{args.ts_dim}{'ft' if args.ts_finetune else ''}"  # settings of the TS branch
+
     def build_fusion_ts(ml_model, llm_model, fus, name, tag, save):
-        fusion = plain_build_fusion(ml_model, llm_model, fus, name, tag, save)
+        # the TS settings are part of the tag, so cache files (and experiment names) of runs with other
+        # TS settings never collide
+        fusion = plain_build_fusion(ml_model, llm_model, fus, name, f"{tag}_{ts_tag}", save)
         loader, encoders, transformer = branch.fresh()
         fusion.add_ts_model(loader, encoders, transformer, date_column=DATE_COLUMN, window_days=args.ts_window)
         return fusion
@@ -211,12 +257,13 @@ def main() -> None:
 
     rows = []
     for train_path, test_path in pairs:
-        row = base.run_pair(train_path, test_path, args)
-        rows.append(row)
+        shutil.rmtree(work_dir / "cache", ignore_errors=True)
+        rows.append(base.run_pair(train_path, test_path, args))
         seed_rows = pd.DataFrame(rows)
-        seed_rows.to_csv(RESULT_DIR / "summary_seeds.csv", index=False)
-        base.aggregate(seed_rows).to_csv(RESULT_DIR / "summary.csv", index=False)
-        base.write_dataset_json(row["dataset"], seed_rows, args)
+        seed_rows.to_csv(RESULT_DIR / f"summary_seeds_{SUFFIX}.csv", index=False)
+        base.aggregate(seed_rows).to_csv(RESULT_DIR / f"summary_{SUFFIX}.csv", index=False)
+        base.write_dataset_json(rows[-1]["dataset"], seed_rows, args)
+        publish(staging)
 
     summary = base.aggregate(pd.DataFrame(rows))
     print("\n=== weighted F1 mean +- std over seeds ===")
@@ -224,8 +271,8 @@ def main() -> None:
         cells = "  ".join(f"{who} {r[f'{who}_f1_weighted_mean']:.3f}+-{r[f'{who}_f1_weighted_std']:.3f}"
                           for who in ("llm", "roberta", "fusion"))
         print(f"{r['dataset']} (n={r['n_seeds']}): {cells}")
-    print(f"\nSaved: {RESULT_DIR / 'summary.csv'}, {RESULT_DIR / 'summary_seeds.csv'} and "
-          f"one <dataset>_summary.json per dataset in {RESULT_DIR}")
+    print(f"\nSaved in {RESULT_DIR}: summary_{SUFFIX}.csv, summary_seeds_{SUFFIX}.csv, one "
+          f"<dataset>_summary_{SUFFIX}.json per dataset and per pair <test file>_{SUFFIX}.csv/.json (+ trials/)")
 
 
 if __name__ == "__main__":
