@@ -12,12 +12,16 @@ fusion MLP gets one more input: an embedding of what the market looked like on t
            data/3 Ts/daily_series.csv. Holidays (empty cells) are filled with the last known value.
            FIXED WINDOW: for a sentence dated d, every series contributes its last --ts-window (default 21)
            values up to and including d, the same window length for every sentence (textclassify's
-           TS.get_series_batch with window_days). One TimesFM-2.5 encoder per series (pooled over
+           TS.get_series_batch with window_days). With --ts-window 0 the window is the whole series: from its
+           beginning (1996-01-02) up to and including d, so it grows with the date (about 21 values for the
+           earliest, about 7000 for the latest sentences). One TimesFM-2.5 encoder per series (pooled over
            the window) -> CrossTSTransformer (attention across the three series) -> a vector of --ts-dim
            (default 64) that is concatenated to [roberta-large embedding, LLM one-hot] in the fusion MLP.
            The TimesFM encoders are frozen by default (the CrossTSTransformer and the MLP are trained);
            --ts-finetune also trains them with the MLP's learning rate. Every Optuna trial and the final MLP
-           start from the pretrained TimesFM weights.
+           start from the pretrained TimesFM weights. As frozen encoders always give the same embedding for the
+           same window, their embeddings are computed once per (series, window) and reused across epochs,
+           Optuna trials and the final MLP.
 
 Reuse of stage 1: --roberta-params-from <summary_seeds.csv of predict_all_labelFusion.py> takes the chosen
 learning rate / batch size / epochs of each pair from that run instead of tuning roberta-large again (the
@@ -40,6 +44,7 @@ Each run's summary only holds the pairs of that run.
     python testing/predict_all_labelFusion_TS_fixed_window.py --datasets mm-test pc-split-test
     python testing/predict_all_labelFusion_TS_fixed_window.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv
     python testing/predict_all_labelFusion_TS_fixed_window.py --ts-window 63 --ts-dim 128
+    python testing/predict_all_labelFusion_TS_fixed_window.py --ts-window 0                      # whole series up to the date
 """
 
 from __future__ import annotations
@@ -47,6 +52,7 @@ from __future__ import annotations
 import argparse
 import atexit
 import copy
+import hashlib
 import os
 import shutil
 import sys
@@ -70,8 +76,10 @@ SUFFIX = f"ts_fixed_window_{datetime.now():%Y%m%d_%H%M%S}"  # <model>_<date_time
 import predict_all_files_labelFusion as files  # noqa: E402
 import predict_all_labelFusion as base  # noqa: E402
 
+import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import torch  # noqa: E402
+import torch.nn as nn  # noqa: E402
 from sklearn.model_selection import train_test_split  # noqa: E402
 
 from textclassify.timeseries import CrossTSTransformer, TS, TSEmbedder  # noqa: E402
@@ -84,6 +92,7 @@ DATED_TEST_DIR = REPO_ROOT / "data" / "test_data_dated"
 TS_FILE = REPO_ROOT / "data" / "3 Ts" / "daily_series.csv"
 TS_SERIES = ["DGS10", "T10Y2Y", "VIXCLS"]
 DATE_COLUMN = "date"
+FULL_HISTORY = 10**6  # window_days that reaches back to the beginning of every series
 
 
 
@@ -102,6 +111,27 @@ class DailySeries(TS):
             self.data[name] = series.dropna().reset_index(drop=True)
 
 
+class CachedEmbedder(nn.Module):
+    """A FROZEN TSEmbedder that remembers its embedding per input series. The same window always gives the same
+    embedding, so epochs, Optuna trials and the final MLP only compute each (series, window) once; the cache is
+    shared by all copies of the encoder (they start from the same pretrained weights)."""
+
+    def __init__(self, inner: TSEmbedder, cache: dict):
+        super().__init__()
+        self.inner = inner
+        self.cache = cache
+
+    def forward(self, past_values, **kwargs):
+        keys = [hashlib.blake2b(np.asarray(v, dtype=np.float32).tobytes(), digest_size=16).digest() for v in past_values]
+        todo = {k: v for k, v in zip(keys, past_values) if k not in self.cache}
+        if todo:
+            with torch.no_grad():
+                embeddings = self.inner(list(todo.values()))["embeddings"].detach().cpu()
+            self.cache.update(zip(todo, embeddings))
+        device = next(self.inner.parameters()).device
+        return {"embeddings": torch.stack([self.cache[k] for k in keys]).to(device)}
+
+
 class TSBranch:
     """Loads the series and the pretrained TimesFM encoders once; fresh() hands every fusion MLP its own copy
     (a fine-tuned or trained branch must never leak into the next Optuna trial)."""
@@ -110,6 +140,7 @@ class TSBranch:
         self.loader = DailySeries(TS_FILE, TS_SERIES)
         self.loader.load_all()
         self.encoders = {name: TSEmbedder(pooling="mean") for name in TS_SERIES}
+        self.caches = {name: {} for name in TS_SERIES}  # embeddings of frozen encoders, per series
         self.hidden_size = next(iter(self.encoders.values())).hidden_size
         self.output_dim = args.ts_dim
         self.finetune = args.ts_finetune
@@ -119,6 +150,7 @@ class TSBranch:
         if not self.finetune:
             for enc in encoders.values():
                 enc.requires_grad_(False)
+            encoders = {name: CachedEmbedder(enc, self.caches[name]) for name, enc in encoders.items()}
         torch.manual_seed(base.RANDOM_STATE)
         transformer = CrossTSTransformer(series_names=TS_SERIES, hidden_size=self.hidden_size, output_dim=self.output_dim)
         return self.loader, encoders, transformer
@@ -176,7 +208,8 @@ def main() -> None:
                         help="project roberta-large's 1024-dim [CLS] embedding down to this size with a "
                              "trainable Linear+ReLU before the fusion MLP; 0 disables the projection")
     parser.add_argument("--ts-window", type=int, default=21,
-                        help="fixed window: number of daily values of every series up to the sentence's date")
+                        help="fixed window: number of daily values of every series up to the sentence's date; "
+                             "0 = the whole series, from its beginning up to the date")
     parser.add_argument("--ts-dim", type=int, default=64, help="size of the time series embedding fed to the fusion MLP")
     parser.add_argument("--ts-finetune", action="store_true",
                         help="also train the TimesFM encoders (default: frozen, only the CrossTSTransformer is trained)")
@@ -198,24 +231,25 @@ def main() -> None:
     base.RESULT_DIR = stage1.RESULT_DIR = files.FUSION_DIR = staging  # FUSION_DIR: where the library would save its own jsons
     base.MODEL_DESCRIPTION = ("labelfusion + time series: roberta-large fine-tuned alone, then fusion MLP on frozen embeddings "
                               f"+ gpt-5-nano labels + TimesFM/CrossTSTransformer embedding of {', '.join(TS_SERIES)}")
-    base.SETTINGS_EXTRA.update({"ts_series": TS_SERIES, "ts_window_days": args.ts_window, "ts_dim": args.ts_dim,
+    base.SETTINGS_EXTRA.update({"ts_series": TS_SERIES, "ts_window_days": args.ts_window or "full history", "ts_dim": args.ts_dim,
                                 "ts_finetune": args.ts_finetune, "roberta_params_from": str(args.roberta_params_from)})
 
     branch = TSBranch(args)
-    print(f"time series: {', '.join(TS_SERIES)}, fixed window {args.ts_window} days, {branch.output_dim}-dim embedding, "
+    print(f"time series: {', '.join(TS_SERIES)}, window {args.ts_window or 'full history (series start up to the date)'}"
+          f"{'' if not args.ts_window else ' days'}, {branch.output_dim}-dim embedding, "
           f"TimesFM {'fine-tuned' if args.ts_finetune else 'frozen'}")
 
     # predict_all_labelFusion.run_pair, with dated data and a fusion MLP that also gets the TS branch.
     plain_build_fusion = base.build_fusion
 
-    ts_tag = f"ts{args.ts_window}d{args.ts_dim}{'ft' if args.ts_finetune else ''}"  # settings of the TS branch
+    ts_tag = f"ts{args.ts_window or 'full'}d{args.ts_dim}{'ft' if args.ts_finetune else ''}"  # settings of the TS branch
 
     def build_fusion_ts(ml_model, llm_model, fus, name, tag, save):
         # the TS settings are part of the tag, so cache files (and experiment names) of runs with other
         # TS settings never collide
         fusion = plain_build_fusion(ml_model, llm_model, fus, name, f"{tag}_{ts_tag}", save)
         loader, encoders, transformer = branch.fresh()
-        fusion.add_ts_model(loader, encoders, transformer, date_column=DATE_COLUMN, window_days=args.ts_window)
+        fusion.add_ts_model(loader, encoders, transformer, date_column=DATE_COLUMN, window_days=args.ts_window or FULL_HISTORY)
         return fusion
 
     base.build_fusion = build_fusion_ts
