@@ -11,7 +11,9 @@
 
 # LabelFusion + time series (testing/predict_all_labelFusion_TS_fixed_window.py): the two-stage LabelFusion
 # plus an embedding of DGS10 / T10Y2Y / VIXCLS (fixed window of the last 21 daily values) from three
-# TimesFM encoders + a CrossTSTransformer (or, with --ts-pool-only, just their pooled embeddings). Output: outputs/labelfusion_roberta_large_ts_fixed_window/
+# TimesFM encoders. This script always runs with --ts-pool-only: no CrossTSTransformer attention, the three
+# per-series embeddings are only pooled (mean, or max with --ts-pooling max) and passed straight to the fusion MLP.
+# Output: outputs/labelfusion_roberta_large_ts_fixed_window/
 #
 # Before the run the job downloads roberta-large and the TimesFM model (google/timesfm-2.5-200m-transformers)
 # from Hugging Face (needs --constraint=inet) and checks that the installed transformers knows TimesFM 2.5.
@@ -21,8 +23,7 @@
 #   sbatch scripts/run_labelFusion_TS_fixed_window.sh                                       # all 24 pairs (does not fit into 48 h)
 #   sbatch scripts/run_labelFusion_TS_fixed_window.sh --datasets mm-test mm-split-test pc-test pc-split-test
 #   sbatch scripts/run_labelFusion_TS_fixed_window.sh --datasets pc-test --limit-train 40 --trials 0 --mlp-trials 0 --epochs 1   # smoke test
-#   sbatch scripts/run_labelFusion_TS_fixed_window.sh --ts-pool-only                        # no attention: pooled (mean) series embeddings go straight to the MLP
-#   sbatch scripts/run_labelFusion_TS_fixed_window.sh --ts-pool-only --ts-pooling max       # same, max over the series
+#   sbatch scripts/run_labelFusion_TS_fixed_window.sh --ts-pooling max                      # max instead of mean over the series
 #   sbatch scripts/run_labelFusion_TS_fixed_window.sh --ts-window 0                         # whole series (start up to the date) instead of 21 days
 #
 # Jobs can run in parallel (each on its own datasets): every result file carries the model and the start time
@@ -64,4 +65,4 @@ REUSE_ARGS=()
 
 srun $PYTHON \
      $BASE/testing/predict_all_labelFusion_TS_fixed_window.py \
-     --trials 24 --mlp-trials 30 --epochs 10 --retries 2 ${REUSE_ARGS[@]+"${REUSE_ARGS[@]}"} "$@"
+     --trials 24 --mlp-trials 30 --epochs 10 --retries 2 --ts-pool-only ${REUSE_ARGS[@]+"${REUSE_ARGS[@]}"} "$@"
