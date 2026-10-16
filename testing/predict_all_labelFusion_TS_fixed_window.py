@@ -23,6 +23,11 @@ fusion MLP gets one more input: an embedding of what the market looked like on t
            same window, their embeddings are computed once per (series, window) and reused across epochs,
            Optuna trials and the final MLP.
 
+  Pooling  --ts-pool-only skips the CrossTSTransformer's attention and projection: the three per-series
+           embeddings (1280 each) are only pooled over the series (--ts-pooling mean or max, CrossTSTransformer.pool)
+           and the pooled vector goes straight into the fusion MLP, so the TS input of the MLP is 1280-dimensional
+           instead of --ts-dim.
+
 Reuse of stage 1: --roberta-params-from <summary_seeds.csv of predict_all_labelFusion.py> takes the chosen
 learning rate / batch size / epochs of each pair from that run instead of tuning roberta-large again (the
 fine-tuned roberta-large itself is not saved, so it is trained once more with these parameters). The result is
@@ -44,6 +49,7 @@ Each run's summary only holds the pairs of that run.
     python testing/predict_all_labelFusion_TS_fixed_window.py --datasets mm-test pc-split-test
     python testing/predict_all_labelFusion_TS_fixed_window.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv
     python testing/predict_all_labelFusion_TS_fixed_window.py --ts-window 63 --ts-dim 128
+    python testing/predict_all_labelFusion_TS_fixed_window.py --ts-pool-only                    # pooled embeddings, no attention
     python testing/predict_all_labelFusion_TS_fixed_window.py --ts-window 0                      # whole series up to the date
 """
 
@@ -56,6 +62,7 @@ import hashlib
 import os
 import shutil
 import sys
+import types
 from datetime import datetime
 from pathlib import Path
 
@@ -130,6 +137,15 @@ class CachedEmbedder(nn.Module):
             self.cache.update(zip(todo, embeddings))
         device = next(self.inner.parameters()).device
         return {"embeddings": torch.stack([self.cache[k] for k in keys]).to(device)}
+
+
+def run_pooled_ts_branch(self, dates):
+    """FusionEnsemble._run_ts_branch without the CrossTSTransformer's attention: the per-series embeddings are
+    pooled over the series and passed on as they are."""
+    tr = self.ts_transformer
+    batch = self.ts_loader.get_series_batch(dates, window_days=self.ts_window_days, stocks=tr.series_names)
+    embeddings = {name: self.ts_embedders[name](batch[name])["embeddings"].to(self.device) for name in tr.series_names}
+    return tr.pool(embeddings, self.ts_pooling)["output"]
 
 
 class TSBranch:
@@ -211,6 +227,11 @@ def main() -> None:
                         help="fixed window: number of daily values of every series up to the sentence's date; "
                              "0 = the whole series, from its beginning up to the date")
     parser.add_argument("--ts-dim", type=int, default=64, help="size of the time series embedding fed to the fusion MLP")
+    parser.add_argument("--ts-pool-only", action="store_true",
+                        help="no attention / projection: pool the per-series embeddings and pass them straight to the "
+                             "fusion MLP (1280 inputs instead of --ts-dim)")
+    parser.add_argument("--ts-pooling", choices=("mean", "max"), default="mean",
+                        help="pooling over the series with --ts-pool-only")
     parser.add_argument("--ts-finetune", action="store_true",
                         help="also train the TimesFM encoders (default: frozen, only the CrossTSTransformer is trained)")
     parser.add_argument("--roberta-params-from", type=Path,
@@ -232,17 +253,20 @@ def main() -> None:
     base.MODEL_DESCRIPTION = ("labelfusion + time series: roberta-large fine-tuned alone, then fusion MLP on frozen embeddings "
                               f"+ gpt-5-nano labels + TimesFM/CrossTSTransformer embedding of {', '.join(TS_SERIES)}")
     base.SETTINGS_EXTRA.update({"ts_series": TS_SERIES, "ts_window_days": args.ts_window or "full history", "ts_dim": args.ts_dim,
+                                "ts_pool_only": args.ts_pooling if args.ts_pool_only else False,
                                 "ts_finetune": args.ts_finetune, "roberta_params_from": str(args.roberta_params_from)})
 
     branch = TSBranch(args)
+    ts_input = (f"pooled ({args.ts_pooling}) {branch.hidden_size}-dim embeddings, no attention" if args.ts_pool_only
+                else f"{branch.output_dim}-dim embedding")
     print(f"time series: {', '.join(TS_SERIES)}, window {args.ts_window or 'full history (series start up to the date)'}"
-          f"{'' if not args.ts_window else ' days'}, {branch.output_dim}-dim embedding, "
-          f"TimesFM {'fine-tuned' if args.ts_finetune else 'frozen'}")
+          f"{'' if not args.ts_window else ' days'}, {ts_input}, TimesFM {'fine-tuned' if args.ts_finetune else 'frozen'}")
 
     # predict_all_labelFusion.run_pair, with dated data and a fusion MLP that also gets the TS branch.
     plain_build_fusion = base.build_fusion
 
-    ts_tag = f"ts{args.ts_window or 'full'}d{args.ts_dim}{'ft' if args.ts_finetune else ''}"  # settings of the TS branch
+    ts_out = f"pool{args.ts_pooling}" if args.ts_pool_only else f"d{args.ts_dim}"
+    ts_tag = f"ts{args.ts_window or 'full'}{ts_out}{'ft' if args.ts_finetune else ''}"  # settings of the TS branch
 
     def build_fusion_ts(ml_model, llm_model, fus, name, tag, save):
         # the TS settings are part of the tag, so cache files (and experiment names) of runs with other
@@ -250,6 +274,10 @@ def main() -> None:
         fusion = plain_build_fusion(ml_model, llm_model, fus, name, f"{tag}_{ts_tag}", save)
         loader, encoders, transformer = branch.fresh()
         fusion.add_ts_model(loader, encoders, transformer, date_column=DATE_COLUMN, window_days=args.ts_window or FULL_HISTORY)
+        if args.ts_pool_only:
+            transformer.output_dim = transformer.hidden_size  # the fusion MLP reads its TS input size from here
+            fusion.ts_pooling = args.ts_pooling
+            fusion._run_ts_branch = types.MethodType(run_pooled_ts_branch, fusion)
         return fusion
 
     base.build_fusion = build_fusion_ts
