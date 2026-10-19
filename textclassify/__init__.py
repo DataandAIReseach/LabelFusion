@@ -24,6 +24,7 @@ from .llm.openai_classifier import OpenAIClassifier
 from .llm.gemini_classifier import GeminiClassifier
 from .llm.deepseek_classifier import DeepSeekClassifier
 from .llm.openrouter_classifier import OpenRouterClassifier
+from .llm.anthropic_classifier import AnthropicClassifier
 
 # Traditional ML Classifiers (optional - require transformers/torch)
 try:
@@ -84,6 +85,7 @@ __all__ = [
     "GeminiClassifier",
     "DeepSeekClassifier",
     "OpenRouterClassifier",
+    "AnthropicClassifier",
     
     # Ensemble Methods
     "VotingEnsemble",

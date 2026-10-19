@@ -9,31 +9,38 @@
 #SBATCH -e /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.err
 #SBATCH --constraint=inet
 
-# Low-data regimes with FROZEN encoders (testing/predict_low_data_regimes.py): for every test file and every regime
-# p = 10, 20, ..., 100 % of its training file a small MLP is trained on the regime and scored on the full test set.
-# Only the MLP is trained (and tuned with Optuna, --mlp-trials, default 30): roberta-large is the pretrained model
-# (never fine-tuned), the TimesFM encoders and the time series transformer are frozen. Three MLPs differ only in
-# their input:
-#   roberta    frozen roberta-large embedding alone
-#   fusion     + the LLM label (LabelFusion)
-#   fusion_ts  + DGS10 / T10Y2Y / VIXCLS (last 21 days, frozen TimesFM encoders pooled over the series)
-# The LLM labels of the test sentences are the regime's (outputs/predictions_low_data_regimes/...).
+# Low-data regimes (testing/predict_low_data_regimes.py): for every test file and every regime
+# p = 10, 20, ..., 100 % of its training file models are trained on the regime and scored on the full test set.
+#   regimes 80 and 100 %  the FULL program of predict_all_labelFusion.py: roberta-large is FINE-TUNED (Optuna over lr x batch
+#                         size x epochs, class weights, warmup, best epoch, retries), then the fusion MLPs are tuned with Optuna and
+#                         trained on the validation split: fusion = fine-tuned roberta-large + LLM label, fusion_ts = additionally the
+#                         FINE-TUNED time series model (DGS10 / T10Y2Y / VIXCLS: TimesFM encoders + CrossTSTransformer trained with the
+#                         MLP; --ts-mlp-trials, default 10, because every trial fine-tunes three TimesFM encoders)
+#   all other regimes     FROZEN encoders: roberta-large (pretrained, never fine-tuned), the TimesFM encoders and the time series
+#                         transformer are frozen, only MLPs are trained (and tuned with Optuna, --mlp-trials, default 30) on the
+#                         whole regime: roberta (embedding alone), fusion (+ LLM label), fusion_ts (+ pooled time series)
+# The LLM labels of the test sentences are the regime's (outputs/predictions_low_data_regimes/...), nothing is asked again.
 # Output: outputs/predict_low_data_regimes/
 #
 # Before the run the job downloads roberta-large and the TimesFM model (google/timesfm-2.5-200m-transformers)
 # from Hugging Face (needs --constraint=inet) and checks that the installed transformers knows TimesFM 2.5.
+# If outputs/labelfusion_roberta_large/summary_seeds.csv exists (run of run_labelFusion.sh), the roberta-large parameters
+# (lr, batch size, epochs) tuned there for the same test file are used at 80 / 100 % instead of tuning stage 1 again (the 24
+# Optuna trials of roberta-large per run are by far the most expensive part).
 #
 #   sbatch scripts/run_predict_low_data_regimes.sh --dry-run                                  # which runs, nothing is trained
-#   sbatch scripts/run_predict_low_data_regimes.sh --datasets pc-split-test --percents 10 100 --mlp-trials 3   # smoke test
+#   sbatch scripts/run_predict_low_data_regimes.sh --datasets pc-split-test --percents 10 80 --mlp-trials 3 --trials 0 --epochs 2   # smoke test
 #   sbatch scripts/run_predict_low_data_regimes.sh --datasets mm-test mm-split-test pc-test pc-split-test
+#   sbatch scripts/run_predict_low_data_regimes.sh --percents 10 20 30 40 50 60 70 90         # only the frozen regimes
+#   sbatch scripts/run_predict_low_data_regimes.sh --percents 80 100                          # only the full program
+#   sbatch scripts/run_predict_low_data_regimes.sh --full-percents                            # frozen everywhere (no value = none)
 #   sbatch scripts/run_predict_low_data_regimes.sh --resume                                   # skip runs that already have a result
 #   sbatch scripts/run_predict_low_data_regimes.sh --no-ts                                    # without the time series model
-#   sbatch scripts/run_predict_low_data_regimes.sh --mlp-trials 10                            # fewer Optuna trials per run and model
-#   sbatch scripts/run_predict_low_data_regimes.sh --ts-window 0 --ts-pooling max             # whole series, max pooling
+#   sbatch scripts/run_predict_low_data_regimes.sh --mlp-trials 10 --trials 16 --ts-mlp-trials 5   # fewer Optuna trials per run
 #
-# 240 runs may not fit into one 48 h job: split them by --datasets and/or --percents and use --resume to go on.
-# Jobs can run in parallel (each on its own datasets): every result file carries the start time of the run in its name
-# (<test file>_<p>_low_data_regimes_<YYYYMMDD_HHMMSS>.csv/.json), so runs never overwrite each other.
+# 240 runs (48 of them with the full program) do not fit into one job: split them by --datasets and/or --percents and use
+# --resume to go on. Jobs can run in parallel (each on its own datasets): every result file carries the start time of the
+# run in its name (<test file>_<p>_low_data_regimes_<YYYYMMDD_HHMMSS>.csv/.json), so runs never overwrite each other.
 # Every run's summary_*.csv only holds that run's runs.
 
 set -euo pipefail
@@ -65,6 +72,10 @@ except ImportError:
 print("TimesFM 2.5 available")
 PY
 
+REUSE=$BASE/outputs/labelfusion_roberta_large/summary_seeds.csv
+REUSE_ARGS=()
+[ -f "$REUSE" ] && REUSE_ARGS=(--roberta-params-from "$REUSE")
+
 srun $PYTHON \
      $BASE/testing/predict_low_data_regimes.py \
-     "$@"
+     ${REUSE_ARGS[@]+"${REUSE_ARGS[@]}"} "$@"

@@ -1,41 +1,57 @@
-"""Low-data regimes with FROZEN encoders: only the fusion MLP is trained (and tuned with Optuna).
+"""Low-data regimes: frozen encoders and only a tuned MLP, and the full program at --full-percents (default 80 and 100 %).
 
 For every test file (data/test_data_dated/<dataset>-<seed>.xlsx, always the FULL test set) and every regime p
 (10, 20, ..., 100 %) of its training file (data/training_data_dated_low_data_regimes/<train name>_<p>.csv, made by
-dataset_scripts/make_low_data_regimes.py) one run trains a small MLP on the regime and predicts the test set. Three
-MLPs differ only in their input, four columns of predictions come out:
+dataset_scripts/make_low_data_regimes.py) one run trains on the regime and predicts the test set. Four columns of
+predictions come out; "training" in the summary says how they were made:
 
   llm           the LLM labels of the regime: GPT-5 nano with 2 examples per 10 % of the training data
                 (predict_all_files_llm_low_data_regimes.py, outputs/predictions_low_data_regimes/...). These are
                 also the LLM labels the fusion models get for the test sentences.
-  roberta       MLP on the frozen roberta-large [CLS] embedding alone (the LLM input is a constant, i.e. no information).
-  fusion        LabelFusion: MLP on the frozen roberta-large embedding + the LLM label. The LLM labels of the regime's
+  roberta       frozen regimes: MLP on the frozen, pretrained roberta-large [CLS] embedding alone (the LLM input is a
+                constant, i.e. no information).  full regimes: roberta-large fine-tuned alone.
+  fusion        LabelFusion: MLP on the roberta-large embedding + the LLM label. The LLM labels of the regime's
                 sentences are the zero-shot ones of predict_all_files_llm.py (outputs/predictions/train_gpt-5-nano_zero_shot).
   fusion_ts     the same with the time series branch: DGS10 / T10Y2Y / VIXCLS (data/3 Ts/daily_series.csv), the last
-                --ts-window days up to the date of the sentence, one frozen TimesFM encoder per series, pooled over the
-                series (--ts-pooling) and concatenated to the MLP input. Skipped with --no-ts.
+                --ts-window days up to the date of the sentence, one TimesFM encoder per series. Frozen regimes: frozen
+                encoders, pooled over the series (--ts-pooling). Full regimes: FINE-TUNED encoders and a trained
+                CrossTSTransformer (attention over the series, --ts-dim outputs). Skipped with --no-ts.
 
-Nothing but the MLP is trained: roberta-large is the pretrained model (never fine-tuned), the TimesFM encoders and the
-time series transformer are frozen. The MLP is therefore trained on the WHOLE regime (no train/validation split is
-needed to protect a fine-tuned encoder) and scored on the full test set: weighted F1 (primary), macro-F1, accuracy.
-Optuna (--mlp-trials, default 30, 0 = the MLP's default configuration) tunes the MLP's learning rate, epochs, hidden
-layers and batch size per run and model, on one half of the regime scored on the other half, as in
-predict_all_labelFusion.py; the best parameters then train the MLP on the whole regime. Because the encoders are frozen,
-every sentence is embedded once for the whole sweep (roberta-large and TimesFM), so a run costs only MLP trainings.
+FROZEN regimes (all but --full-percents): nothing but the MLP is trained. roberta-large is the pretrained model
+(never fine-tuned), the TimesFM encoders and the time series transformer are frozen. The MLP is trained on the WHOLE
+regime (no train/validation split is needed to protect a fine-tuned encoder). Optuna (--mlp-trials, default 30,
+0 = the MLP's default configuration) tunes its learning rate, epochs, hidden layers and batch size per run and model,
+on one half of the regime scored on the other half; the best parameters then train the MLP on the whole regime. Every
+sentence is embedded once for the whole sweep (roberta-large and TimesFM), so such a run costs only MLP trainings.
+
+FULL regimes (--full-percents, default 80 100; none with --full-percents and no value): the full program of
+predict_all_labelFusion.py. The regime is split 80/20 (stratified) into train and validation. Stage 1: roberta-large is
+fine-tuned alone; Optuna (--trials, default 24: the 16-point learning-rate x batch-size grid, then free refinement)
+over lr / batch size / epochs, weighted F1 on the validation split, with class weights, 10 % warmup, best-epoch
+selection and --retries (default 2) on a one-class collapse. Stage 2: the fine-tuned roberta-large is frozen and the
+fusion MLPs are tuned and trained on the VALIDATION split, which roberta-large never trained on: fusion with the
+fine-tuned roberta-large + the LLM label (--mlp-trials), fusion_ts additionally with the fine-tuned time series model,
+whose TimesFM encoders and CrossTSTransformer are trained together with the MLP (--ts-mlp-trials, default 10, because
+every trial fine-tunes three TimesFM encoders; the library trains them with the MLP's learning rate). --roberta-params-from <summary_seeds.csv of predict_all_labelFusion.py> takes the learning rate / batch size /
+epochs tuned there for the same test file instead of tuning stage 1 again. The fine-tuned "roberta" and the frozen
+"roberta" of the other regimes are different models: compare the curve across that boundary with care.
+
+Everything is scored on the full test set: weighted F1 (primary), macro-F1, accuracy.
 
 Several runs (e.g. one sbatch job per group of datasets) can run at the same time without influencing each other:
-every run has its own work folder (.work/<job id>) for the library's prediction caches, and every result file carries
-the start time of the run in its name. Writes to ./outputs/predict_low_data_regimes/:
+every run has its own work folder (.work/<job id>) for the saved roberta-large models and the library's prediction
+caches, and every result file carries the start time of the run in its name. Writes to ./outputs/predict_low_data_regimes/:
     <test file>_<p>_low_data_regimes_<date_time>.csv / .json   per run: sentence, label, true, llm_pred, roberta_pred, fusion_pred, fusion_ts_pred
-    summary_seeds_low_data_regimes_<date_time>.csv             one row per run (all metrics, MLP parameters used)
+    summary_seeds_low_data_regimes_<date_time>.csv             one row per run (all metrics, "training", parameters used)
     summary_low_data_regimes_<date_time>.csv                   per dataset and regime: mean / std (ddof=1) over the seeds
     failures_low_data_regimes_<date_time>.csv                  runs that raised an error (the sweep goes on)
-    trials/...                                                 Optuna trials of the MLPs
+    trials/...                                                 Optuna trials
 
     python testing/predict_low_data_regimes.py --dry-run                                  # which runs, nothing is trained
-    python testing/predict_low_data_regimes.py --datasets pc-split-test --percents 10 100 # a first look
+    python testing/predict_low_data_regimes.py --datasets pc-split-test --percents 10 80  # a first look: one frozen, one full run
     python testing/predict_low_data_regimes.py                                            # everything
-    python testing/predict_low_data_regimes.py --no-ts --mlp-trials 10                    # without the time series, fewer trials
+    python testing/predict_low_data_regimes.py --no-ts --mlp-trials 10 --full-percents 100   # without the time series, fewer trials
+    python testing/predict_low_data_regimes.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv
 """
 
 from __future__ import annotations
@@ -43,6 +59,7 @@ from __future__ import annotations
 import argparse
 import atexit
 import collections
+import copy
 import gc
 import hashlib
 import os
@@ -75,12 +92,14 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import torch  # noqa: E402
 import torch.nn as nn  # noqa: E402
+from sklearn.model_selection import train_test_split  # noqa: E402
 
 from test_textclassify_llm import _add_onehot_labels  # noqa: E402
 from textclassify import RoBERTaLargeClassifier  # noqa: E402
 from textclassify.core.types import ModelConfig, ModelType  # noqa: E402
 from textclassify.timeseries import CrossTSTransformer, TS, TSEmbedder  # noqa: E402
 
+stage1 = base.stage1
 REPO_ROOT = base.TEST_DIR.parent.parent
 TRAIN_REGIME_DIR = REPO_ROOT / "data" / "training_data_dated_low_data_regimes"
 TEST_DATED_DIR = REPO_ROOT / "data" / "test_data_dated"
@@ -132,25 +151,39 @@ class CachedEmbedder(nn.Module):
 
 
 class TSBranch:
-    """Loads the series and the pretrained TimesFM encoders once. Everything is frozen: the encoders (their embeddings
-    are cached for the whole sweep) and the CrossTSTransformer, which FusionEnsemble.add_ts_model needs but which the
-    pooled branch never calls."""
+    """Loads the series and the pretrained TimesFM encoders once and hands out two kinds of branches.
+
+    fresh_frozen():    FROZEN regimes. The encoders and the CrossTSTransformer are frozen (the transformer is only needed
+                       by FusionEnsemble.add_ts_model, the pooled branch never calls it); the encoders' embeddings are
+                       cached for the whole sweep.
+    fresh_finetuned(): FULL regimes. Own copies of the pretrained encoders and a new CrossTSTransformer (attention over the
+                       three series, --ts-dim outputs); FusionEnsemble fine-tunes them together with the fusion MLP. Every
+                       Optuna trial and the final MLP start from the pretrained TimesFM weights."""
 
     def __init__(self, args):
         self.loader = DailySeries(TS_FILE, TS_SERIES)
         self.loader.load_all()
-        encoders = {name: TSEmbedder(pooling="mean") for name in TS_SERIES}
-        for enc in encoders.values():
+        self.pretrained = {name: TSEmbedder(pooling="mean") for name in TS_SERIES}
+        for enc in self.pretrained.values():
             enc.requires_grad_(False)
-        self.hidden_size = next(iter(encoders.values())).hidden_size
+        self.hidden_size = next(iter(self.pretrained.values())).hidden_size
         self.caches = {name: {} for name in TS_SERIES}
-        self.encoders = {name: CachedEmbedder(enc, self.caches[name]) for name, enc in encoders.items()}
+        self.cached = {name: CachedEmbedder(enc, self.caches[name]) for name, enc in self.pretrained.items()}
+        self.ts_dim = args.ts_dim
 
-    def fresh(self):
+    def fresh_frozen(self):
         torch.manual_seed(base.RANDOM_STATE)
         transformer = CrossTSTransformer(series_names=TS_SERIES, hidden_size=self.hidden_size, output_dim=self.hidden_size)
         transformer.requires_grad_(False)
-        return self.loader, self.encoders, transformer
+        return self.loader, self.cached, transformer
+
+    def fresh_finetuned(self):
+        encoders = {name: copy.deepcopy(enc) for name, enc in self.pretrained.items()}
+        for enc in encoders.values():
+            enc.requires_grad_(True)
+        torch.manual_seed(base.RANDOM_STATE)
+        transformer = CrossTSTransformer(series_names=TS_SERIES, hidden_size=self.hidden_size, output_dim=self.ts_dim)
+        return self.loader, encoders, transformer
 
 
 def run_pooled_ts_branch(self, dates):
@@ -179,6 +212,15 @@ def load_regime(path: Path) -> pd.DataFrame:
 
 def load_test(test_path: Path) -> pd.DataFrame:
     return with_dates(pd.read_excel(TEST_DATED_DIR / test_path.name))
+
+
+def split_regime(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Regime -> (train, validation), 80/20 stratified, as base.split_pair does for a whole train file."""
+    try:
+        train_df, val_df = train_test_split(df, train_size=0.8, random_state=base.RANDOM_STATE, stratify=df["label"])
+    except ValueError:  # a class too small to stratify
+        train_df, val_df = train_test_split(df, train_size=0.8, random_state=base.RANDOM_STATE)
+    return train_df.reset_index(drop=True), val_df.reset_index(drop=True)
 
 
 def jobs(args) -> list[tuple[Path, Path, Path, int]]:
@@ -213,19 +255,14 @@ class ConstantLLM(base.PrecomputedLLM):
         super().__init__(collections.defaultdict(lambda: base.LABEL_COLUMNS[-1]))
 
 
-def run_job(test_path: Path, train_path: Path, llm_path: Path, percent: int, args, roberta, branches) -> tuple[dict, pd.DataFrame]:
+def prepare(test_path: Path, train_path: Path, llm_path: Path, percent: int):
+    """The regime, the full test set, the LLM labels, the start of the output frame and the summary row."""
     name = f"{test_path.stem}_{percent}"
-    t0 = time.time()
     regime_df = load_regime(train_path)
     test_df = load_test(test_path)
-    print(f"\n=== {name}: regime {len(regime_df)} / test {len(test_df)} ===")
-
     llm_train = base.PrecomputedLLM(base.llm_predictions(base.LLM_TRAIN_DIR / f"{base.paired_train(test_path).stem}.csv"))
     llm_test = base.llm_predictions(llm_path)
     llm_test_preds = [llm_test[t] for t in test_df[base.TEXT_COLUMN]]
-    constant = ConstantLLM()
-    constant_test_preds = [base.LABEL_COLUMNS[-1]] * len(test_df)
-
     out = pd.DataFrame({
         base.TEXT_COLUMN: test_df[base.TEXT_COLUMN], "label": test_df["label"], "true": test_df["label"].map(base.LABEL_MAP),
         "llm_pred": llm_test_preds,
@@ -234,6 +271,26 @@ def run_job(test_path: Path, train_path: Path, llm_path: Path, percent: int, arg
     row = {"dataset": m["dataset"], "seed": m["seed"], "file": name, "percent": percent,
            "regime_rows": len(regime_df), "test_rows": len(test_df),
            "llm_examples": max(1, round(2 * percent / 10))}  # the examples of the regime's LLM labels
+    return name, regime_df, test_df, llm_train, llm_test_preds, out, row
+
+
+def finish(row: dict, out: pd.DataFrame, t0: float) -> tuple[dict, pd.DataFrame]:
+    for who in WHO:
+        if f"{who}_pred" in out:
+            row.update({f"{who}_{k}": v for k, v in base.scores(out["true"].tolist(), out[f"{who}_pred"].tolist()).items()})
+    row["seconds"] = round(time.time() - t0)
+    print({k: round(v, 3) if isinstance(v, float) else v for k, v in row.items() if k.endswith(("f1_weighted", "seconds"))})
+    return row, out
+
+
+def run_job(test_path: Path, train_path: Path, llm_path: Path, percent: int, args, roberta, branches) -> tuple[dict, pd.DataFrame]:
+    """FROZEN regime: only MLPs are trained, on the whole regime."""
+    t0 = time.time()
+    name, regime_df, test_df, llm_train, llm_test_preds, out, row = prepare(test_path, train_path, llm_path, percent)
+    print(f"\n=== {name} (frozen encoders): regime {len(regime_df)} / test {len(test_df)} ===")
+    row["training"] = "frozen"
+    constant = ConstantLLM()
+    constant_test_preds = [base.LABEL_COLUMNS[-1]] * len(test_df)
 
     # (model, LLM input, test LLM labels, fusion builder): the MLP is the same, only its input differs
     models = [("roberta", constant, constant_test_preds, branches["plain"]),
@@ -251,13 +308,48 @@ def run_job(test_path: Path, train_path: Path, llm_path: Path, percent: int, arg
         row.update({f"{who}_mlp_lr": mlp["fusion_lr"], f"{who}_mlp_epochs": mlp["num_epochs"],
                     f"{who}_mlp_batch_size": mlp["batch_size"], f"{who}_mlp_val_f1": mlp_val_f1})
         gc.collect()
+    return finish(row, out, t0)
 
-    for who in WHO:
-        if f"{who}_pred" in out:
-            row.update({f"{who}_{k}": v for k, v in base.scores(out["true"].tolist(), out[f"{who}_pred"].tolist()).items()})
-    row["seconds"] = round(time.time() - t0)
-    print({k: round(v, 3) if isinstance(v, float) else v for k, v in row.items() if k.endswith(("f1_weighted", "seconds"))})
-    return row, out
+
+def run_job_full(test_path: Path, train_path: Path, llm_path: Path, percent: int, args, branches) -> tuple[dict, pd.DataFrame]:
+    """FULL regime: the program of predict_all_labelFusion.py (+ the time series model) on the regime."""
+    t0 = time.time()
+    name, regime_df, test_df, llm_train, llm_test_preds, out, row = prepare(test_path, train_path, llm_path, percent)
+    train_df, val_df = split_regime(regime_df)
+    print(f"\n=== {name} (full program): train {len(train_df)} / val {len(val_df)} / test {len(test_df)} ===")
+    row.update({"training": "finetuned", "train_rows": len(train_df), "val_rows": len(val_df)})
+
+    # Stage 1: roberta-large alone (Optuna over lr x batch size x epochs, class weights, warmup, best epoch, retries)
+    if args.trials > 0:
+        rob, roberta_val_f1 = stage1.tune(train_df, val_df, name, args)
+    else:
+        rob, roberta_val_f1 = stage1.default_params(args), None
+    roberta, memo = base.train_roberta(rob, train_df, val_df, retries=args.retries)
+    out["roberta_pred"] = roberta.predict_without_saving(test_df).predictions
+    row.update({"roberta_lr": rob["learning_rate"], "roberta_batch_size": rob["batch_size"],
+                "roberta_epochs": rob["num_epochs"], "roberta_val_f1": roberta_val_f1})
+
+    # Stage 2: roberta-large frozen, the fusion MLPs are tuned and trained on the validation split
+    # fusion: the fine-tuned roberta-large + LLM label. fusion_ts: additionally the FINE-TUNED time series model
+    # (TimesFM encoders + CrossTSTransformer, trained with the MLP); that is far more expensive per MLP trial.
+    models = [("fusion", branches["plain"], args.mlp_trials)]
+    if "ts_finetuned" in branches:
+        models.append(("fusion_ts", branches["ts_finetuned"], args.ts_mlp_trials))
+    for who, build, trials in models:
+        base.build_fusion = build
+        fname = name if who == "fusion" else f"{name}_{who}"
+        if trials > 0:
+            mlp, mlp_val_f1 = base.tune_mlp(roberta, llm_train, train_df, val_df, fname, argparse.Namespace(**{**vars(args), "mlp_trials": trials}))
+        else:
+            mlp, mlp_val_f1 = base.default_mlp_params(args), None
+        out[f"{who}_pred"] = base.mlp_fit_predict(roberta, llm_train, mlp, train_df, val_df, test_df, llm_test_preds, fname, "final", verbose=False)
+        row.update({f"{who}_mlp_lr": mlp["fusion_lr"], f"{who}_mlp_epochs": mlp["num_epochs"],
+                    f"{who}_mlp_batch_size": mlp["batch_size"], f"{who}_mlp_val_f1": mlp_val_f1})
+    del roberta, memo
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    return finish(row, out, t0)
 
 
 def aggregate(seed_rows: pd.DataFrame) -> pd.DataFrame:
@@ -305,6 +397,23 @@ def main() -> None:
     parser.add_argument("--resume", action="store_true", help="skip runs that already have a result file in the output folder")
     parser.add_argument("--mlp-trials", type=int, default=30,
                         help="Optuna trials per run and model tuning the fusion MLP; 0 = the MLP's default configuration")
+    parser.add_argument("--full-percents", nargs="*", type=int, default=[80, 100],
+                        help="regimes that get the full program (fine-tuned roberta-large with Optuna, warmup, class weights, "
+                             "best epoch, retries; MLPs on the validation split). Default 80 100; give no value for none")
+    parser.add_argument("--ts-mlp-trials", type=int, default=10,
+                        help="full regimes: Optuna trials for the fusion MLP WITH the fine-tuned time series model (every trial "
+                             "fine-tunes three TimesFM encoders, so this is much more expensive than --mlp-trials); 0 = defaults")
+    parser.add_argument("--ts-dim", type=int, default=64,
+                        help="full regimes: size of the fine-tuned CrossTSTransformer's output fed to the MLP")
+    parser.add_argument("--trials", type=int, default=24,
+                        help="full regimes: roberta-large Optuna trials per run (the 16 grid points first, the rest is free); 0 = defaults")
+    parser.add_argument("--epochs", type=int, default=10,
+                        help="full regimes: roberta-large (maximum) epochs of the default configuration and of the grid points")
+    parser.add_argument("--retries", type=int, default=2,
+                        help="full regimes: repeat the final roberta-large training with another seed up to N times on a one-class collapse")
+    parser.add_argument("--roberta-params-from", type=Path,
+                        help="full regimes: summary_seeds.csv of a predict_all_labelFusion.py run, lr / batch size / epochs per test "
+                             "file instead of tuning stage 1")
     parser.add_argument("--ml-proj-dim", type=int, default=768,
                         help="project roberta-large's 1024-dim [CLS] embedding down to this size before the MLP; 0 disables")
     parser.add_argument("--roberta-model", default="roberta-large", help="the (frozen) encoder; roberta-large unless testing")
@@ -323,10 +432,12 @@ def main() -> None:
         todo = [j for j in todo if f"{j[0].stem}_{j[3]}" not in done]
     print(f"{len(todo)} runs ({', '.join(sorted({str(j[3]) + '%' for j in todo}, key=lambda s: int(s[:-1])))}) "
           f"on {len({j[0] for j in todo})} test files; models: roberta, fusion{'' if args.no_ts else ', fusion_ts'} "
-          f"(frozen encoders, MLP tuned with {args.mlp_trials} Optuna trials)")
+          f"(full program at {', '.join(str(p) + '%' for p in args.full_percents) or 'no regime'}, frozen encoders + "
+          f"MLP tuned with {args.mlp_trials} Optuna trials at the others)")
     if args.dry_run:
         for test_path, train_path, llm_path, percent in todo[:10]:
-            print(f"  {test_path.stem}_{percent}: train {train_path.name}, LLM labels {llm_path.name}")
+            print(f"  {test_path.stem}_{percent} ({'full program' if percent in args.full_percents else 'frozen'}): "
+                  f"train {train_path.name}, LLM labels {llm_path.name}")
         print("  ..." if len(todo) > 10 else "")
         return
     if not todo:
@@ -339,34 +450,68 @@ def main() -> None:
     os.chdir(WORK_DIR)
     staging = WORK_DIR / "out"
     staging.mkdir()
-    base.RESULT_DIR = files.FUSION_DIR = staging
+    base.RESULT_DIR = stage1.RESULT_DIR = files.FUSION_DIR = staging
 
-    roberta = build_frozen_roberta(args.roberta_model)
+    frozen = {}  # the frozen roberta-large is only built (and its embeddings cached) if a frozen regime is in the sweep
     plain_build_fusion = base.build_fusion
     branches = {"plain": plain_build_fusion}
     if not args.no_ts:
         branch = TSBranch(args)
         ts_tag = f"ts{args.ts_window or 'full'}pool{args.ts_pooling}"
+        tsft_tag = f"tsft{args.ts_window or 'full'}d{args.ts_dim}"
+        window_days = args.ts_window or FULL_HISTORY
 
         def build_fusion_ts(ml_model, llm_model, fus, name, tag, save):
-            # the TS settings are part of the tag: cache files of the plain and the time series fusion never collide
+            # FROZEN regimes. The TS settings are part of the tag: cache files of the different fusion models never collide
             fusion = plain_build_fusion(ml_model, llm_model, fus, name, f"{tag}_{ts_tag}", save)
-            loader, encoders, transformer = branch.fresh()
-            fusion.add_ts_model(loader, encoders, transformer, date_column=DATE_COLUMN, window_days=args.ts_window or FULL_HISTORY)
+            loader, encoders, transformer = branch.fresh_frozen()
+            fusion.add_ts_model(loader, encoders, transformer, date_column=DATE_COLUMN, window_days=window_days)
             fusion.ts_pooling = args.ts_pooling
             fusion._run_ts_branch = types.MethodType(run_pooled_ts_branch, fusion)
             return fusion
 
+        def build_fusion_ts_finetuned(ml_model, llm_model, fus, name, tag, save):
+            # FULL regimes: the library's own branch (TimesFM encoders -> CrossTSTransformer attention), all trained
+            fusion = plain_build_fusion(ml_model, llm_model, fus, name, f"{tag}_{tsft_tag}", save)
+            loader, encoders, transformer = branch.fresh_finetuned()
+            fusion.add_ts_model(loader, encoders, transformer, date_column=DATE_COLUMN, window_days=window_days)
+            return fusion
+
         branches["ts"] = build_fusion_ts
+        branches["ts_finetuned"] = build_fusion_ts_finetuned
         print(f"time series: {', '.join(TS_SERIES)}, window {args.ts_window or 'full history'}"
-              f"{'' if not args.ts_window else ' days'}, frozen TimesFM encoders, pooled ({args.ts_pooling})")
+              f"{'' if not args.ts_window else ' days'}; frozen regimes: frozen TimesFM encoders, pooled ({args.ts_pooling}); "
+              f"full regimes ({', '.join(str(p) + '%' for p in args.full_percents) or 'none'}): fine-tuned TimesFM encoders + "
+              f"CrossTSTransformer ({args.ts_dim} dims)")
+
+    if args.roberta_params_from:
+        reuse = pd.read_csv(args.roberta_params_from).set_index("file")
+        plain_tune = stage1.tune
+
+        def tune_or_reuse(train_df, val_df, name, targs):
+            pair = REGIME_RE.sub("", name)  # <test file>_<p> -> <test file>
+            if pair not in reuse.index:
+                return plain_tune(train_df, val_df, name, targs)
+            r = reuse.loc[pair]
+            params = {**stage1.default_params(targs), "learning_rate": float(r["roberta_lr"]),
+                      "batch_size": int(r["roberta_batch_size"]), "num_epochs": int(r["roberta_epochs"])}
+            val_f1 = r.get("roberta_val_f1")
+            return params, (None if pd.isna(val_f1) else float(val_f1))
+
+        stage1.tune = tune_or_reuse
+        args.trials = max(args.trials, 1)  # tune() now only looks the parameters up
 
     rows, failures = [], []
     for test_path, train_path, llm_path, percent in todo:
         shutil.rmtree(WORK_DIR / "cache", ignore_errors=True)
         name = f"{test_path.stem}_{percent}"
         try:
-            row, out = run_job(test_path, train_path, llm_path, percent, args, roberta, branches)
+            if percent in args.full_percents:
+                row, out = run_job_full(test_path, train_path, llm_path, percent, args, branches)
+            else:
+                if "roberta" not in frozen:
+                    frozen["roberta"] = build_frozen_roberta(args.roberta_model)
+                row, out = run_job(test_path, train_path, llm_path, percent, args, frozen["roberta"], branches)
         except Exception as e:  # one failing run must not stop the sweep
             traceback.print_exc()
             failures.append({"file": name, "error": f"{type(e).__name__}: {e}"})
