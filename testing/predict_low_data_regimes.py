@@ -1,52 +1,48 @@
-"""Low-data regimes: roberta-large alone, LabelFusion (roberta-large + LLM) and LabelFusion with the time series.
+"""Low-data regimes with FROZEN encoders: only the fusion MLP is trained (and tuned with Optuna).
 
 For every test file (data/test_data_dated/<dataset>-<seed>.xlsx, always the FULL test set) and every regime p
 (10, 20, ..., 100 %) of its training file (data/training_data_dated_low_data_regimes/<train name>_<p>.csv, made by
-dataset_scripts/make_low_data_regimes.py) one run trains on the regime and predicts the test set with four models:
+dataset_scripts/make_low_data_regimes.py) one run trains a small MLP on the regime and predicts the test set. Three
+MLPs differ only in their input, four columns of predictions come out:
 
-  llm           the LLM labels of that regime: GPT-5 nano with 2 examples per 10 % of the training data
+  llm           the LLM labels of the regime: GPT-5 nano with 2 examples per 10 % of the training data
                 (predict_all_files_llm_low_data_regimes.py, outputs/predictions_low_data_regimes/...). These are
                 also the LLM labels the fusion models get for the test sentences.
-  roberta       roberta-large alone, fine-tuned on the regime (train 80 % / validation 20 %, stratified).
-  fusion        LabelFusion as in predict_all_labelFusion.py: the fine-tuned roberta-large is frozen, a fusion MLP
-                learns from its [CLS] embedding + the LLM label on the validation split. The LLM labels of the
-                train/validation sentences are the zero-shot ones of predict_all_files_llm.py
-                (outputs/predictions/train_gpt-5-nano_zero_shot).
-  fusion_ts     the same fusion MLP with the time series branch of predict_all_labelFusion_TS_fixed_window.py:
-                DGS10 / T10Y2Y / VIXCLS (data/3 Ts/daily_series.csv), the last --ts-window days up to the date of
-                the sentence, TimesFM encoders, pooled over the series (--ts-pool-only, default; --no-ts-pool-only
-                switches to the CrossTSTransformer's attention). Skipped with --no-ts.
+  roberta       MLP on the frozen roberta-large [CLS] embedding alone (the LLM input is a constant, i.e. no information).
+  fusion        LabelFusion: MLP on the frozen roberta-large embedding + the LLM label. The LLM labels of the regime's
+                sentences are the zero-shot ones of predict_all_files_llm.py (outputs/predictions/train_gpt-5-nano_zero_shot).
+  fusion_ts     the same with the time series branch: DGS10 / T10Y2Y / VIXCLS (data/3 Ts/daily_series.csv), the last
+                --ts-window days up to the date of the sentence, one frozen TimesFM encoder per series, pooled over the
+                series (--ts-pooling) and concatenated to the MLP input. Skipped with --no-ts.
 
-roberta-large is fine-tuned once per run and shared by the three roberta-based models, so they differ only in
-what the fusion MLP sees. Everything is scored on the full test set: weighted F1 (primary), macro-F1, accuracy.
-
-Tuning is OFF by default, because a sweep has 240 runs: roberta-large uses the default configuration (lr 1e-5,
-batch 16, up to --epochs epochs with best-epoch selection and --retries on a collapse) and the MLPs their defaults.
---trials N / --mlp-trials N switch on the Optuna searches of predict_all_labelFusion.py per run, and
---roberta-params-from <summary_seeds.csv of predict_all_labelFusion.py> takes the learning rate / batch size / epochs
-tuned there for the same test file (at 100 % of the data) for all regimes of it.
+Nothing but the MLP is trained: roberta-large is the pretrained model (never fine-tuned), the TimesFM encoders and the
+time series transformer are frozen. The MLP is therefore trained on the WHOLE regime (no train/validation split is
+needed to protect a fine-tuned encoder) and scored on the full test set: weighted F1 (primary), macro-F1, accuracy.
+Optuna (--mlp-trials, default 30, 0 = the MLP's default configuration) tunes the MLP's learning rate, epochs, hidden
+layers and batch size per run and model, on one half of the regime scored on the other half, as in
+predict_all_labelFusion.py; the best parameters then train the MLP on the whole regime. Because the encoders are frozen,
+every sentence is embedded once for the whole sweep (roberta-large and TimesFM), so a run costs only MLP trainings.
 
 Several runs (e.g. one sbatch job per group of datasets) can run at the same time without influencing each other:
-every run has its own work folder (.work/<job id>) for the library's prediction caches and the saved roberta-large
-models, and every result file carries the start time of the run in its name. Writes to ./outputs/predict_low_data_regimes/:
+every run has its own work folder (.work/<job id>) for the library's prediction caches, and every result file carries
+the start time of the run in its name. Writes to ./outputs/predict_low_data_regimes/:
     <test file>_<p>_low_data_regimes_<date_time>.csv / .json   per run: sentence, label, true, llm_pred, roberta_pred, fusion_pred, fusion_ts_pred
-    summary_seeds_low_data_regimes_<date_time>.csv             one row per run (all metrics, parameters used)
+    summary_seeds_low_data_regimes_<date_time>.csv             one row per run (all metrics, MLP parameters used)
     summary_low_data_regimes_<date_time>.csv                   per dataset and regime: mean / std (ddof=1) over the seeds
     failures_low_data_regimes_<date_time>.csv                  runs that raised an error (the sweep goes on)
-    trials/...                                                 Optuna trials, if tuning is on
+    trials/...                                                 Optuna trials of the MLPs
 
     python testing/predict_low_data_regimes.py --dry-run                                  # which runs, nothing is trained
     python testing/predict_low_data_regimes.py --datasets pc-split-test --percents 10 100 # a first look
     python testing/predict_low_data_regimes.py                                            # everything
-    python testing/predict_low_data_regimes.py --no-ts                                    # without the time series model
-    python testing/predict_low_data_regimes.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv --mlp-trials 10
+    python testing/predict_low_data_regimes.py --no-ts --mlp-trials 10                    # without the time series, fewer trials
 """
 
 from __future__ import annotations
 
 import argparse
 import atexit
-import copy
+import collections
 import gc
 import hashlib
 import os
@@ -79,12 +75,12 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import torch  # noqa: E402
 import torch.nn as nn  # noqa: E402
-from sklearn.model_selection import train_test_split  # noqa: E402
 
 from test_textclassify_llm import _add_onehot_labels  # noqa: E402
+from textclassify import RoBERTaLargeClassifier  # noqa: E402
+from textclassify.core.types import ModelConfig, ModelType  # noqa: E402
 from textclassify.timeseries import CrossTSTransformer, TS, TSEmbedder  # noqa: E402
 
-stage1 = base.stage1
 REPO_ROOT = base.TEST_DIR.parent.parent
 TRAIN_REGIME_DIR = REPO_ROOT / "data" / "training_data_dated_low_data_regimes"
 TEST_DATED_DIR = REPO_ROOT / "data" / "test_data_dated"
@@ -136,26 +132,25 @@ class CachedEmbedder(nn.Module):
 
 
 class TSBranch:
-    """Loads the series and the pretrained TimesFM encoders once; fresh() hands every fusion MLP its own copy."""
+    """Loads the series and the pretrained TimesFM encoders once. Everything is frozen: the encoders (their embeddings
+    are cached for the whole sweep) and the CrossTSTransformer, which FusionEnsemble.add_ts_model needs but which the
+    pooled branch never calls."""
 
     def __init__(self, args):
         self.loader = DailySeries(TS_FILE, TS_SERIES)
         self.loader.load_all()
-        self.encoders = {name: TSEmbedder(pooling="mean") for name in TS_SERIES}
+        encoders = {name: TSEmbedder(pooling="mean") for name in TS_SERIES}
+        for enc in encoders.values():
+            enc.requires_grad_(False)
+        self.hidden_size = next(iter(encoders.values())).hidden_size
         self.caches = {name: {} for name in TS_SERIES}
-        self.hidden_size = next(iter(self.encoders.values())).hidden_size
-        self.output_dim = args.ts_dim
-        self.finetune = args.ts_finetune
+        self.encoders = {name: CachedEmbedder(enc, self.caches[name]) for name, enc in encoders.items()}
 
     def fresh(self):
-        encoders = {name: copy.deepcopy(enc) for name, enc in self.encoders.items()}
-        if not self.finetune:
-            for enc in encoders.values():
-                enc.requires_grad_(False)
-            encoders = {name: CachedEmbedder(enc, self.caches[name]) for name, enc in encoders.items()}
         torch.manual_seed(base.RANDOM_STATE)
-        transformer = CrossTSTransformer(series_names=TS_SERIES, hidden_size=self.hidden_size, output_dim=self.output_dim)
-        return self.loader, encoders, transformer
+        transformer = CrossTSTransformer(series_names=TS_SERIES, hidden_size=self.hidden_size, output_dim=self.hidden_size)
+        transformer.requires_grad_(False)
+        return self.loader, self.encoders, transformer
 
 
 def run_pooled_ts_branch(self, dates):
@@ -186,15 +181,6 @@ def load_test(test_path: Path) -> pd.DataFrame:
     return with_dates(pd.read_excel(TEST_DATED_DIR / test_path.name))
 
 
-def split_regime(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Regime -> (train, validation), 80/20 stratified, as base.split_pair does for a whole train file."""
-    try:
-        train_df, val_df = train_test_split(df, train_size=0.8, random_state=base.RANDOM_STATE, stratify=df["label"])
-    except ValueError:  # a class too small to stratify
-        train_df, val_df = train_test_split(df, train_size=0.8, random_state=base.RANDOM_STATE)
-    return train_df.reset_index(drop=True), val_df.reset_index(drop=True)
-
-
 def jobs(args) -> list[tuple[Path, Path, Path, int]]:
     """(test file, train regime file, the regime's LLM predictions, percent) for every run that can be made."""
     found = []
@@ -219,50 +205,52 @@ def jobs(args) -> list[tuple[Path, Path, Path, int]]:
 
 # ---- one run ----------------------------------------------------------------------------------------------------------
 
-def run_job(test_path: Path, train_path: Path, llm_path: Path, percent: int, args, fusion_builders) -> tuple[dict, pd.DataFrame]:
+class ConstantLLM(base.PrecomputedLLM):
+    """An 'LLM' that always says the same: its one-hot carries no information, so the fusion MLP effectively sees the
+    roberta-large embedding alone."""
+
+    def __init__(self):
+        super().__init__(collections.defaultdict(lambda: base.LABEL_COLUMNS[-1]))
+
+
+def run_job(test_path: Path, train_path: Path, llm_path: Path, percent: int, args, roberta, branches) -> tuple[dict, pd.DataFrame]:
     name = f"{test_path.stem}_{percent}"
     t0 = time.time()
-    train_df, val_df = split_regime(load_regime(train_path))
+    regime_df = load_regime(train_path)
     test_df = load_test(test_path)
-    print(f"\n=== {name}: train {len(train_df)} / val {len(val_df)} / test {len(test_df)} ===")
+    print(f"\n=== {name}: regime {len(regime_df)} / test {len(test_df)} ===")
 
-    llm = base.PrecomputedLLM(base.llm_predictions(base.LLM_TRAIN_DIR / f"{base.paired_train(test_path).stem}.csv"))
+    llm_train = base.PrecomputedLLM(base.llm_predictions(base.LLM_TRAIN_DIR / f"{base.paired_train(test_path).stem}.csv"))
     llm_test = base.llm_predictions(llm_path)
     llm_test_preds = [llm_test[t] for t in test_df[base.TEXT_COLUMN]]
-
-    # roberta-large alone, once for all three roberta-based models
-    if args.trials > 0:
-        rob, roberta_val_f1 = stage1.tune(train_df, val_df, name, args)
-    else:
-        rob, roberta_val_f1 = stage1.default_params(args), None
-    roberta, memo = base.train_roberta(rob, train_df, val_df, retries=args.retries)
-    roberta_preds = roberta.predict_without_saving(test_df).predictions
+    constant = ConstantLLM()
+    constant_test_preds = [base.LABEL_COLUMNS[-1]] * len(test_df)
 
     out = pd.DataFrame({
         base.TEXT_COLUMN: test_df[base.TEXT_COLUMN], "label": test_df["label"], "true": test_df["label"].map(base.LABEL_MAP),
-        "llm_pred": llm_test_preds, "roberta_pred": roberta_preds,
+        "llm_pred": llm_test_preds,
     })
-    row = {"dataset": base.SEED_RE.match(test_path.stem)["dataset"], "seed": base.SEED_RE.match(test_path.stem)["seed"],
-           "file": name, "percent": percent, "train_rows": len(train_df), "val_rows": len(val_df), "test_rows": len(test_df),
-           "llm_examples": max(1, round(2 * percent / 10)),  # the LLM labels of the regime, see predict_all_files_llm_low_data_regimes.py
-           "roberta_lr": rob["learning_rate"], "roberta_batch_size": rob["batch_size"], "roberta_epochs": rob["num_epochs"],
-           "roberta_val_f1": roberta_val_f1}
+    m = base.SEED_RE.match(test_path.stem)
+    row = {"dataset": m["dataset"], "seed": m["seed"], "file": name, "percent": percent,
+           "regime_rows": len(regime_df), "test_rows": len(test_df),
+           "llm_examples": max(1, round(2 * percent / 10))}  # the examples of the regime's LLM labels
 
-    # the fusion MLPs (frozen roberta-large embedding + LLM label), with and without the time series branch
-    for who, build in fusion_builders.items():
+    # (model, LLM input, test LLM labels, fusion builder): the MLP is the same, only its input differs
+    models = [("roberta", constant, constant_test_preds, branches["plain"]),
+              ("fusion", llm_train, llm_test_preds, branches["plain"])]
+    if "ts" in branches:
+        models.append(("fusion_ts", llm_train, llm_test_preds, branches["ts"]))
+    for who, llm, test_labels, build in models:
         base.build_fusion = build
-        fname = name if who == "fusion" else f"{name}_ts"
+        fname = name if who == "fusion" else f"{name}_{who}"  # trial files / cache names per model
         if args.mlp_trials > 0:
-            mlp, mlp_val_f1 = base.tune_mlp(roberta, llm, train_df, val_df, fname, args)
+            mlp, mlp_val_f1 = base.tune_mlp(roberta, llm, regime_df, regime_df, fname, args)
         else:
             mlp, mlp_val_f1 = base.default_mlp_params(args), None
-        out[f"{who}_pred"] = base.mlp_fit_predict(roberta, llm, mlp, train_df, val_df, test_df, llm_test_preds, fname, "final", verbose=False)
+        out[f"{who}_pred"] = base.mlp_fit_predict(roberta, llm, mlp, regime_df, regime_df, test_df, test_labels, fname, "final", verbose=False)
         row.update({f"{who}_mlp_lr": mlp["fusion_lr"], f"{who}_mlp_epochs": mlp["num_epochs"],
                     f"{who}_mlp_batch_size": mlp["batch_size"], f"{who}_mlp_val_f1": mlp_val_f1})
-    del roberta, memo
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+        gc.collect()
 
     for who in WHO:
         if f"{who}_pred" in out:
@@ -295,6 +283,18 @@ def publish(staging: Path) -> None:
             shutil.move(path, target_dir / f"{path.stem}_{SUFFIX}{path.suffix}")
 
 
+def build_frozen_roberta(model_name: str):
+    """The pretrained roberta-large, never fine-tuned and frozen, with its embeddings memoised per sentence for the
+    whole sweep (FusionEnsemble asks for them on every fit() / predict())."""
+    config = ModelConfig(model_name="roberta-large", model_type=ModelType.TRADITIONAL_ML,
+                         parameters={"model_name": model_name, "max_length": 128, "batch_size": 32})
+    roberta = RoBERTaLargeClassifier(config=config, text_column=base.TEXT_COLUMN, label_columns=base.LABEL_COLUMNS,
+                                     multi_label=False, auto_save_results=False, cache_dir=str(WORK_DIR / "models"))
+    roberta.load_pretrained()
+    base.EmbeddingMemo(roberta)
+    return roberta
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="*", help="only test files (name without seed) containing one of these")
@@ -303,27 +303,15 @@ def main() -> None:
                         help="the regimes' LLM predictions (<test file>_<p>.csv) of predict_all_files_llm_low_data_regimes.py")
     parser.add_argument("--dry-run", action="store_true", help="list the runs, nothing is trained")
     parser.add_argument("--resume", action="store_true", help="skip runs that already have a result file in the output folder")
-    parser.add_argument("--epochs", type=int, default=10,
-                        help="roberta-large (maximum) epochs of the default configuration and of the grid points")
-    parser.add_argument("--retries", type=int, default=2,
-                        help="repeat the final roberta-large training with another seed up to N times if it collapses to one class")
-    parser.add_argument("--trials", type=int, default=0,
-                        help="roberta-large Optuna trials per run (the 16 grid points first); 0 = default configuration")
-    parser.add_argument("--mlp-trials", type=int, default=0,
-                        help="fusion MLP Optuna trials per run and model; 0 = default configuration")
+    parser.add_argument("--mlp-trials", type=int, default=30,
+                        help="Optuna trials per run and model tuning the fusion MLP; 0 = the MLP's default configuration")
     parser.add_argument("--ml-proj-dim", type=int, default=768,
-                        help="project roberta-large's 1024-dim [CLS] embedding down to this size before the fusion MLP; 0 disables")
+                        help="project roberta-large's 1024-dim [CLS] embedding down to this size before the MLP; 0 disables")
+    parser.add_argument("--roberta-model", default="roberta-large", help="the (frozen) encoder; roberta-large unless testing")
     parser.add_argument("--no-ts", action="store_true", help="skip the fusion model with the time series branch")
     parser.add_argument("--ts-window", type=int, default=21,
                         help="number of daily values of every series up to the sentence's date; 0 = the whole series")
-    parser.add_argument("--ts-dim", type=int, default=64, help="size of the time series embedding (attention variant)")
-    parser.add_argument("--ts-pool-only", action=argparse.BooleanOptionalAction, default=True,
-                        help="pool the per-series embeddings and pass them straight to the MLP (default); "
-                             "--no-ts-pool-only uses the CrossTSTransformer's attention")
-    parser.add_argument("--ts-pooling", choices=("mean", "max"), default="mean", help="pooling over the series")
-    parser.add_argument("--ts-finetune", action="store_true", help="also train the TimesFM encoders (default: frozen)")
-    parser.add_argument("--roberta-params-from", type=Path,
-                        help="summary_seeds.csv of a predict_all_labelFusion.py run: roberta-large parameters per test file")
+    parser.add_argument("--ts-pooling", choices=("mean", "max"), default="mean", help="pooling of the three series embeddings")
     args = parser.parse_args()
 
     todo = jobs(args)
@@ -334,7 +322,8 @@ def main() -> None:
         done = {re.sub(r"_low_data_regimes_\d{8}_\d{6}$", "", p.stem) for p in RESULT_DIR.glob("lab-manual-*_low_data_regimes_*.csv")}
         todo = [j for j in todo if f"{j[0].stem}_{j[3]}" not in done]
     print(f"{len(todo)} runs ({', '.join(sorted({str(j[3]) + '%' for j in todo}, key=lambda s: int(s[:-1])))}) "
-          f"on {len({j[0] for j in todo})} test files; models: roberta, fusion{'' if args.no_ts else ', fusion_ts'}")
+          f"on {len({j[0] for j in todo})} test files; models: roberta, fusion{'' if args.no_ts else ', fusion_ts'} "
+          f"(frozen encoders, MLP tuned with {args.mlp_trials} Optuna trials)")
     if args.dry_run:
         for test_path, train_path, llm_path, percent in todo[:10]:
             print(f"  {test_path.stem}_{percent}: train {train_path.name}, LLM labels {llm_path.name}")
@@ -350,54 +339,34 @@ def main() -> None:
     os.chdir(WORK_DIR)
     staging = WORK_DIR / "out"
     staging.mkdir()
-    base.RESULT_DIR = stage1.RESULT_DIR = files.FUSION_DIR = staging
+    base.RESULT_DIR = files.FUSION_DIR = staging
 
+    roberta = build_frozen_roberta(args.roberta_model)
     plain_build_fusion = base.build_fusion
-    fusion_builders = {"fusion": plain_build_fusion}
+    branches = {"plain": plain_build_fusion}
     if not args.no_ts:
         branch = TSBranch(args)
-        ts_out = f"pool{args.ts_pooling}" if args.ts_pool_only else f"d{args.ts_dim}"
-        ts_tag = f"ts{args.ts_window or 'full'}{ts_out}{'ft' if args.ts_finetune else ''}"
+        ts_tag = f"ts{args.ts_window or 'full'}pool{args.ts_pooling}"
 
         def build_fusion_ts(ml_model, llm_model, fus, name, tag, save):
             # the TS settings are part of the tag: cache files of the plain and the time series fusion never collide
             fusion = plain_build_fusion(ml_model, llm_model, fus, name, f"{tag}_{ts_tag}", save)
             loader, encoders, transformer = branch.fresh()
             fusion.add_ts_model(loader, encoders, transformer, date_column=DATE_COLUMN, window_days=args.ts_window or FULL_HISTORY)
-            if args.ts_pool_only:
-                transformer.output_dim = transformer.hidden_size  # the fusion MLP reads its TS input size from here
-                fusion.ts_pooling = args.ts_pooling
-                fusion._run_ts_branch = types.MethodType(run_pooled_ts_branch, fusion)
+            fusion.ts_pooling = args.ts_pooling
+            fusion._run_ts_branch = types.MethodType(run_pooled_ts_branch, fusion)
             return fusion
 
-        fusion_builders["fusion_ts"] = build_fusion_ts
+        branches["ts"] = build_fusion_ts
         print(f"time series: {', '.join(TS_SERIES)}, window {args.ts_window or 'full history'}"
-              f"{'' if not args.ts_window else ' days'}, "
-              f"{'pooled (' + args.ts_pooling + ')' if args.ts_pool_only else 'attention'}, TimesFM {'fine-tuned' if args.ts_finetune else 'frozen'}")
-
-    if args.roberta_params_from:
-        reuse = pd.read_csv(args.roberta_params_from).set_index("file")
-        plain_tune = stage1.tune
-
-        def tune_or_reuse(train_df, val_df, name, targs):
-            pair = REGIME_RE.sub("", name)  # <test file>_<p> -> <test file>
-            if pair not in reuse.index:
-                return plain_tune(train_df, val_df, name, targs)
-            r = reuse.loc[pair]
-            params = {**stage1.default_params(targs), "learning_rate": float(r["roberta_lr"]),
-                      "batch_size": int(r["roberta_batch_size"]), "num_epochs": int(r["roberta_epochs"])}
-            val_f1 = r.get("roberta_val_f1")
-            return params, (None if pd.isna(val_f1) else float(val_f1))
-
-        stage1.tune = tune_or_reuse
-        args.trials = max(args.trials, 1)  # tune() now only looks the parameters up
+              f"{'' if not args.ts_window else ' days'}, frozen TimesFM encoders, pooled ({args.ts_pooling})")
 
     rows, failures = [], []
     for test_path, train_path, llm_path, percent in todo:
         shutil.rmtree(WORK_DIR / "cache", ignore_errors=True)
         name = f"{test_path.stem}_{percent}"
         try:
-            row, out = run_job(test_path, train_path, llm_path, percent, args, fusion_builders)
+            row, out = run_job(test_path, train_path, llm_path, percent, args, roberta, branches)
         except Exception as e:  # one failing run must not stop the sweep
             traceback.print_exc()
             failures.append({"file": name, "error": f"{type(e).__name__}: {e}"})
