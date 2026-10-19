@@ -1,0 +1,104 @@
+sentence,year,label,orig_index,date,month,day,date_status,date_candidates
+"But, really, it isn’t monetary policy.",2022,2,92,2019-10-30,10,30,exact,2019-10-30
+And inflation is well above target.,2020,1,21,2021-12-15,12,15,exact,2021-12-15
+"Again, that’s not a forecast, I’ve made a hypothesis, which would imply slower improvement in unemployment.",2019,0,3,2012-04-25,4,25,exact,2012-04-25
+"Moreover, in light of the anticipated modest pace of economic recovery, the Committee expects that over coming quarters the unemployment rate will decline only gradually toward its mandate-consistent levels.",2014,0,168,2012-01-25,1,25,exact,2012-01-25
+"For example, we have used some of our work to look at interest rate risk and interest rate sensitivity and, you know, found generally that banks can also sustain a significant increase in long-term interest rates as well for a number of reasons, one of them being that higher interest rates increase their franchise value because it increases their net interest margin over time.",2021,2,104,2013-03-20,3,20,exact,2013-03-20
+"The U.S. economy is in a good place, and we will continue to use our monetary policy tools to help keep it there.",2020,1,239,2019-01-30,1,30,sampled,2019-01-30|2019-03-20
+The outbreak has also disrupted economic activity in many countries and has prompted significant movements in financial markets.,2021,2,248,2020-03-03,3,3,exact,2020-03-03
+And productivity’s been very low.,2020,1,30,2018-03-21,3,21,exact,2018-03-21
+It was the year of synchronized global growth.,2021,2,153,2018-12-19,12,19,exact,2018-12-19
+"I guess I would also urge you to remember that when you look at the projections, that there are many factors that affect those projections, and changes in tax policy—that’s only one of a number of factors, including incoming data that has, to some extent, altered the outlook for growth and inflation.",2019,2,112,2017-12-13,12,13,exact,2017-12-13
+"Monetary policy has a role, and it really is in, you know—our original role was providing liquidity to financial systems when they’re under stress, and that’s—that’s really part of what we did today.",2014,0,165,2020-03-15,3,15,exact,2020-03-15
+"On the other hand, by that metric, the, the September 16, 2020 unemployment rate would have been in the—in the 20s in, in April.",2021,2,175,2020-09-16,9,16,exact,2020-09-16
+I did indicate that I do have concerns about the scope for monetary policy.,2013,2,107,2016-09-21,9,21,exact,2016-09-21
+"I mean certain parts of South Carolina have developed pretty strongly but the part where I come from—mostly agricultural, it has a little bit of manufacturing—has a very high unemployment rate, a high foreclosure rate, and people are having a hard time there.",2019,0,113,2012-12-12,12,12,exact,2012-12-12
+"Well, that’s—what’s happening there is the fact that the relationship between resource utilization, or unemployment, and inflation has just gotten weaker and weaker over the years.",2020,0,293,2019-12-11,12,11,exact,2019-12-11
+"Of course, we’re ready to provide information that Congress needs to evaluate the Fed’s decisionmaking, in monetary policy and elsewhere.",2021,2,174,2015-03-18,3,18,exact,2015-03-18
+"It was to do with, you know, strong monetary policy and fiscal stimulus into an economy that was recovering rapidly, and in which there were these supply-side barriers which effectively led to, you know, in certain parts of the economy, what you might call a vertical supply curve.",2021,1,154,2021-12-15,12,15,exact,2021-12-15
+"But it could be that if interest rates rise quickly, for example, that we would be in a situation of not giving remittances to the Treasury for a couple of years, and that would create problems, no doubt, for the Fed in terms of congressional response.",2018,2,79,2013-12-18,12,18,exact,2013-12-18
+"The problem with the current situation is that, that if you have a sustained period of supply shocks, those can actually start to undermine or to work—to work on de-anchoring inflation expectations.",2012,1,250,2022-07-27,7,27,exact,2022-07-27
+"There should be able to be an adjustment that would have lower than—perhaps lower-than-expected increases in unemployment—lower than would be expected in the ordinary course of events because the level—the ratio of, of vacancies to unemployed is just out of keeping with historical experience.",2015,2,257,2022-07-27,7,27,exact,2022-07-27
+"And the maximum level of employment that’s consistent with price stability evolves over time within a—within a business cycle and over a longer period, in part reflecting [the] evolution of the factors that affect labor supply, including those related to the pandemic.",2022,2,37,2021-12-15,12,15,exact,2021-12-15
+We're looking at wages and we're looking at ultimately inflation.,2019,2,289,2022-05-04,5,4,exact,2022-05-04
+"The Federal Reserve’s enhanced guidance about its policy intentions and its substantial and still-increasing holdings of longer-term securities will ensure that monetary policy remains highly accommodative, consistent with the pursuit of its mandated objectives of maximum employment and price stability.",2020,0,236,2013-12-18,12,18,exact,2013-12-18
+But it’s not easy to get a clear read on the implications of asset prices for the overall outlook.,2020,2,80,2017-09-20,9,20,exact,2017-09-20
+"Again, while I do not shirk the responsibility of the Fed having to do what it can to meet its mandate, obviously, a broad range of policies can affect growth and employment, and I hope that there will be a range of actions that will complement and supplement the Federal Reserve’s efforts.",2019,2,4,2011-11-02,11,2,exact,2011-11-02
+"It was a question of not getting inflation up to our target on a robust, symmetric kind of a way.",2021,0,152,2020-03-15,3,15,exact,2020-03-15
+The economy is continuing to make progress toward the FOMC’s objective of maximum sustainable employment.,2012,1,244,2014-09-17,9,17,exact,2014-09-17
+"That’s not going to happen without, without restoring price stability.",2016,1,230,2022-07-27,7,27,exact,2022-07-27
+"Wage growth is not—there are many factors that affect it—it’s not definitive in any sense in determining our policy,",2021,2,267,2021-01-01,1,1,year_fallback,
+And one reason for that is that long-term interest rates generally embody two factors.,2011,2,27,2017-12-13,12,13,exact,2017-12-13
+"In light of increased uncertainties and muted inflation pressures, we now emphasize that the Committee will closely monitor the implications of incoming information for the economic outlook and will act as appropriate to sustain the expansion with a strong labor market and inflation near its 2 percent objective.",2013,0,135,2019-06-19,6,19,exact,2019-06-19
+"But to the extent that continues to be the case, that should make it easier to restore price stability.",2014,1,86,2022-09-21,9,21,exact,2022-09-21
+"And I really don’t have much for you other than to say that they will be data dependent—that, over time, the stance of policy will be adjusted to try to keep the economy on a track where we see continuing progress toward achieving our goals of maximum employment and price stability.",2019,1,11,2014-12-17,12,17,exact,2014-12-17
+"if you ask me, is this a significant factor shaping monetary policy now, well, it’s on the list of risks, it’s not a major—it’s not a major factor.",2015,2,279,2015-01-01,1,1,year_fallback,
+"You know, what you hear out there is that demand—you talk to banks, and they’ll say demand for loans is very, very low right now.",2014,0,313,2020-11-05,11,5,exact,2020-11-05
+"As always, our actions are guided by our congressional mandate to promote maximum employment and price stability.",2018,1,64,2020-03-03,3,3,exact,2020-03-03
+These base effects will contribute about 1 percentage point to headline inflation and about 0.7 percentage point to core inflation in April and May.,2022,2,261,2021-04-28,4,28,exact,2021-04-28
+So it’s a double whammy coming from higher gasoline prices.,2016,1,193,2011-04-27,4,27,exact,2011-04-27
+"The jobs picture continues to be strong, with the unemployment rate near historic lows and with stronger wage gains.",2021,1,247,2019-01-30,1,30,exact,2019-01-30
+"We, frankly, didn’t even get inflation back up to target—without seeing wages getting out of touch with—with where they should be, so that’s the—that’s the biggest thing we can do.",2020,0,290,2020-06-10,6,10,exact,2020-06-10
+"Well, if the economy worsens and inflation remains relatively low, then we wouldn’t begin to exit, and, therefore, we wouldn’t change the language.",2020,0,291,2011-06-22,6,22,exact,2011-06-22
+"When we reach maximum employment, when we reach a state where labor market conditions are at maximum employment in the Committee’s judgment, it’s very possible that the inflation test will already be met.",2017,0,304,2021-11-03,11,3,exact,2021-11-03
+"Returning to monetary policy, we recognize that there has been a great deal of focus on today’s policy decision.",2012,2,182,2015-09-17,9,17,exact,2015-09-17
+"I’m just saying, that, that is what fiscal policy can do that, really, monetary policy can’t do—is, is invest in the future productive capacity of the economy, raise potential growth.",2020,2,158,2021-03-17,3,17,exact,2021-03-17
+I’m old enough to remember what very high inflation was like.,2012,2,160,2022-03-16,3,16,exact,2022-03-16
+"The housing sector has fully recovered from the downturn, supported in part by low mortgage interest rates.",2021,0,246,2020-11-05,11,5,sampled,2020-11-05|2020-12-16
+"You can get to 20, if you wanted to, easily, but labor force participation, the unemployment rate, different age groups of—you know, prime-age labor force participation, in particular, gets a lot of focus, the JOLTS data get a lot of focus.",2019,2,307,2021-12-15,12,15,exact,2021-12-15
+We have not seen wage growth pick up.,2020,2,284,2015-03-18,3,18,exact,2015-03-18
+"And so what that means is the Federal Reserve cannot add monetary accommodation by cutting short-term interest rates, the usual approach.",2020,2,31,2012-06-20,6,20,exact,2012-06-20
+"So on the first, the Committee’s forecasts and those of most outside forecasters do show growth running below its longer-run potential this year and next year.",2019,0,198,2022-09-21,9,21,exact,2022-09-21
+"In fact, it’s already—it’s already understood, I think, that—that there’s more—even though we’re at 3½ percent unemployment, there’s actually more slack out there, in a sense.",2022,0,134,2019-12-11,12,11,exact,2019-12-11
+"Growth in household spending moderated toward the end of last year,",2013,2,105,2013-01-01,1,1,year_fallback,
+"Now, we’ve long expected, as most analysts have, to see some slowing in Chinese growth over time as they rebalance their economy.",2021,0,171,2015-09-17,9,17,exact,2015-09-17
+And what we—it looks like we’re seeing a slowdown in the rate of growth.,2022,0,48,2020-07-29,7,29,exact,2020-07-29
+But there’s also a role for monetary policy.,2014,2,85,2020-03-03,3,3,exact,2020-03-03
+"We also said we wouldn’t raise rates just in response to very low unemployment, in the absence of inflation.",2020,0,271,2021-09-22,9,22,exact,2021-09-22
+"And, at a high level, yes, I would say, and I’ve said before, that it’s really fiscal policy that is more powerful and that has much more to do with—fiscal policy can do those things that will increase the longer-run growth rate of the United States by improving productivity and labor force September 18, 2019 participation and the skills and aptitudes of workers.",2011,2,55,2019-09-18,9,18,exact,2019-09-18
+1 Chair Yellen intended to say that “interest rate differentials globally do tend to induce capital flows that have impacts on exchange rates.” GREG ROBB.,2019,2,0,2015-09-17,9,17,exact,2015-09-17
+So unemployment has tended to go up much faster for minorities and for others who are—tend to be at the low end of the income spectrum.,2021,0,208,2020-04-29,4,29,exact,2020-04-29
+"with a healthy job market, rising incomes, and upbeat consumer confidence, the fundamentals supporting household spending are solid.",2013,2,105,2013-01-01,1,1,year_fallback,
+"And I think, more broadly, monetary policy is also supporting household spending and home buying by keeping the labor market strong, keeping workers’ incomes rising, and keeping consumer confidence at high levels, where it currently is.",2019,0,12,2019-10-30,10,30,exact,2019-10-30
+"We have a much more resilient, stronger banking system, and we’re not seeing some worrisome buildup in leverage or credit growth at successive levels.1 So, you know, this is something that the FOMC pays attention to,",2015,2,279,2015-01-01,1,1,year_fallback,
+"Core inflation, which excludes energy and food prices, has been running close to 1½ percent.",2017,0,97,2016-06-15,6,15,exact,2016-06-15
+"Business and household spending are increasing at rates consistent with moderate economic growth, though household spending appears to be rising at a somewhat slower pace than earlier this year.",2011,1,70,2012-06-20,6,20,exact,2012-06-20
+"So you’re right, you’re seeing—I, I can’t remember the number, but it might be in the 3s—3, 3½ percent growth for next year.",2019,2,214,2021-06-16,6,16,exact,2021-06-16
+"Well, our policy approach doesn’t involve intentionally trying to raise inflation.",2020,1,292,2012-09-13,9,13,exact,2012-09-13
+"But I think that that’s a prudent move, to move in a gradual way to remove Chair Yellen’s Press Conference FINAL accommodation, with unemployment now—and not only, I should say, the unemployment rate, but I think any indicator of labor market performance and tightness that you could look at, whether it’s household perceptions of the availability of jobs, difficulty that firms report in hiring workers, the rate at which workers are quitting their jobs, the rate of job openings, all of these indicators do signal a tight labor market.",2011,1,72,2017-06-14,6,14,exact,2017-06-14
+"As you said, falling oil prices pull down inflation.",2017,0,68,2016-06-15,6,15,exact,2016-06-15
+"What I’m telling you is that the stance of monetary policy we have today, we believe, is appropriate.",2017,2,300,2021-03-17,3,17,exact,2021-03-17
+So negative interest rates is something that we looked at during the financial crisis and chose not to do.,2019,2,197,2019-09-18,9,18,exact,2019-09-18
+"And I can only say qualitatively that the Committee will continue to look at the evolution of the outlook, try to assess whether unemployment is making sufficient progress towards our objectives, and, in particular, whether the recovery is still continuing.",2018,0,9,2012-04-25,4,25,exact,2012-04-25
+"The Phillips curve has become, according to most estimates, quite flat in the sense that movements in unemployment have only a modest impact on inflation, so we shouldn’t overblow how large that is.",2020,2,238,2016-03-16,3,16,exact,2016-03-16
+"Monetary policy, maximum employment, stable prices—it’s less obvious to me.",2014,2,166,2020-12-16,12,16,exact,2020-12-16
+"These measures, along with our strong guidance on interest rates and on our balance sheet, will ensure that monetary policy will continue to support the economy until the recovery is complete.",2022,0,263,2021-07-28,7,28,sampled,2021-07-28|2021-09-22
+"And you know, we haven’t yet—we just touched 2 percent core inflation, to pick one measure—just touched it for a few months, and then we’ve fallen back.",2022,0,49,2019-10-30,10,30,exact,2019-10-30
+"In coming months, as those earlier declines drop out of the calculation, inflation should move up closer to 2 percent and stabilize around that level over the medium term.",2022,2,133,2018-03-21,3,21,exact,2018-03-21
+"growth in the far larger part of the services economy, which has led to low unemployment, good job creation, rising wages, that’s kind of the two big pieces of it that you see.",2014,1,88,2014-01-01,1,1,year_fallback,
+"The asset purchases are about creating some near-term momentum in the economy, trying to strengthen growth and job creation in the near term, and the increases in the federal funds rate target, when they ultimately occur, are about reducing accommodation.",2012,1,240,2012-12-12,12,12,exact,2012-12-12
+"Our mandate, sorry, is price inflation.",2021,1,178,2019-03-20,3,20,exact,2019-03-20
+"As a further step in enhancing the clarity of our communications, the Committee recently decided to begin publishing information about participants’ assessments of appropriate monetary policy—that is, the path of policy that each participant judges as most likely to foster mandate-consistent outcomes for employment and inflation if the economy evolves as expected.",2018,2,62,2012-01-25,1,25,exact,2012-01-25
+And I fully expect it will return to solid growth and a solid labor market as well.,2019,2,10,2020-03-03,3,3,exact,2020-03-03
+"So you’re going to have different perspectives from Committee participants about how fast growth will be, how fast the labor market will heal, or how fast—sorry, inflation will move up.",2019,1,213,2021-03-17,3,17,exact,2021-03-17
+We continue to discuss whether or not the unemployment rate itself is an adequate measure of how much underutilization of labor resources there really is.,2020,2,274,2014-09-17,9,17,exact,2014-09-17
+it does have a bearing on the inflation outlook.,2021,2,267,2021-01-01,1,1,year_fallback,
+"So, as you know, the ultimate focus that we have is on the real economy: maximum employment and price stability.",2019,2,218,2022-01-26,1,26,exact,2022-01-26
+"With unemployment still elevated and inflation below the Committee’s longer-run objective, the Committee is continuing its highly accommodative policies.",2019,0,306,2013-06-19,6,19,exact,2013-06-19
+"And we’re learning to, to engage in economic activity.",2017,2,44,2020-09-16,9,16,exact,2020-09-16
+"For example, one—in the long-run, the size of the balance sheet is going to depend on the public’s demand for our liabilities, including currency and reserves.",2021,2,102,2018-03-21,3,21,exact,2018-03-21
+"You know, monetary policy is a forward-looking exercise, and I’m going to—I’m just going to stick with that.",2014,2,310,2018-12-19,12,19,exact,2018-12-19
+"The unemployment rate declined in May and , 2020 June but, at 11.1 percent, remains far above its level before the outbreak and greater than the Chair Powell’s Press Conference FINAL peak during the Global Financial Crisis.",2012,0,254,2020-07-29,7,29,exact,2020-07-29
+"Everyone, particularly people on fixed incomes, and at the lower part of the income distribution are better off with stable prices.",2021,2,100,2022-05-04,5,4,exact,2022-05-04
+"Well, you’re certainly right that we have been over-optimistic about out-year growth.",2022,1,296,2013-09-18,9,18,exact,2013-09-18
+"It isn’t really just targeting the headline numbers, but it’s about taking all of those things into account in your thinking about what constitutes maximum employment.",2021,2,150,2021-09-22,9,22,exact,2021-09-22
+"PCE core is at about 2, and I think we see that, you know, the temporary increase in headline inflation as being a function of oil prices probably, and we expect inflation to go back down to 2 percent.",2012,1,181,2018-09-26,9,26,exact,2018-09-26
+"So, as I mentioned, we’re going to be looking at all of those things: activity, labor market, inflation.",2019,2,217,2022-07-27,7,27,exact,2022-07-27
+"But that has not—what, what happens is that when wages move up because unemployment is low, companies have been absorbing that increase into their margins rather than raising prices.",2020,2,84,2021-03-17,3,17,exact,2021-03-17
+There was a lot of pent-up demand.,2015,2,258,2021-01-27,1,27,exact,2021-01-27
+And part of that just is the effect of lower interest rates.,2011,0,29,2020-01-29,1,29,exact,2020-01-29
+"And so when asset prices went back up, probably there’ll be a swing around there, a positive contribution.",2020,2,32,2019-05-01,5,1,exact,2019-05-01
+"By contrast, raising rates too slowly would raise the risk that monetary policy would need to tighten abruptly down the road, which could jeopardize the economic expansion.",2022,1,94,2018-03-21,3,21,exact,2018-03-21
+"And obviously there are benefits from a strong economy to every household in the economy, including savers, from having a better job market and a more secure economy.",2011,2,26,2015-06-17,6,17,exact,2015-06-17
+"Now, with inflation below 2 percent, I think it’s appropriate that the labor market be that tight.",2021,0,172,2017-06-14,6,14,exact,2017-06-14
+"These headwinds—which include developments abroad, subdued household formation, and meager productivity growth—could persist for some time.",2022,0,262,2016-06-15,6,15,exact,2016-06-15
