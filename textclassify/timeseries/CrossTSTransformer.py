@@ -132,6 +132,46 @@ class CrossTSTransformer(nn.Module):
             "per_series": embeddings_dict.copy(),
         }
 
+    def pool(
+        self,
+        embeddings_dict: Dict[str, torch.Tensor],
+        pooling: str = "mean",
+        project: bool = False,
+    ) -> Dict[str, torch.Tensor]:
+        """
+        Pool the per-series embeddings and hand the vector on as it is: no
+        positional embedding, no TransformerEncoder (no cross-series attention),
+        and by default no projection either. The pooled vector goes straight to
+        the consumer (e.g. the fusion MLP), so "output" has hidden_size
+        dimensions here, not output_dim. Use it as a baseline for forward().
+
+        Args:
+            embeddings_dict: dict {series_name: (B, hidden_size)}
+            pooling: "mean" or "max" over the series dimension
+            project: if True, "output" is the pooled vector passed through the
+                     projection layer ((B, output_dim), as in forward()).
+
+        Returns:
+            dict with the keys of forward(); "attended" holds the unchanged
+            input tokens (B, n_series, hidden_size) because no attention is applied.
+        """
+        if pooling not in ("mean", "max"):
+            raise ValueError(f"pooling must be 'mean' or 'max', got '{pooling}'")
+
+        # Validate input and stack it as tokens, exactly as forward() does.
+        stacked = self.fuser(embeddings_dict)["stacked"]  # (B, N * hidden_size)
+        tokens = stacked.view(stacked.shape[0], self.n_series, self.hidden_size)  # (B, N, 1280)
+
+        pooled = tokens.mean(dim=1) if pooling == "mean" else tokens.max(dim=1).values  # (B, 1280)
+        output = self.projection(pooled) if project else pooled
+
+        return {
+            "output": output,
+            "pooled": pooled,
+            "attended": tokens,
+            "per_series": embeddings_dict.copy(),
+        }
+
 
 # ----------------------------------------------------------------------
 # Example usage
