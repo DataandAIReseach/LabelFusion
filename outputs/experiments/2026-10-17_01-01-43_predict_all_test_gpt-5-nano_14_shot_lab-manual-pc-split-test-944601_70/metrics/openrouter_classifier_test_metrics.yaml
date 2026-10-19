@@ -1,0 +1,12 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2026-10-17_01-01-43_predict_all_test_gpt-5-nano_14_shot_lab-manual-pc-split-test-944601_70
+  git_commit: e55204452045924426dcafc064098ff92a0ebd7e
+  model_name: openrouter_classifier
+  timestamp: '2026-10-17T01:03:34.777058'
+metrics:
+  accuracy: 0.5846153846153846
+  auc: 0.6506410256410257
+  f1: 0.5211383275012498
+  precision: 0.5862691960252936
+  recall: 0.5256410256410257

@@ -1,0 +1,45 @@
+created_at: '2026-10-17T03:42:20.122112'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: michaelschlee
+    platform: Linux-6.8.0-147-generic-x86_64-with-glibc2.39
+    python_version: 3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]
+    working_directory: /home/michaelschlee/ownCloud/GIT/LabelFusion
+  experiment_id: 2026-10-17_03-40-08_predict_all_test_gpt-5-nano_10_shot_lab-manual-sp-test-78516_50
+  git_commit: e55204452045924426dcafc064098ff92a0ebd7e
+  model_name: ''
+  model_type: ''
+  timestamp: '2026-10-17T03:40:08.951224'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/openrouter_classifier_test_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/test_predictions_6324fcbc0622.json
+  - predictions/test_predictions_6324fcbc0622.csv
+test_results: null
+training_results:
+  classes:
+  - dovish
+  - hawkish
+  - neutral
+  classification_type: single_label
+  completed: true
+  few_shot_mode: 10
+  metrics:
+    accuracy: 0.7085427135678392
+    auc: 0.6814859988301722
+    f1: 0.6041988121059038
+    precision: 0.7054214848332495
+    recall: 0.5716023716023716
+  model_name: openai/gpt-5-nano
+  model_type: llm
+  num_labels: 3
+  provider: openrouter
+  test_samples: 199
+  train_samples: 10
