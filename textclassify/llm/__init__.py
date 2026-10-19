@@ -43,6 +43,7 @@ from .openai_classifier import OpenAIClassifier
 from .gemini_classifier import GeminiClassifier
 from .deepseek_classifier import DeepSeekClassifier
 from .openrouter_classifier import OpenRouterClassifier
+from .anthropic_classifier import AnthropicClassifier
 
 __all__ = [
     "BaseLLMClassifier",
@@ -50,5 +51,6 @@ __all__ = [
     "GeminiClassifier",
     "DeepSeekClassifier",
     "OpenRouterClassifier",
+    "AnthropicClassifier",
 ]
 
