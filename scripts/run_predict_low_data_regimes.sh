@@ -4,7 +4,7 @@
 #SBATCH -G A100:1                 # ganze A100 statt "irgendeine GPU" (Name ggf. anpassen)
 #SBATCH -c 4
 #SBATCH --mem 32G
-#SBATCH -t 72:00:00
+#SBATCH -t 48:00:00
 #SBATCH -o /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.out
 #SBATCH -e /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.err
 #SBATCH --constraint=inet
