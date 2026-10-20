@@ -41,7 +41,7 @@ except ImportError:  # pragma: no cover - optional for direct script execution
     pytest = None
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]  # testing/old/<this file>
 sys.path.insert(0, str(REPO_ROOT))
 
 # Load OPENROUTER_API_KEY (and optional TEXTCLASSIFY_LLM_MODEL) from the repo-root .env

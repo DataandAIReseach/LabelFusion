@@ -461,6 +461,5 @@ def main() -> None:
     if rows:
         print(f"\nSaved: {FUSION_DIR / 'summary.csv'}")
 
-
 if __name__ == "__main__":
     main()
