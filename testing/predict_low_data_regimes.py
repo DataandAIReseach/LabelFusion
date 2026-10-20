@@ -1,4 +1,4 @@
-"""Low-data regimes: frozen encoders and only a tuned MLP, and the full program at --full-percents (default 80 and 100 %).
+"""Low-data regimes: the full program at --full-percents (default: every regime), frozen encoders and only a tuned MLP at the others.
 
 For every test file (data/test_data_dated/<dataset>-<seed>.xlsx, always the FULL test set) and every regime p
 (10, 20, ..., 100 %) of its training file (data/training_data_dated_low_data_regimes/<train name>_<p>.csv, made by
@@ -16,14 +16,14 @@ predictions come out; "training" in the summary says how they were made:
                 encoders, pooled over the series (--ts-pooling). Full regimes: FINE-TUNED encoders and a trained
                 CrossTSTransformer (attention over the series, --ts-dim outputs). Skipped with --no-ts.
 
-FROZEN regimes (all but --full-percents): nothing but the MLP is trained. roberta-large is the pretrained model
+FROZEN regimes (all but --full-percents; none by default): nothing but the MLP is trained. roberta-large is the pretrained model
 (never fine-tuned), the TimesFM encoders and the time series transformer are frozen. The MLP is trained on the WHOLE
 regime (no train/validation split is needed to protect a fine-tuned encoder). Optuna (--mlp-trials, default 30,
 0 = the MLP's default configuration) tunes its learning rate, epochs, hidden layers and batch size per run and model,
 on one half of the regime scored on the other half; the best parameters then train the MLP on the whole regime. Every
 sentence is embedded once for the whole sweep (roberta-large and TimesFM), so such a run costs only MLP trainings.
 
-FULL regimes (--full-percents, default 80 100; none with --full-percents and no value): the full program of
+FULL regimes (--full-percents, default every regime found; none with --full-percents and no value): the full program of
 predict_all_labelFusion.py. The regime is split 80/20 (stratified) into train and validation. Stage 1: roberta-large is
 fine-tuned alone; Optuna (--trials, default 24: the 16-point learning-rate x batch-size grid, then free refinement)
 over lr / batch size / epochs, weighted F1 on the validation split, with class weights, 10 % warmup, best-epoch
@@ -58,7 +58,7 @@ caches, and every result file carries the start time of the run in its name. Eve
     trials/...                                                 Optuna trials
 
     python testing/predict_low_data_regimes.py --dry-run                                  # which runs, nothing is trained
-    python testing/predict_low_data_regimes.py --datasets pc-split-test --percents 10 80  # a first look: one frozen, one full run
+    python testing/predict_low_data_regimes.py --datasets pc-split-test --percents 10 80  # a first look: two regimes
     python testing/predict_low_data_regimes.py                                            # everything
     python testing/predict_low_data_regimes.py --no-ts --mlp-trials 10 --full-percents 100   # without the time series, fewer trials
     python testing/predict_low_data_regimes.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv
@@ -84,7 +84,7 @@ from datetime import datetime
 from pathlib import Path
 
 TESTING_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(TESTING_DIR))
+sys.path.insert(0, str(TESTING_DIR / "old"))  # the helper modules (predict_all_labelFusion.py, ...) live in testing/old
 
 # Everything this script writes lives in RESULT_DIR. Every run gets its own work folder (.work/<job id>) there for the
 # saved roberta-large models and the library's prediction caches (the library names them after the train texts, so two
@@ -480,9 +480,9 @@ def main() -> None:
     parser.add_argument("--resume", action="store_true", help="skip runs that already have a result file in the output folder")
     parser.add_argument("--mlp-trials", type=int, default=30,
                         help="Optuna trials per run and model tuning the fusion MLP; 0 = the MLP's default configuration")
-    parser.add_argument("--full-percents", nargs="*", type=int, default=[80, 100],
+    parser.add_argument("--full-percents", nargs="*", type=int, default=None,
                         help="regimes that get the full program (fine-tuned roberta-large with Optuna, warmup, class weights, "
-                             "best epoch, retries; MLPs on the validation split). Default 80 100; give no value for none")
+                             "best epoch, retries; MLPs on the validation split). Default: every regime; give no value for none")
     parser.add_argument("--ts-mlp-trials", type=int, default=10,
                         help="full regimes: Optuna trials for the fusion MLP WITH the fine-tuned time series model (every trial "
                              "fine-tunes three TimesFM encoders, so this is much more expensive than --mlp-trials); 0 = defaults")
@@ -505,6 +505,10 @@ def main() -> None:
                         help="number of daily values of every series up to the sentence's date; 0 = the whole series")
     parser.add_argument("--ts-pooling", choices=("mean", "max"), default="mean", help="pooling of the three series embeddings")
     args = parser.parse_args()
+    # absolute before main() changes into the work folder
+    for key in ("llm_cache_dir", "legacy_llm_cache_dir", "roberta_params_from"):
+        if getattr(args, key) is not None:
+            setattr(args, key, getattr(args, key).resolve())
 
     LLM_CACHE_DIR, LEGACY_LLM_CACHE_DIR, LLM_MODEL = args.llm_cache_dir, args.legacy_llm_cache_dir, args.llm_model
     if find_cache(train_cache_name()) is None:
@@ -514,6 +518,8 @@ def main() -> None:
     if not todo:
         raise SystemExit("no runs found (are the regimes of dataset_scripts/make_low_data_regimes.py and the LLM "
                          "LLM caches of predict_all_files_llm_low_data_regimes.py there?)")
+    if args.full_percents is None:  # default: the full program at every regime
+        args.full_percents = sorted({j[3] for j in todo})
     if args.resume:
         done = {re.sub(r"_low_data_regimes_\d{8}_\d{6}$", "", p.stem) for p in RESULT_DIR.glob("lab-manual-*_low_data_regimes_*.csv")}
         todo = [j for j in todo if f"{j[0].stem}_{j[3]}" not in done]
