@@ -45,12 +45,12 @@ saved roberta-large models, and every result file carries the model and the star
     trials/<test file>_trials_... .csv and _mlp_trials_... .csv
 Each run's summary only holds the pairs of that run.
 
-    python testing/predict_all_labelFusion_TS_fixed_window.py                                   # every dataset, every seed
-    python testing/predict_all_labelFusion_TS_fixed_window.py --datasets mm-test pc-split-test
-    python testing/predict_all_labelFusion_TS_fixed_window.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv
-    python testing/predict_all_labelFusion_TS_fixed_window.py --ts-window 63 --ts-dim 128
-    python testing/predict_all_labelFusion_TS_fixed_window.py --ts-pool-only                    # pooled embeddings, no attention
-    python testing/predict_all_labelFusion_TS_fixed_window.py --ts-window 0                      # whole series up to the date
+    python testing/old/predict_all_labelFusion_TS_fixed_window.py                                   # every dataset, every seed
+    python testing/old/predict_all_labelFusion_TS_fixed_window.py --datasets mm-test pc-split-test
+    python testing/old/predict_all_labelFusion_TS_fixed_window.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv
+    python testing/old/predict_all_labelFusion_TS_fixed_window.py --ts-window 63 --ts-dim 128
+    python testing/old/predict_all_labelFusion_TS_fixed_window.py --ts-pool-only                    # pooled embeddings, no attention
+    python testing/old/predict_all_labelFusion_TS_fixed_window.py --ts-window 0                      # whole series up to the date
 """
 
 from __future__ import annotations

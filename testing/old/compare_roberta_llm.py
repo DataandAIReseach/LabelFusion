@@ -22,8 +22,8 @@ Writes to ./outputs/roberta_vs_llm/:
     comparison.xlsx   the same table with the two colour columns filled in those colours
     summary.csv       per pair and per dataset: share of agreement / only roberta / only LLM / both / neither
 
-    python testing/compare_roberta_llm.py                       # all test sets
-    python testing/compare_roberta_llm.py --datasets mm-test    # datasets containing these
+    python testing/old/compare_roberta_llm.py                       # all test sets
+    python testing/old/compare_roberta_llm.py --datasets mm-test    # datasets containing these
 """
 
 from __future__ import annotations

@@ -9,7 +9,7 @@
 #SBATCH -e /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.err
 #SBATCH --constraint=inet
 
-# LabelFusion + time series (testing/predict_all_labelFusion_TS_fixed_window.py): the two-stage LabelFusion
+# LabelFusion + time series (testing/old/predict_all_labelFusion_TS_fixed_window.py): the two-stage LabelFusion
 # plus an embedding of DGS10 / T10Y2Y / VIXCLS (fixed window of the last 21 daily values) from three
 # TimesFM encoders. This script always runs with --ts-pool-only: no CrossTSTransformer attention, the three
 # per-series embeddings are only pooled (mean, or max with --ts-pooling max) and passed straight to the fusion MLP.
@@ -64,5 +64,5 @@ REUSE_ARGS=()
 [ -f "$REUSE" ] && REUSE_ARGS=(--roberta-params-from "$REUSE")
 
 srun $PYTHON \
-     $BASE/testing/predict_all_labelFusion_TS_fixed_window.py \
+     $BASE/testing/old/predict_all_labelFusion_TS_fixed_window.py \
      --trials 24 --mlp-trials 30 --epochs 10 --retries 2 --ts-pool-only ${REUSE_ARGS[@]+"${REUSE_ARGS[@]}"} "$@"
