@@ -19,12 +19,12 @@ Writes to ./outputs/predictions_low_data_regimes/ (<model> = the model id withou
 Finished files are skipped on a rerun (--force repeats them); the classifier's prediction cache lives in
 outputs/llm_cache like for predict_all_files_llm.py, so no sentence is paid for twice.
 
-    python testing/predict_all_files_llm_low_data_regimes.py --dry-run                       # what would be classified, no API calls
-    python testing/predict_all_files_llm_low_data_regimes.py                                 # every test file, every regime
-    python testing/predict_all_files_llm_low_data_regimes.py --datasets mm-test --percents 10 50
-    python testing/predict_all_files_llm_low_data_regimes.py --limit 20                      # smoke test: first 20 sentences per file
-    python testing/predict_all_files_llm_low_data_regimes.py --provider anthropic            # Claude (claude-haiku-5-5) with an Anthropic key
-    python testing/predict_all_files_llm_low_data_regimes.py --provider anthropic --model claude-sonnet-5-5
+    python testing/old/predict_all_files_llm_low_data_regimes.py --dry-run                       # what would be classified, no API calls
+    python testing/old/predict_all_files_llm_low_data_regimes.py                                 # every test file, every regime
+    python testing/old/predict_all_files_llm_low_data_regimes.py --datasets mm-test --percents 10 50
+    python testing/old/predict_all_files_llm_low_data_regimes.py --limit 20                      # smoke test: first 20 sentences per file
+    python testing/old/predict_all_files_llm_low_data_regimes.py --provider anthropic            # Claude (claude-haiku-5-5) with an Anthropic key
+    python testing/old/predict_all_files_llm_low_data_regimes.py --provider anthropic --model claude-sonnet-5-5
 """
 
 from __future__ import annotations

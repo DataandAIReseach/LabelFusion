@@ -49,10 +49,10 @@ Writes to ./outputs/labelfusion_roberta_large/:
     trials/<test file name>_mlp_trials.csv  every stage-2 Optuna trial
 All summaries are rewritten after every pair, so a stopped run keeps its progress.
 
-    python testing/predict_all_labelFusion.py                                   # every dataset, every seed
-    python testing/predict_all_labelFusion.py --datasets mm-test pc-split-test  # datasets containing these
-    python testing/predict_all_labelFusion.py --trials 16                       # stage-1 grid only, no refinement
-    python testing/predict_all_labelFusion.py --datasets pc-test --limit-train 40 --trials 0 --mlp-trials 0 --epochs 1  # smoke test
+    python testing/old/predict_all_labelFusion.py                                   # every dataset, every seed
+    python testing/old/predict_all_labelFusion.py --datasets mm-test pc-split-test  # datasets containing these
+    python testing/old/predict_all_labelFusion.py --trials 16                       # stage-1 grid only, no refinement
+    python testing/old/predict_all_labelFusion.py --datasets pc-test --limit-train 40 --trials 0 --mlp-trials 0 --epochs 1  # smoke test
 """
 
 from __future__ import annotations

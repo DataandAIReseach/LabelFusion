@@ -34,6 +34,6 @@ echo "host: $(hostname)  start: $(date)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
 echo "python: $PYTHON  repo: $REPO  args: $*"
 
-srun "$PYTHON" testing/compare_roberta_llm.py --trials 24 --epochs 10 --retries 2 "$@"
+srun "$PYTHON" testing/old/compare_roberta_llm.py --trials 24 --epochs 10 --retries 2 "$@"
 
 echo "end: $(date)"

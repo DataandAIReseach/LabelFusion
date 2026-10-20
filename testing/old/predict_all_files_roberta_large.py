@@ -40,10 +40,10 @@ All summaries are rewritten after every pair, so a stopped run keeps its progres
 Fine-tuned models are never kept (~1.4 GB each): they are written to LABELFUSION_MODEL_CACHE
 (default ~/.cache/labelfusion) by RoBERTaClassifier.fit() and deleted right after.
 
-    python testing/predict_all_files_roberta_large.py                                   # every dataset, every seed: 16-point grid + 8 sampler trials
-    python testing/predict_all_files_roberta_large.py --trials 16                       # grid only, no refinement
-    python testing/predict_all_files_roberta_large.py --datasets mm-test pc-split-test  # datasets containing these
-    python testing/predict_all_files_roberta_large.py --datasets pc-test --limit-train 40 --trials 0 --epochs 1  # smoke test
+    python testing/old/predict_all_files_roberta_large.py                                   # every dataset, every seed: 16-point grid + 8 sampler trials
+    python testing/old/predict_all_files_roberta_large.py --trials 16                       # grid only, no refinement
+    python testing/old/predict_all_files_roberta_large.py --datasets mm-test pc-split-test  # datasets containing these
+    python testing/old/predict_all_files_roberta_large.py --datasets pc-test --limit-train 40 --trials 0 --epochs 1  # smoke test
 """
 
 from __future__ import annotations
