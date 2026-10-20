@@ -10,6 +10,12 @@ try:
 except ModuleNotFoundError:
     OPENAI_AVAILABLE = False
 
+try:
+    from anthropic import AsyncAnthropic
+    ANTHROPIC_AVAILABLE = True
+except ModuleNotFoundError:
+    ANTHROPIC_AVAILABLE = False
+
 from ..core.exceptions import APIError
 
 class BaseLLMContentGenerator(ABC):
@@ -111,6 +117,47 @@ class OpenRouterContentGenerator(BaseLLMContentGenerator):
             raise APIError(f"OpenRouter API call failed: {str(e)}")
 
 
+class AnthropicContentGenerator(BaseLLMContentGenerator):
+    """Content generator using Anthropic's Claude API directly (not via OpenRouter).
+
+    API keys look like: sk-ant-...  (environment variable ANTHROPIC_API_KEY, or CLAUDE_API_KEY)
+    Model names are Anthropic's own ids, e.g. "claude-haiku-5-5" or "claude-sonnet-5-5".
+    """
+
+    def __init__(self, model_name: str, api_key: Optional[str] = None, max_tokens: int = 1024, temperature: float = 0.1):
+        if not ANTHROPIC_AVAILABLE:
+            raise RuntimeError("anthropic SDK not available (pip install anthropic)")
+        self.model_name = model_name
+        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("CLAUDE_API_KEY")
+        self.max_tokens = max_tokens  # required by the Messages API; the classification itself is a few tokens
+        self.temperature = temperature
+        self._clients = {}
+
+    @property
+    def client(self) -> "AsyncAnthropic":
+        # One async client per event loop: predict() uses a fresh asyncio.run() each call.
+        loop = asyncio.get_running_loop()
+        if loop not in self._clients:
+            self._clients[loop] = AsyncAnthropic(api_key=self.api_key, max_retries=5)
+        return self._clients[loop]
+
+    async def generate_content(self, prompt: str, role_prompt: Optional[str] = None) -> str:
+        """Generate content via the Anthropic Messages API."""
+        try:
+            kwargs = dict(
+                model=self.model_name,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            if role_prompt:
+                kwargs["system"] = role_prompt
+            response = await self.client.messages.create(**kwargs)
+            return "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
+        except Exception as e:
+            raise APIError(f"Anthropic API call failed: {str(e)}")
+
+
 class GeminiContentGenerator(BaseLLMContentGenerator):
     """Content generator using Google's Gemini API."""
     
@@ -180,7 +227,7 @@ def create_llm_generator(provider: str, model_name: str, api_key: Optional[str] 
     """Factory function to create appropriate LLM generator.
     
     Args:
-        provider: LLM provider ('openai', 'openrouter', 'gemini', or 'deepseek')
+        provider: LLM provider ('openai', 'openrouter', 'gemini', 'deepseek' or 'anthropic')
         model_name: Name of the model to use
         api_key: Optional API key
         
@@ -222,7 +269,10 @@ def create_llm_generator(provider: str, model_name: str, api_key: Optional[str] 
         'openrouter':  OpenRouterContentGenerator if OPENAI_AVAILABLE else LocalDummyContentGenerator,
         'gemini':      GeminiContentGenerator,
         'deepseek':    DeepseekContentGenerator,
+        'anthropic':   AnthropicContentGenerator,  # no silent dummy fallback: a missing SDK must not look like predictions
     }
+    if provider == 'claude':  # alias
+        provider = 'anthropic'
 
     if provider not in generators:
         raise ValueError(f"Unknown provider: {provider}. Available: {list(generators.keys())}")

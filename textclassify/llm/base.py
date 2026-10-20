@@ -1,6 +1,7 @@
 """Base class for LLM-based text classifiers."""
 
 import asyncio
+import os
 import json
 import re
 import logging
@@ -123,6 +124,11 @@ class BaseLLMClassifier(AsyncBaseClassifier):
             api_key = key_manager.get_key("deepseek")
             if not api_key:
                 raise ValueError("No API key found for deepseek")
+        elif self.provider == 'anthropic':
+            api_key = key_manager.get_key("anthropic") or key_manager.get_key("claude")
+            if not api_key:
+                raise ValueError("No API key found for anthropic. Set ANTHROPIC_API_KEY (or CLAUDE_API_KEY) environment variable.")
+            os.environ.setdefault("ANTHROPIC_API_KEY", api_key)  # PromptEngineer looks the key up by provider name
         elif self.provider == 'openrouter':
             api_key = key_manager.get_key("openrouter")
             if not api_key:
