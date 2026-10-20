@@ -9,7 +9,7 @@
 #SBATCH -e /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.err
 #SBATCH --constraint=inet
 
-# Two-stage LabelFusion (testing/predict_all_labelFusion.py): stage 1 roberta-large alone (4x4 grid +
+# Two-stage LabelFusion (testing/old/predict_all_labelFusion.py): stage 1 roberta-large alone (4x4 grid +
 # Optuna, class weights, warmup, best epoch, retries), stage 2 frozen embeddings + LLM labels -> MLP.
 # Output: outputs/labelfusion_roberta_large/ (summary.csv = mean +- std per dataset).
 #
@@ -35,5 +35,5 @@ srun nvidia-smi -L
 srun nvidia-smi --query-gpu=name,memory.total --format=csv
 
 srun $BASE/env_labelFusion/bin/python \
-     $BASE/testing/predict_all_labelFusion.py \
+     $BASE/testing/old/predict_all_labelFusion.py \
      --trials 24 --mlp-trials 30 --epochs 10 --retries 2 "$@"

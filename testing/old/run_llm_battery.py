@@ -4,8 +4,8 @@ Runs testing/test_textclassify_llm.py once per (model, sample_size) as a
 subprocess (the script reads its config from env vars at import time) and
 prints/saves a summary table.
 
-    python testing/run_llm_battery.py                  # all models
-    python testing/run_llm_battery.py gpt-5-nano ...   # only these model keys
+    python testing/old/run_llm_battery.py                  # all models
+    python testing/old/run_llm_battery.py gpt-5-nano ...   # only these model keys
 
 Results are merged into the CSV by (model, train_samples).
 """

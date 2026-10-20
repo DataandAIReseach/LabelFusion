@@ -18,10 +18,10 @@ summary.csv with accuracy / macro-F1 per file, all under ./outputs (repo root):
 The classifier's own experiment logs and prediction cache (outputs/experiments,
 outputs/llm_cache) live there too; a rerun reuses the cache and makes no API calls.
 
-    python testing/predict_all_files_llm.py              # both parts
-    python testing/predict_all_files_llm.py train        # only the training files
-    python testing/predict_all_files_llm.py test --limit 20   # smoke test
-    python testing/predict_all_files_llm.py test --from-cache # rebuild CSV/JSON from the
+    python testing/old/predict_all_files_llm.py              # both parts
+    python testing/old/predict_all_files_llm.py train        # only the training files
+    python testing/old/predict_all_files_llm.py test --limit 20   # smoke test
+    python testing/old/predict_all_files_llm.py test --from-cache # rebuild CSV/JSON from the
                                                               # prediction cache, no API calls
 """
 

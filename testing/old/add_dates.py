@@ -24,8 +24,8 @@ New columns: date (YYYY-MM-DD), month, day, date_status, date_candidates.
 Output: data/training_data_dated/ and data/test_data_dated/, same file names.
 Nothing in the original files is changed.
 
-    python testing/add_dates.py                       # clones the repo if needed
-    python testing/add_dates.py --repo /path/to/fomc-hawkish-dovish
+    python testing/old/add_dates.py                       # clones the repo if needed
+    python testing/old/add_dates.py --repo /path/to/fomc-hawkish-dovish
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ import random
 
 import pandas as pd
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]  # testing/old/<this file>
 DEFAULT_SOURCE = Path.home() / ".cache" / "fomc-hawkish-dovish"
 SOURCE_URL = "https://github.com/gtfintechlab/fomc-hawkish-dovish"
 SPLITS = ["training_data", "test_data"]

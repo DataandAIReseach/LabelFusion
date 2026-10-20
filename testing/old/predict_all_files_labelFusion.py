@@ -45,11 +45,11 @@ chosen parameters) and ./outputs/fusion/optuna/<study>_trials.csv (every trial).
 pointed at a cache outside the repo (LABELFUSION_MODEL_CACHE, default ~/.cache/labelfusion) and
 that copy is deleted right after training.
 
-    python testing/predict_all_files_labelFusion.py                            # everything
-    python testing/predict_all_files_labelFusion.py --files mm-test-5768       # matching pairs only
-    python testing/predict_all_files_labelFusion.py --tune-scope shared --tune-file lab-manual-mm-test-5768
-    python testing/predict_all_files_labelFusion.py --trials 0                 # no tuning (defaults)
-    python testing/predict_all_files_labelFusion.py --files pc-test-5768 --limit-train 60 --trials 3 --epochs 1   # smoke test
+    python testing/old/predict_all_files_labelFusion.py                            # everything
+    python testing/old/predict_all_files_labelFusion.py --files mm-test-5768       # matching pairs only
+    python testing/old/predict_all_files_labelFusion.py --tune-scope shared --tune-file lab-manual-mm-test-5768
+    python testing/old/predict_all_files_labelFusion.py --trials 0                 # no tuning (defaults)
+    python testing/old/predict_all_files_labelFusion.py --files pc-test-5768 --limit-train 60 --trials 3 --epochs 1   # smoke test
 
 CPU cost (no GPU here): about 3-6 s per step of 16 sentences, i.e. roughly 5-10 minutes per epoch
 for the larger files. A trial is therefore 5-40 minutes on a large pair. See --tune-minutes to cap

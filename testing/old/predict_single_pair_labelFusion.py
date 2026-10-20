@@ -30,10 +30,10 @@ Writes to ./outputs/fusion/single/:
     <dataset>_summary.json         per dataset: run settings, every seed's run, mean and std per metric
 All summaries are rewritten after every pair, so a stopped run keeps its progress.
 
-    python testing/predict_single_pair_labelFusion.py                                   # every dataset, every seed, 5 trials
-    python testing/predict_single_pair_labelFusion.py --datasets mm-test pc-split-test  # datasets containing these
-    python testing/predict_single_pair_labelFusion.py --datasets pc-test --limit-train 40 --trials 0 --epochs 1 --fusion-epochs 1  # smoke test
-    python testing/predict_single_pair_labelFusion.py --joint-training                  # joint RoBERTa + fusion MLP training
+    python testing/old/predict_single_pair_labelFusion.py                                   # every dataset, every seed, 5 trials
+    python testing/old/predict_single_pair_labelFusion.py --datasets mm-test pc-split-test  # datasets containing these
+    python testing/old/predict_single_pair_labelFusion.py --datasets pc-test --limit-train 40 --trials 0 --epochs 1 --fusion-epochs 1  # smoke test
+    python testing/old/predict_single_pair_labelFusion.py --joint-training                  # joint RoBERTa + fusion MLP training
 """
 
 from __future__ import annotations
