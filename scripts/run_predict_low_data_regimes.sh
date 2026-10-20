@@ -10,7 +10,8 @@
 #SBATCH --constraint=inet
 
 # Low-data regimes (testing/predict_low_data_regimes.py): for every test file and every regime
-# p = 10, 20, ..., 100 % of its training file models are trained on the regime and scored on the full test set.
+# p = 10, 20, ..., 70 % of its training file models are trained on the regime and scored on the full test set. Only these
+# regimes (PERCENTS below) are run by default; --percents ... on the command line replaces them, e.g. --percents 80 90 100.
 #   every regime (default) the FULL program of predict_all_labelFusion.py: roberta-large is FINE-TUNED (Optuna over lr x batch
 #                         size x epochs, class weights, warmup, best epoch, retries), then the fusion MLPs are tuned with Optuna and
 #                         trained on the validation split: fusion = fine-tuned roberta-large + LLM label, fusion_ts = additionally the
@@ -28,19 +29,19 @@
 # roberta-large is tuned in every regime (24 Optuna trials per run, by far the most expensive part). To reuse the parameters
 # of a run_labelFusion.sh run instead (tuned on 100 % of the training file), pass
 # --roberta-params-from $BASE/outputs/labelfusion_roberta_large/summary_seeds.csv explicitly.
-# All 240 runs take roughly 5-8 GPU days: scripts/submit_predict_low_data_regimes.sh submits them as 9 jobs.
+# All 168 runs (24 test files x the regimes 10 to 70 %) take several GPU days: scripts/submit_predict_low_data_regimes.sh submits them as 7 jobs.
 #
 #   sbatch scripts/run_predict_low_data_regimes.sh --dry-run                                  # which runs, nothing is trained
 #   sbatch scripts/run_predict_low_data_regimes.sh --datasets pc-split-test --percents 10 80 --mlp-trials 3 --trials 0 --epochs 2   # smoke test
 #   sbatch scripts/run_predict_low_data_regimes.sh --datasets mm-test mm-split-test pc-test pc-split-test
-#   sbatch scripts/run_predict_low_data_regimes.sh --percents 80 100                          # only these regimes
+#   sbatch scripts/run_predict_low_data_regimes.sh --percents 10 40                           # only these regimes (instead of 10 to 70 %)
 #   sbatch scripts/run_predict_low_data_regimes.sh --full-percents 80 100                     # full program only at 80 / 100 %, frozen elsewhere
 #   sbatch scripts/run_predict_low_data_regimes.sh --full-percents                            # frozen everywhere (no value = none)
 #   sbatch scripts/run_predict_low_data_regimes.sh --resume                                   # skip runs that already have a result
 #   sbatch scripts/run_predict_low_data_regimes.sh --no-ts                                    # without the time series model
 #   sbatch scripts/run_predict_low_data_regimes.sh --mlp-trials 10 --trials 16 --ts-mlp-trials 5   # fewer Optuna trials per run
 #
-# 240 runs (all with the full program) do not fit into one job: split them by --datasets and/or --percents and use
+# 168 runs (all with the full program) do not fit into one job: split them by --datasets and/or --percents and use
 # --resume to go on. Jobs can run in parallel (each on its own datasets): every result file carries the start time of the
 # run in its name (<test file>_<p>_low_data_regimes_<YYYYMMDD_HHMMSS>.csv/.json), so runs never overwrite each other.
 # Every run's summary_*.csv only holds that run's runs.
@@ -50,6 +51,13 @@ set -euo pipefail
 BASE=/mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion
 PYTHON=$BASE/env_labelFusion/bin/python
 mkdir -p $BASE/logs
+
+# the regimes that are run unless the command line brings its own --percents
+PERCENTS=(10 20 30 40 50 60 70)
+PERCENT_ARGS=(--percents "${PERCENTS[@]}")
+for arg in "$@"; do
+    [ "$arg" = "--percents" ] && PERCENT_ARGS=()
+done
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export PYTHONUNBUFFERED=1
@@ -76,4 +84,4 @@ PY
 
 srun $PYTHON \
      $BASE/testing/predict_low_data_regimes.py \
-     "$@"
+     ${PERCENT_ARGS[@]+"${PERCENT_ARGS[@]}"} "$@"
