@@ -55,4 +55,9 @@ textclassify.egg-info/
 /notes/
 
 /env_LabelFusion/outputs/
+<<<<<<< HEAD
 env_labelFusion/
+=======
+/outputs/
+>>>>>>> 5ac001cc7cddadd110224007b8b5647a03237212
+outputs/
