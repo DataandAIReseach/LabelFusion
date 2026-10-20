@@ -1,0 +1,1514 @@
+[
+  {
+    "sentence":"And that’s because of this misalignment between supply and demand.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"These base effects will contribute about 1 percentage point to headline inflation and about 0.7 percentage point to core inflation in April and May.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We think that the economy will need highly accommodative monetary policy and the use of our tools for an extended period.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Also, the Committee will pay close attention to measures of inflation expectations to ensure that those expectations remain well anchored.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"By the way, we’re also not at maximum employment, as I mentioned.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"So in—in—in U-6, the U-6 level of unemployment has tripled from 7 percent to 21 percent.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But I think that that’s a prudent move, to move in a gradual way to remove Chair Yellen’s Press Conference FINAL accommodation, with unemployment now—and not only, I should say, the unemployment rate, but I think any indicator of labor market performance and tightness that you could look at, whether it’s household perceptions of the availability of jobs, difficulty that firms report in hiring workers, the rate at which workers are quitting their jobs, the rate of job openings, all of these indicators do signal a tight labor market.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"So it’s a serious economic problem for the United States, but it’s—it’s got underlying causes that are not related to monetary policy or to our response to the pandemic.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I think that keeping interest rates low is still appropriate for our economy.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The persistence of that into, into inflation over time is just not there.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"During this time of reopening, we are likely to see some upward pressure on prices, and I’ll discuss why.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Last year, we had 1.9 percent productivity, which is much higher.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And what we—it looks like we’re seeing a slowdown in the rate of growth.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It also affects stock prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Inflation pressures remain muted, and indicators of longer-term inflation expectations are at the lower end of their historic ranges.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In coming months, as those earlier declines drop out of the calculation, inflation should move up closer to 2 percent and stabilize around that level over the medium term.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I’m more concerned about that than about the possibility, which exists, of higher inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"But I do think that—and I do think also that unemployment insurance benefits will run out in September, so to the extent that’s a factor, which is not clear, it will no longer be a factor fairly soon.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And I really don’t have much for you other than to say that they will be data dependent—that, over time, the stance of policy will be adjusted to try to keep the economy on a track where we see continuing progress toward achieving our goals of maximum employment and price stability.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So I don’t have a sense—the Committee doesn’t try to gauge what is the right level of equity prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We continue to discuss whether or not the unemployment rate itself is an adequate measure of how much underutilization of labor resources there really is.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"You know, we’re, we’re—inflation measures are always going to be a bit volatile.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And—but inflation expectations did not move strongly down here in the United States.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So, you know, I can’t—all I can tell you is, we’ll be looking at weak global growth.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And that is a statement about productivity growth, which has been pretty disappointing.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"If you lay the crosscurrents on top of that—concerns about global growth and trade developments—you have the full picture.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The economy is continuing to make progress toward the FOMC’s objective of maximum sustainable employment.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"You’ll never get inflation to 2 percent.” Some of our critics now who say inflation’s too tight—too high were the same ones who were saying, “You’ll never get to 2 percent.” Well, but anyway, that’s what happened.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But there’s also a role for monetary policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"More broadly, however, weaker demand, especially in sectors that have been most affected by the pandemic, has held down consumer prices, and overall, inflation is running well below our 2 percent longer-run objective.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"But again, our basic forecast is one which is basically, as was pointed out earlier by Mr. Hilsenrath, a moderately optimistic forecast, where growth picks up as we pass through this period of fiscal restraint; where unemployment continues to fall at a gradual pace as it has been since last September—and we have made some progress since last September; and inflation rises slowly towards 2 percent.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And if we do that, inflation expectations will be right at 2 percent, and that’ll help us achieve 2 percent inflation over time and avoid the situation where the central bank loses its ability to support the economy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And inflation is well above target.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"And we’ve seen significant outflows of capital from those countries, pressures on their exchange rates, and concerns about their performance going forward.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So for many, many years, we’ve been far from maximum employment and stable prices, and so the need for accommodative policy has been—has been clear.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"You know, monetary policy is a forward-looking exercise, and I’m going to—I’m just going to stick with that.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"By contrast, raising rates too slowly would raise the risk that monetary policy would need to tighten abruptly down the road, which could jeopardize the economic expansion.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"But now, let’s go to your—the part of your question about inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In addition, the median estimate of the longer-run normal unemployment rate moved down a tenth to 4.6 percent.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The central tendency rises to 2.4 to 2.7 percent next year, somewhat above estimates of the longer-run growth rate.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Against this backdrop, today the Federal Open Market Committee raised its policy interest rate by ¾ percentage point and anticipates that ongoing increases in that rate will be appropriate.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"So I think, through all of those channels, monetary policy works.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I expect that to continue, and I would expect also to see some improvement in the degree of part-time employment that’s for economic reasons.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"These headwinds—which include developments abroad, subdued household formation, and meager productivity growth—could persist for some time.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And, and those are—that’s again—that goes to keeping this episode as short as it can be and avoiding unnecessary business bankruptcies, unnecessary household bankruptcies, and unnecessary long-term stays of unemployment or supporting people through them so that they can maintain their financial footing and their lives and be able to go back to work in a productive way.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"And I assure you that my colleagues and I will continue to conduct monetary policy without regard to political considerations.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I would further say that I think it’s important to emphasize that we’re not going to mechanically take the interest rate projections that participants provide and just build policy off of that.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So, with this coronavirus arriving, we judged that the—the net effects of this will be to—to have inflation move down even a little bit more.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Now, we’ve long expected, as most analysts have, to see some slowing in Chinese growth over time as they rebalance their economy.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So we view maximum employment as the maximum sustainable level of employment, meaning it’s not so much that it will cause the economy to overheat.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"I would note, by the way, that at the current moment, it doesn’t really matter whether we have one mandate or two, because we’re below our inflation target and we—unemployment is above where we’d like it to be.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"For example, the unemployment rate has risen by 0.3 percentage points since March, and new claims for unemployment insurance have moved somewhat higher.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So and, and, you know, the shorter-term ones do tend to move around based on, for example, gasoline prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So let me talk about the coronavirus specifically, and then I’ll turn more to global growth more generally.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It was a question of not getting inflation up to our target on a robust, symmetric kind of a way.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"We are quite aware that very low interest rates, particularly for a protracted period, do have costs for a lot of people.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The problem with the current situation is that, that if you have a sustained period of supply shocks, those can actually start to undermine or to work—to work on de-anchoring inflation expectations.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"That said, many of my colleagues and I would see a portion of the decline in the unemployment rate as perhaps not representing a diminution of slack in the labor market.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And no, we’re not—we, we have not at all changed our view, and I haven’t changed my view that inflation running above 2 percent, moderately above 2 percent, is a desirable thing.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"In fact, it’s already—it’s already understood, I think, that—that there’s more—even though we’re at 3½ percent unemployment, there’s actually more slack out there, in a sense.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Inflation, in fact, is under control, and starting to come down.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"As always, each participant’s projections are conditioned on his or her own view of appropriate monetary policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"As always, our actions are guided by our congressional mandate to promote maximum employment and price stability.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We have a three-part baseline projection, which involves increasing growth that’s picking up over time as fiscal drag is reduced, continuing gains in the labor market, and inflation moving back towards objective.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Same thing with economic activity.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And we were actually quite concerned that growth was not sufficient to continue to bring the unemployment rate down.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"We, frankly, didn’t even get inflation back up to target—without seeing wages getting out of touch with—with where they should be, so that’s the—that’s the biggest thing we can do.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"But, first, on inflation expectations, it is true that the breakevens from the inflation-adjusted—inflation-indexed bonds have come down.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Our current framework for implementing monetary policy is working very well.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"By getting unemployment down, we hope to bring back to work some of the people who’ve been out of work as long as they have and, in that respect, try to avoid the longer-term consequences of people being out of work for months at a time.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"But I want to emphasize that we do have a commitment to raising inflation to 2 percent.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"We’re also, as part of our review, looking at potential innovations, changes to the way we think about things, changes to the framework that would lead us—that would be more supportive of achieving inflation on a 2 percent—on a symmetric 2 percent basis over time.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Of course, we can’t do anything about long-run employment opportunities, but we can help the economy recover more quickly.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Core inflation, which excludes energy and food prices, has been running close to 1½ percent.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And then, what the statement emphasizes, and this is the same language we used in December and January, we used the language especially if inflation is running below our 2 percent objective.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"And, you know, we do want inflation to run moderately above 2 percent.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"But it could be that if interest rates rise quickly, for example, that we would be in a situation of not giving remittances to the Treasury for a couple of years, and that would create problems, no doubt, for the Fed in terms of congressional response.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And maybe reducing their level of the natural rate of unemployment, which has been the trend.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And downward revisions to the longer-run normal unemployment rate in a way suggests that participants are seeing more slack in the economy now than they previously did.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"As was highlighted by the Bureau of Labor Statistics, this figure likely understates the extent of unemployment; accounting for the unusually large number of workers who reported themselves as employed but absent from their jobs would raise the unemployment rate by about 3 percentage points.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"For example, one—in the long-run, the size of the balance sheet is going to depend on the public’s demand for our liabilities, including currency and reserves.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In addition, the May 1, 2019 trimmed mean measures of inflation did not go down as much.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In the near term, 12-month measures of PCE inflation are expected to move above 2 percent as the very low readings from early in the pandemic fall out of the calculation and past increases in oil prices pass through to consumer energy prices.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Well, you know, if the economy were disappointing, we—you know, our actions wouldn’t purely be based on inflation, we would also take employment into account.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"But also we want to see inflation move up back to our 2 percent objective over the medium term, and so seeing above-trend growth and continuing tightness—greater tightness in labor and product markets—I think that will help us achieve our objective as well with respect to inflation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"As far as—as the policy rate, what we’ve said is that we will maintain the rate at this level until we’re confident that the economy has weathered recent events and is on track to achieve our maximum employment and price stability goals.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"So, if we maintain a highly accommodative monetary policy for a very long time from here and the economy performs as we expect—namely, it’s strong and the risks that are out there don’t materialize—my concern will be that we will have much more tightening in labor markets than you see in these projections.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"PCE core is at about 2, and I think we see that, you know, the temporary increase in headline inflation as being a function of oil prices probably, and we expect inflation to go back down to 2 percent.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The “extended period” language is conditioned on exactly those same points: “Extended period” is conditioned on resource slack, on subdued inflation, and on stable inflation expectations.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Inflation has continued to run below our longer-run objective, in part reflecting lower energy prices.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And, and some of the answer to that may be price.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I don’t really think asset prices themselves represent a significant threat to financial stability, and that’s because households are in good shape financially than they have been.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Well, that’s—what’s happening there is the fact that the relationship between resource utilization, or unemployment, and inflation has just gotten weaker and weaker over the years.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And I can only say qualitatively that the Committee will continue to look at the evolution of the outlook, try to assess whether unemployment is making sufficient progress towards our objectives, and, in particular, whether the recovery is still continuing.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We’re charged by Congress with trying to pursue maximum employment, and we have taken that very seriously.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"And—and we do that with measures that—that, you know, keep people in their homes; that—that support hiring; that support growth; that avoid unnecessary, avoidable business insolvencies.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"To the extent the global economy is weak and the United States is strong, it’ll—we’ll wind up, you know, we’ll wind up exporting some of our demand through, through imports rather than having, having a lot of exports.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It isn’t really just targeting the headline numbers, but it’s about taking all of those things into account in your thinking about what constitutes maximum employment.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And obviously there are benefits from a strong economy to every household in the economy, including savers, from having a better job market and a more secure economy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And part of that just is the effect of lower interest rates.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"But you didn’t under the merely adverse scenario, which featured an inflation shock followed by a quick rise in short-term rates.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The recent lower readings on inflation have been driven significantly by what appear to be one-off reductions in certain categories of prices, such as wireless telephone services and prescription drugs.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"What we really mean is that we would look at—we know that inflation will move around on both sides of the target, and what we say is that we would be equally concerned with inflation persistently above as persistently below the target.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So in terms of financial markets and monetary policy, we—as we say in our statement every cycle, we do take financial conditions into consideration because financial—broader financial conditions do affect the broader economy, and they’re one of the many things that we take into account.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And our plan as we do that is, as those purchases get to that level, we believe we can gradually reduce them, and we believe we can also gradually reduce repo as—as we reach an ample level, as we’re satisfying demand now more from underlying reserves from bill purchases rather than from repo.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"That means that we can run at low levels of unemployment and have a historically good—in some dimensions—labor market without having to worry about inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Well, we—as a Committee, we do not desire inflation undershoots.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Monetary policy has a role, and it really is in, you know—our original role was providing liquidity to financial systems when they’re under stress, and that’s—that’s really part of what we did today.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"1 Chair Yellen intended to say that “interest rate differentials globally do tend to induce capital flows that have impacts on exchange rates.” GREG ROBB.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We have not seen wage growth pick up.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"These are, you know, this is—this is the economy at nearly full employment or in the range—in the neighborhood of full employment.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We have continued to provide guidance, the same guidance that we have for some time, that says the Committee “anticipates that, even after employment and inflation are near mandate-consistent levels, economic conditions may, for some time, warrant keeping the target federal funds rate below levels the Committee views as normal in the longer run.” I know that’s a mouthful, but it says, in effect, that the Committee believes that the economic conditions that have made recovery difficult, we’re getting beyond them.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"So there’s been a number of emerging markets—as you know, we’re suffering under the weight of declines in oil prices that are affecting their economic activity.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So you’re going to have different perspectives from Committee participants about how fast growth will be, how fast the labor market will heal, or how fast—sorry, inflation will move up.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"There should be able to be an adjustment that would have lower than—perhaps lower-than-expected increases in unemployment—lower than would be expected in the ordinary course of events because the level—the ratio of, of vacancies to unemployed is just out of keeping with historical experience.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And, and that’s why we have adopted the flexible average inflation-targeting framework.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Returning to monetary policy, we recognize that there has been a great deal of focus on today’s policy decision.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"You know, it’s interest rates, it’s risk spreads, it’s currency, it’s the stock market, it’s credit availability, it’s many, many factors.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So that’s the kind of thinking we’ll be doing, and, again, we’re looking—ultimately, we’re not going to declare victory until we see a series of these, really see convincing evidence, compelling evidence, that inflation is coming down.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"One of the things we’ve learned from our financial crisis and from a series of financial crises in history and around the globe is that, very commonly, when the economy takes a hit and falls into a recession, that productivity doesn’t pick up to pre-recession levels and that there looks like there is a permanent hit to the path of potential output for the economy, which is called “hysteresis.” And I raised the question as to whether or not this might operate in the opposite direction as well.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But again, in terms of terminology, I guess I would reject that term for the Federal Reserve because we are going to be evenhanded in treating the price stability and maximum employment parts of our mandate on a level footing.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I don’t think we look at—I understand what you’re asking, but we’re looking at—our mandate is price inflation and maximum employment, and that’s what we’re looking at with setting interest rates.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The asset purchases are about creating some near-term momentum in the economy, trying to strengthen growth and job creation in the near term, and the increases in the federal funds rate target, when they ultimately occur, are about reducing accommodation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"We have a much more resilient, stronger banking system, and we’re not seeing some worrisome buildup in leverage or credit growth at successive levels.1 So, you know, this is something that the FOMC pays attention to, but if you ask me, is this a significant factor shaping monetary policy now, well, it’s on the list of risks, it’s not a major—it’s not a major factor.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I mean, it really depends on how long it takes for wages and, more than that, prices to come down for inflation to come down.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But it’s not easy to get a clear read on the implications of asset prices for the overall outlook.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And I fully expect it will return to solid growth and a solid labor market as well.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"I don’t know that demand for reserves has risen over the past years.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In terms of the, you know, inflation, a couple things—your second question.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"There was a lot of pent-up demand.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I did indicate that I do have concerns about the scope for monetary policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And we’ve talked about the effects on asset prices, but we have continued to analyze the effects of changes in interest rates, for example, on decisions like investment or car purchases.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"If inflation remains higher during the course of 2022, then we may already have met that test by the time we reach liftoff.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"But many other commodity prices have fallen further, and the reason I would give for that is that the emerging markets—China, the rest of Asia, and some other parts of the world—plus Europe, of course, are softer, and so global commodity demand is weaker.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"If we don’t see the improvement that’s projected in the baseline outlook, that the June 18, 2014 opposite would be true and the pace of the timing and pace of interest rate increases would be Chair Yellen’s Press Conference FINAL later and more gradual.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Admittedly, some of the wage increases is being eaten away by inflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"You can get to 20, if you wanted to, easily, but labor force participation, the unemployment rate, different age groups of—you know, prime-age labor force participation, in particular, gets a lot of focus, the JOLTS data get a lot of focus.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Monetary policy, maximum employment, stable prices—it’s less obvious to me.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But—so I would just say that our—that there are many things that go in, as you know, to, to setting asset prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But, I would say, overall, we’re trying to sustain the expansion and keep, you know, close to our statutory goals, which are maximum employment and stable prices.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So that’s in the low 20s, and that’s post the May employment report.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Finally, I would like to note that the Committee strives to explain its monetary policy decisions as clearly as possible, and we continue to explore ways of enhancing the clarity of our public communications.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"That is a positive for growth.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Committee, based on its assessment at each meeting, has felt comfortable saying that, based on its assessment of those factors, it considers that it will be likely appropriate to maintain the current target range for a considerable time after the asset purchase program ends, especially if inflation remains below the 2 percent objective.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Earlier in the year, as you will all recall, after careful study over a period of years, actually, the Committee announced the decision to implement monetary policy in an ample-reserves regime.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We have not focused on whether we meet the liftoff test, because we don’t meet the liftoff test now because we’re not at maximum employment.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"If you look at the number of job openings compared to the number of unemployed, it’s—we’re, we’re clearly on a path to a very strong labor market with high participation, low unemployment, high employment, wages moving up across the spectrum.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Inflation is also being held down, reflecting weaker demand as well as significantly lower energy prices.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The entire Committee is committed to achieving our 2 percent inflation objective over the December 16, 2015 medium term, just as we want to make sure that inflation doesn’t persist at levels above our Chair Yellen’s Press Conference FINAL 2 percent objective.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"So, as you know, the ultimate focus that we have is on the real economy: maximum employment and price stability.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It was to do with, you know, strong monetary policy and fiscal stimulus into an economy that was recovering rapidly, and in which there were these supply-side barriers which effectively led to, you know, in certain parts of the economy, what you might call a vertical supply curve.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"We also don’t conduct monetary policy in order to prove our independence.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And one reason for that is that long-term interest rates generally embody two factors.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The changes—the financial market changes that you described, particularly the increase in stock prices, the increase in longer-term rates, and the strengthening of the dollar, suggest that many market participants anticipate expansionary fiscal policies that would raise interest rates somewhat in the United States relative to abroad and would cause a strengthening in the dollar.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"With unemployment still elevated and inflation below the Committee’s longer-run objective, the Committee is continuing its highly accommodative policies.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"So, as I mentioned, we’re going to be looking at all of those things: activity, labor market, inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It isn’t the kind of inflation that’s spread broadly across the economy.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And, at a high level, yes, I would say, and I’ve said before, that it’s really fiscal policy that is more powerful and that has much more to do with—fiscal policy can do those things that will increase the longer-run growth rate of the United States by improving productivity and labor force September 18, 2019 participation and the skills and aptitudes of workers.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But you do see growth in services, so you—this pattern around the world of Chair Powell’s Press Conference FINAL weak manufacturing but growth in the far larger part of the services economy, which has led to low unemployment, good job creation, rising wages, that’s kind of the two big pieces of it that you see.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Now, members of the Committee have different views about why this is likely to be true, that the funds rate—when the labor market is normalized and inflation is back to our objective—they maybe have slightly different views on exactly why it’s likely to be the case that interest rates will be a little lower than they would in the longer run.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Inflation has declined further below our longer-run objective, largely reflecting the lower energy prices I just mentioned.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I mean certain parts of South Carolina have developed pretty strongly but the part where I come from—mostly agricultural, it has a little bit of manufacturing—has a very high unemployment rate, a high foreclosure rate, and people are having a hard time there.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"As a further step in enhancing the clarity of our communications, the Committee recently decided to begin publishing information about participants’ assessments of appropriate monetary policy—that is, the path of policy that each participant judges as most likely to foster mandate-consistent outcomes for employment and inflation if the economy evolves as expected.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Business and household spending are increasing at rates consistent with moderate economic growth, though household spending appears to be rising at a somewhat slower pace than earlier this year.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The U.S. economy is in a good place, and we will continue to use our monetary policy tools to help keep it there.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"She showed there some so-called optimal policy rules that come from trying to get the best possible outcomes from our quantitative econometric models, and what you see, if you look at that, is that the best possible outcomes, assuming perfect certainty, assuming perfect foresight—very unrealistic assumptions—still involve inflation staying quite close to 2 percent.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"As the factors restraining economic growth are projected to fade further over time, the median rate rises to 3 percent by the end of 2018, close to its longer-run normal level.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Well, our policy approach doesn’t involve intentionally trying to raise inflation.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I think the—you know, in a way, the least tight aspect of it is, is looking at the unemployment rate, which is still below our median estimate of, of [the unemployment rate consistent with] maximum employment.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"The unemployment rate declined in May and , 2020 June but, at 11.1 percent, remains far above its level before the outbreak and greater than the Chair Powell’s Press Conference FINAL peak during the Global Financial Crisis.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"That should drive productivity.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I’m old enough to remember what very high inflation was like.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We expect the economy will continue to perform well, with the job market strengthening further and inflation rising to 2 percent over the next couple of years.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"As I mentioned, once you—once you’re, broadly speaking, in the range of neutral, I think it’s appropriate to be putting aside individual estimates of that and be looking at what the incoming data are telling you about the outlook, updating your estimates of what neutral might be, of what the natural rate of unemployment might be, of the state of the economy, so—and letting that lead you to adjust your outlook and, therefore, your appropriate path for policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So I, you know, I’m—I feel quite comfortable that we can—in particular, that we can raise interest rates at the appropriate time, even if the balance sheet remains large for an extended period.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"So the FOMC will always, in some sense, trump the projections of forward interest rates, but clearly, because the participants and the people around the table are the same, the projections should give significant information about where the FOMC is likely to go.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"When we reach maximum employment, when we reach a state where labor market conditions are at maximum employment in the Committee’s judgment, it’s very possible that the inflation test will already be met.",
+    "label":0,
+    "true":"dovish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"So the—the sooner we get the virus under control, the sooner people can regain that confidence and regain their economic activity.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And, in particular, I do personally believe that the slowdown is at least partly temporary, and that we’ll see greater growth going forward.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"You know, what you hear out there is that demand—you talk to banks, and they’ll say demand for loans is very, very low right now.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It would consist of inflation plus—plus productivity growth.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And that, I think, does raise, raise the risk that high inflation will be more persistent.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"We have Chair Yellen’s Press Conference FINAL households who are becoming more comfortable with their debt levels and more able to service that debt, an improving job market.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"I mean, we—the—again, the relationship between slack in the economy and inflation is weak, has been weak.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But my colleagues and I continue to believe that the factors that are responsible this year for holding inflation down are likely to prove transitory.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"The housing sector has fully recovered from the downturn, supported in part by low mortgage interest rates.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"As you said, falling oil prices pull down inflation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The central tendency of the unemployment rate projections is slightly lower than in the March projections and now stands at 6.0 to 6.1 percent at the end of this year.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And I think, more broadly, monetary policy is also supporting household spending and home buying by keeping the labor market strong, keeping workers’ incomes rising, and keeping consumer confidence at high levels, where it currently is.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"And so what that means is the Federal Reserve cannot add monetary accommodation by cutting short-term interest rates, the usual approach.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In real terms, with a 2 percent inflation objective—that’s 1 percent in real terms.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So, you know, as I mentioned, the Committee acutely feels its obligation to move to make sure that we restore price stability and is determined to use its tools to do so.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"So those who can get credit, together with the low prices of houses, are at—able to buy much more house than they could have a few years ago.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So we want to see that healthy process unfold as we decide what the true state of the economy is, and we think it will evolve in a way that will mean lower inflation.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But in terms of just targeting growth, you know, I think—I actually think our dual mandate works very well, which is maximum employment and stable prices.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"We are hopeful that Europe will take additional measures and do all that’s necessary to stabilize the situation and to provide the basis for an ongoing stable structure that—in which banks and sovereigns are both stabilized, in which there’s a program for growth, and in which fiscal arrangements are clear—are made much clearer.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Again, while I do not shirk the responsibility of the Fed having to do what it can to meet its mandate, obviously, a broad range of policies can affect growth and employment, and I hope that there will be a range of actions that will complement and supplement the Federal Reserve’s efforts.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"It is true that changes in longer-term interest rates in the United States—but also in other advanced economies—does have some effect on emerging markets, particularly those who are trying to peg their exchange rate, and can lead to some capital inflows or outflows.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"If you look at core PCE inflation, which is a good measure of where inflation is running now, if you look at it on a 3-, 6-, and 12-month trailing annualized basis, you’ll see that inflation is at 4.8 percent, 4.5 percent, and 4.8 percent.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And we’re learning to, to engage in economic activity.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"But, certainly, we’ve had a lot of years in which interest rates have been low.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"And it is not—it’s not exactly the same as watching global growth, where you see growth weakening, you see central banks and governments responding with fiscal policy, and you see growth strengthening, and you see a business cycle.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And those don’t—those, frankly, don’t carry significant implications in the long run for the—for inflation or for the American economy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So on the first, the Committee’s forecasts and those of most outside forecasters do show growth running below its longer-run potential this year and next year.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Our role, though, is also to, you know, to make sure that—that maximum employment happens in a context of price stability and financial stability, which is why we’re gradually raising rates.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"There’s a lot more demand for risk sharing, for liquidity services, and so on.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"These measures, along with our strong guidance on interest rates and on our balance sheet, will ensure that monetary policy will continue to support the economy until the recovery is complete.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"I’m just saying, that, that is what fiscal policy can do that, really, monetary policy can’t do—is, is invest in the future productive capacity of the economy, raise potential growth.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"You know, stimulating aggregate demand is one thing, but where there’s a part of the economy that kind of will be resistant to that, you also need fiscal policy.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And as I mentioned, I think at the last press conference, estimates by the—by members of the Committee have moved down by a full percentage point since maybe 2012 as we’ve learned—as unemployment has dropped and inflation hasn’t really reacted.",
+    "label":2,
+    "true":"neutral",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Our tools work on demand.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It will include all data relevant to our dual mandate of stable prices and maximum employment.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So the Committee estimates that the longer-run normal level of the unemployment rate is 5.0 to 5.2.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And, as I think all of us—having that expectation and that if the economy continued to progress along the lines that we expected and we continued to see the risks as balanced—do regard it as appropriate to gradually remove accommodation that’s in place by having several interest rate increases this year.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"Many members of the Committee, participants, have said that they think policy should be based on the actual evolution of economic activity and inflation, which tends to be variable over time, and that’s why I say I anticipate it will be data dependent.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"In light of increased uncertainties and muted inflation pressures, we now emphasize that the Committee will closely monitor the implications of incoming information for the economic outlook and will act as appropriate to sustain the expansion with a strong labor market and inflation near its 2 percent objective.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"And I’ll discuss the thinking behind today’s interest rate reduction and then turn to the path forward.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Growth in household spending moderated toward the end of last year, but with a healthy job market, rising incomes, and upbeat consumer confidence, the fundamentals supporting household spending are solid.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We want to see lower unemployment.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"But to the extent that continues to be the case, that should make it easier to restore price stability.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"And if the stock theory of the portfolio is correct, which we believe it is, holding all of those securities off of the market and reinvesting and still keeping the, you know, rolling-over maturing securities, will still continue to put downward pressure on interest rates.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"And you know, we haven’t yet—we just touched 2 percent core inflation, to pick one measure—just touched it for a few months, and then we’ve fallen back.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"To do that you've got to have price stability, and we've got to get back to price stability so that we can have a labor market where people's wages aren't being eaten up by inflation and where we can have a long expansion too.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"It’s where we always want inflation to be heading.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Phillips curve has become, according to most estimates, quite flat in the sense that movements in unemployment have only a modest impact on inflation, so we shouldn’t overblow how large that is.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So you’re talking about the inflation target, basically.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"After precipitous drops in March and April, employment rose strongly in May and June as many people returned to work from temporary layoffs.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Committee will continue to pay close attention to the evolution of inflation and inflation expectations.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We have a 2 percent symmetric inflation objective, and, for a number of years now, inflation has been running under 2 percent.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"It is not a Taylor rule but it has the same feature that it relates policy to observables in the economy, such as unemployment and inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"That’s not going to happen without, without restoring price stability.",
+    "label":1,
+    "true":"hawkish",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"I would describe some measures of wage growth as having moved up some.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Smoothing through these variations, average monthly job growth appears to have stepped down from last year’s strong pace, but job gains remain well above the pace necessary to provide jobs for new labor force entrants.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And the way I would explain it is, is that inflation that’s too low will mean that interest rates are lower.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"What monetary policy affects, primarily, is the state of the business cycle, the amount of excess unemployment or the extent of recession in the economy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We had a 10 percent unemployment rate, and our congressional mandate is maximum employment and price stability.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"That transition itself could help bring inflation down, because, presumably, people would spend a little less on goods while they start spending more on travel and all sorts of travel services and things like that.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"However, at 7.7 percent, the unemployment rate remains elevated.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"If we think that the potential growth rate of the economy is somewhere between, somewhere around 1.75 percent, 2.8 percent is strong economic growth.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"That’s probably related to gas prices and also just stock prices to some extent for other people.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We're looking at wages and we're looking at ultimately inflation.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"So, I think you raise a very important point because, although there is a great deal of market focus on the timing of liftoff, what to matter in thinking about the stance of policy is what the entire path of interest rates will look like.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"We have long said that the size of the balance sheet will be considered normalized when the balance sheet is once again at the smallest level consistent with conducting monetary policy efficiently and effectively.",
+    "label":2,
+    "true":"neutral",
+    "pred":"hawkish"
+  },
+  {
+    "sentence":"So the term “trend inflation”—usually there are a variety of statistical techniques that can be used to extract a trend from a series.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"This was before inflation really was under control, but, you know, it’s very interesting to look at the history.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The outbreak has also disrupted economic activity in many countries and has prompted significant movements in financial markets.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"And then we’ll look to have that just running in the background and have—and have the interest rates, again, be the active tool of monetary policy.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"Now, we have—you know, we haven’t anticipated that slowdown in productivity, and that’s one of the main reasons why we haven’t anticipated the relatively slow growth.",
+    "label":0,
+    "true":"dovish",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"What I’m telling you is that the stance of monetary policy we have today, we believe, is appropriate.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"If we—if we analyze inflation data and conclude that, clearly, transitory influences are holding down inflation, I do not want to say that we would respond to that.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  },
+  {
+    "sentence":"The Federal Reserve’s enhanced guidance about its policy intentions and its substantial and still-increasing holdings of longer-term securities will ensure that monetary policy remains highly accommodative, consistent with the pursuit of its mandated objectives of maximum employment and price stability.",
+    "label":0,
+    "true":"dovish",
+    "pred":"dovish"
+  },
+  {
+    "sentence":"Looking ahead, FOMC participants project the unemployment rate to continue to decline; the median projection is 5 percent at the end of next year and moves below 4 percent by 2023.",
+    "label":2,
+    "true":"neutral",
+    "pred":"neutral"
+  }
+]

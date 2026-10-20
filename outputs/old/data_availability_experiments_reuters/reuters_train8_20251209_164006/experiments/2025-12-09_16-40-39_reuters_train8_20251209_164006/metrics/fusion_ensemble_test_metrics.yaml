@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2025-12-09_16-40-39_reuters_train8_20251209_164006
+  git_commit: 9d0adf44b7826ffd0cd358a1c6df6b31a35bcae4
+  model_name: fusion_ensemble
+  timestamp: '2025-12-09T16:41:03.644681'
+metrics:
+  f1: 0.6913555992141454
+  hamming_loss: 0.04467583497053045
+  micro_f1: 0.9553241650294696
+  micro_precision: 0.9553241650294696
+  micro_recall: 0.9553241650294696
+  precision: 0.6923379174852652
+  recall: 0.691290111329404
+  subset_accuracy: 0.6880157170923379

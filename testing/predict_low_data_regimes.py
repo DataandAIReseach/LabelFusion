@@ -5,13 +5,12 @@ For every test file (data/test_data_dated/<dataset>-<seed>.xlsx, always the FULL
 dataset_scripts/make_low_data_regimes.py) one run trains on the regime and predicts the test set. Four columns of
 predictions come out; "training" in the summary says how they were made:
 
-  llm           the LLM labels of the regime: GPT-5 nano with 2 examples per 10 % of the training data
-                (predict_all_files_llm_low_data_regimes.py, outputs/predictions_low_data_regimes/...). These are
-                also the LLM labels the fusion models get for the test sentences.
+  llm           the LLM labels of the regime: GPT-5 nano with 2 examples per 10 % of the training data, read from the
+                regime's LLM cache (below). These are also the LLM labels the fusion models get for the test sentences.
   roberta       frozen regimes: MLP on the frozen, pretrained roberta-large [CLS] embedding alone (the LLM input is a
                 constant, i.e. no information).  full regimes: roberta-large fine-tuned alone.
   fusion        LabelFusion: MLP on the roberta-large embedding + the LLM label. The LLM labels of the regime's
-                sentences are the zero-shot ones of predict_all_files_llm.py (outputs/predictions/train_gpt-5-nano_zero_shot).
+                sentences are the zero-shot ones (also from the LLM cache, below).
   fusion_ts     the same with the time series branch: DGS10 / T10Y2Y / VIXCLS (data/3 Ts/daily_series.csv), the last
                 --ts-window days up to the date of the sentence, one TimesFM encoder per series. Frozen regimes: frozen
                 encoders, pooled over the series (--ts-pooling). Full regimes: FINE-TUNED encoders and a trained
@@ -38,9 +37,20 @@ epochs tuned there for the same test file instead of tuning stage 1 again. The f
 
 Everything is scored on the full test set: weighted F1 (primary), macro-F1, accuracy.
 
+LLM cache: no LLM is called. The predictions are read from the LLM caches of predict_all_files_llm.py /
+predict_all_files_llm_low_data_regimes.py, which live INSIDE this script's output folder:
+
+    outputs/predict_low_data_regimes/llm_cache/
+        predict_all_train_gpt-5-nano_zero_shot/                      the zero-shot labels of all training sentences
+        predict_all_test_gpt-5-nano_<k>_shot_<test file>_<p>/        the labels of the full test set for regime p
+                                                                     (k = 2 examples per 10 % drawn from that regime)
+A cache folder that is not there yet is copied once from the legacy outputs/llm_cache (--legacy-llm-cache-dir); the
+legacy folder itself is never changed.
+
 Several runs (e.g. one sbatch job per group of datasets) can run at the same time without influencing each other:
 every run has its own work folder (.work/<job id>) for the saved roberta-large models and the library's prediction
-caches, and every result file carries the start time of the run in its name. Writes to ./outputs/predict_low_data_regimes/:
+caches, and every result file carries the start time of the run in its name. Everything lives in ./outputs/predict_low_data_regimes/:
+    llm_cache/                                                 the LLM caches of the regimes (above)
     <test file>_<p>_low_data_regimes_<date_time>.csv / .json   per run: sentence, label, true, llm_pred, roberta_pred, fusion_pred, fusion_ts_pred
     summary_seeds_low_data_regimes_<date_time>.csv             one row per run (all metrics, "training", parameters used)
     summary_low_data_regimes_<date_time>.csv                   per dataset and regime: mean / std (ddof=1) over the seeds
@@ -63,6 +73,7 @@ import copy
 import gc
 import hashlib
 import os
+import pickle
 import re
 import shutil
 import sys
@@ -103,7 +114,10 @@ stage1 = base.stage1
 REPO_ROOT = base.TEST_DIR.parent.parent
 TRAIN_REGIME_DIR = REPO_ROOT / "data" / "training_data_dated_low_data_regimes"
 TEST_DATED_DIR = REPO_ROOT / "data" / "test_data_dated"
-LLM_REGIME_DIR = base.OUT_DIR / "predictions_low_data_regimes" / "test_gpt-5-nano_2_per_10_percent"
+LLM_CACHE_DIR = RESULT_DIR / "llm_cache"  # the LLM caches of the regimes (set from --llm-cache-dir)
+LEGACY_LLM_CACHE_DIR = base.OUT_DIR / "llm_cache"  # where predict_all_files_llm*.py wrote them (set from --legacy-llm-cache-dir)
+LLM_MODEL = "gpt-5-nano"  # the model name in the cache folder names (set from --llm-model)
+SHOTS_PER_10_PERCENT = 2
 TS_FILE = REPO_ROOT / "data" / "3 Ts" / "daily_series.csv"
 TS_SERIES = ["DGS10", "T10Y2Y", "VIXCLS"]
 DATE_COLUMN = "date"
@@ -223,8 +237,64 @@ def split_regime(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     return train_df.reset_index(drop=True), val_df.reset_index(drop=True)
 
 
+def shots_for(percent: int) -> int:
+    """2 examples per 10 % of the training data: 10 % -> 2, 20 % -> 4, ..., 100 % -> 20."""
+    return max(1, round(SHOTS_PER_10_PERCENT * percent / 10))
+
+
+def train_cache_name() -> str:
+    return f"train_{LLM_MODEL}_zero_shot"
+
+
+def regime_cache_name(test_stem: str, percent: int) -> str:
+    return f"test_{LLM_MODEL}_{shots_for(percent)}_shot_{test_stem}_{percent}"
+
+
+def find_cache(run_name: str) -> Path | None:
+    """The cache folder of an LLM run: in this script's llm_cache, else in the legacy outputs/llm_cache."""
+    for root in (LLM_CACHE_DIR, LEGACY_LLM_CACHE_DIR):
+        folder = root / f"predict_all_{run_name}"
+        if folder.is_dir() and any(folder.glob("cache_*.pkl")):
+            return folder
+    return None
+
+
+def import_cache(folder: Path) -> Path:
+    """Make sure the folder is inside this script's llm_cache: a legacy folder is copied once, never moved."""
+    target = LLM_CACHE_DIR / folder.name
+    if folder != target and not target.exists():
+        LLM_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(folder, target)
+    return target
+
+
+def read_cache(folder: Path) -> dict[str, str]:
+    """sentence -> predicted class name, from the classifier's prediction cache (only successful, unambiguous calls)."""
+    preds: dict[str, str] = {}
+    for pkl in sorted(folder.glob("cache_*.pkl")):
+        with open(pkl, "rb") as fh:
+            for entry in pickle.load(fh).values():
+                vec = entry.get("prediction")
+                if entry.get("success") and vec is not None and sum(vec) == 1:
+                    preds[entry["text"]] = base.LABEL_COLUMNS[list(vec).index(1)]
+    return preds
+
+
+_TRAIN_LABELS: dict[str, str] = {}
+
+
+def train_labels() -> dict[str, str]:
+    """The zero-shot labels of every training sentence (one cache for all training files, read once)."""
+    if not _TRAIN_LABELS:
+        folder = find_cache(train_cache_name())
+        if folder is None:
+            raise FileNotFoundError(f"no zero-shot cache predict_all_{train_cache_name()} in {LLM_CACHE_DIR} or {LEGACY_LLM_CACHE_DIR}")
+        _TRAIN_LABELS.update(read_cache(import_cache(folder)))
+    return _TRAIN_LABELS
+
+
 def jobs(args) -> list[tuple[Path, Path, Path, int]]:
-    """(test file, train regime file, the regime's LLM predictions, percent) for every run that can be made."""
+    """(test file, train regime file, the regime's LLM cache folder, percent) for every run that can be made."""
     found = []
     for test_path in sorted(base.TEST_DIR.glob("lab-manual-*-test-*.xlsx")):
         m = base.SEED_RE.match(test_path.stem)
@@ -236,10 +306,11 @@ def jobs(args) -> list[tuple[Path, Path, Path, int]]:
             if not r or (args.percents and int(r["percent"]) not in args.percents):
                 continue
             percent = int(r["percent"])
-            llm_path = args.llm_test_dir / f"{test_path.stem}_{percent}.csv"
-            missing = [p.name for p in (TEST_DATED_DIR / test_path.name, llm_path) if not p.exists()]
+            llm_path = find_cache(regime_cache_name(test_path.stem, percent))
+            missing = ([TEST_DATED_DIR / test_path.name] if not (TEST_DATED_DIR / test_path.name).exists() else []) \
+                + ([f"LLM cache predict_all_{regime_cache_name(test_path.stem, percent)}"] if llm_path is None else [])
             if missing:
-                print(f"skip {test_path.stem}_{percent}: missing {', '.join(missing)}")
+                print(f"skip {test_path.stem}_{percent}: missing {', '.join(map(str, missing))}")
                 continue
             found.append((test_path, train_path, llm_path, percent))
     return sorted(found, key=lambda j: (j[0].stem, j[3]))
@@ -260,8 +331,15 @@ def prepare(test_path: Path, train_path: Path, llm_path: Path, percent: int):
     name = f"{test_path.stem}_{percent}"
     regime_df = load_regime(train_path)
     test_df = load_test(test_path)
-    llm_train = base.PrecomputedLLM(base.llm_predictions(base.LLM_TRAIN_DIR / f"{base.paired_train(test_path).stem}.csv"))
-    llm_test = base.llm_predictions(llm_path)
+    train_labels_ = train_labels()
+    missing = [t for t in regime_df[base.TEXT_COLUMN] if t not in train_labels_]
+    if missing:
+        raise KeyError(f"{len(missing)} sentences of the regime have no zero-shot label in the LLM cache")
+    llm_train = base.PrecomputedLLM(train_labels_)
+    llm_test = read_cache(import_cache(llm_path))  # the regime's labels of the test sentences
+    missing = [t for t in test_df[base.TEXT_COLUMN] if t not in llm_test]
+    if missing:
+        raise KeyError(f"{len(missing)} test sentences have no label in the LLM cache {llm_path.name}")
     llm_test_preds = [llm_test[t] for t in test_df[base.TEXT_COLUMN]]
     out = pd.DataFrame({
         base.TEXT_COLUMN: test_df[base.TEXT_COLUMN], "label": test_df["label"], "true": test_df["label"].map(base.LABEL_MAP),
@@ -270,7 +348,7 @@ def prepare(test_path: Path, train_path: Path, llm_path: Path, percent: int):
     m = base.SEED_RE.match(test_path.stem)
     row = {"dataset": m["dataset"], "seed": m["seed"], "file": name, "percent": percent,
            "regime_rows": len(regime_df), "test_rows": len(test_df),
-           "llm_examples": max(1, round(2 * percent / 10))}  # the examples of the regime's LLM labels
+           "llm_examples": shots_for(percent)}  # the examples of the regime's LLM labels
     return name, regime_df, test_df, llm_train, llm_test_preds, out, row
 
 
@@ -388,11 +466,16 @@ def build_frozen_roberta(model_name: str):
 
 
 def main() -> None:
+    global LLM_CACHE_DIR, LEGACY_LLM_CACHE_DIR, LLM_MODEL
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="*", help="only test files (name without seed) containing one of these")
     parser.add_argument("--percents", nargs="*", type=int, help="only these regimes (default: all found)")
-    parser.add_argument("--llm-test-dir", type=Path, default=LLM_REGIME_DIR,
-                        help="the regimes' LLM predictions (<test file>_<p>.csv) of predict_all_files_llm_low_data_regimes.py")
+    parser.add_argument("--llm-cache-dir", type=Path, default=LLM_CACHE_DIR,
+                        help="the LLM caches of the regimes (default: outputs/predict_low_data_regimes/llm_cache)")
+    parser.add_argument("--legacy-llm-cache-dir", type=Path, default=LEGACY_LLM_CACHE_DIR,
+                        help="where predict_all_files_llm*.py wrote them; cache folders missing in --llm-cache-dir are copied from here")
+    parser.add_argument("--llm-model", default=LLM_MODEL,
+                        help="the LLM whose cache folders are read (name as in the folder names, e.g. gpt-5-nano)")
     parser.add_argument("--dry-run", action="store_true", help="list the runs, nothing is trained")
     parser.add_argument("--resume", action="store_true", help="skip runs that already have a result file in the output folder")
     parser.add_argument("--mlp-trials", type=int, default=30,
@@ -423,10 +506,14 @@ def main() -> None:
     parser.add_argument("--ts-pooling", choices=("mean", "max"), default="mean", help="pooling of the three series embeddings")
     args = parser.parse_args()
 
+    LLM_CACHE_DIR, LEGACY_LLM_CACHE_DIR, LLM_MODEL = args.llm_cache_dir, args.legacy_llm_cache_dir, args.llm_model
+    if find_cache(train_cache_name()) is None:
+        raise SystemExit(f"no zero-shot cache predict_all_{train_cache_name()} in {LLM_CACHE_DIR} or {LEGACY_LLM_CACHE_DIR}")
+
     todo = jobs(args)
     if not todo:
         raise SystemExit("no runs found (are the regimes of dataset_scripts/make_low_data_regimes.py and the LLM "
-                         "predictions of predict_all_files_llm_low_data_regimes.py there?)")
+                         "LLM caches of predict_all_files_llm_low_data_regimes.py there?)")
     if args.resume:
         done = {re.sub(r"_low_data_regimes_\d{8}_\d{6}$", "", p.stem) for p in RESULT_DIR.glob("lab-manual-*_low_data_regimes_*.csv")}
         todo = [j for j in todo if f"{j[0].stem}_{j[3]}" not in done]
@@ -437,7 +524,7 @@ def main() -> None:
     if args.dry_run:
         for test_path, train_path, llm_path, percent in todo[:10]:
             print(f"  {test_path.stem}_{percent} ({'full program' if percent in args.full_percents else 'frozen'}): "
-                  f"train {train_path.name}, LLM labels {llm_path.name}")
+                  f"train {train_path.name}, LLM cache {llm_path.parent.name}/{llm_path.name}")
         print("  ..." if len(todo) > 10 else "")
         return
     if not todo:

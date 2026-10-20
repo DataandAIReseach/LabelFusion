@@ -1,0 +1,126 @@
+created_at: '2025-12-09T16:35:59.621406'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq003
+    platform: Linux-4.18.0-553.81.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2025-12-09_16-35-36_reuters_train4_20251209_163536_roberta
+  git_commit: 9d0adf44b7826ffd0cd358a1c6df6b31a35bcae4
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-12-09T16:35:36.823219'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/roberta_classifier_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/validation_predictions_aa685a6f1bc6.json
+  - predictions/validation_predictions_aa685a6f1bc6.csv
+test_results: null
+training_results:
+  classes:
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  device: cuda
+  model_name: roberta-base
+  num_labels: 10
+  training_samples: 233
+  validation_predictions:
+    metrics:
+      classification_report:
+        acq:
+          f1-score: 0.4064039408866995
+          precision: 0.2550231839258114
+          recall: 1.0
+          support: 165.0
+        corn:
+          f1-score: 0.0
+          precision: 0.0
+          recall: 0.0
+          support: 18.0
+        crude:
+          f1-score: 0.11641791044776119
+          precision: 0.061806656101426306
+          recall: 1.0
+          support: 39.0
+        earn:
+          f1-score: 0.6160427807486631
+          precision: 0.44513137557959814
+          recall: 1.0
+          support: 288.0
+        grain:
+          f1-score: 0.12481857764876633
+          precision: 0.06656346749226007
+          recall: 1.0
+          support: 43.0
+        interest:
+          f1-score: 0.10263929618768329
+          precision: 0.05409582689335394
+          recall: 1.0
+          support: 35.0
+        macro avg:
+          f1-score: 0.1885355384412065
+          precision: 0.1170716748430671
+          recall: 0.8781481481481481
+          support: 720.0
+        micro avg:
+          f1-score: 0.2311391145746974
+          precision: 0.13123705516851816
+          recall: 0.9680555555555556
+          support: 720.0
+        money-fx:
+          f1-score: 0.2774869109947644
+          precision: 0.16158536585365854
+          recall: 0.9814814814814815
+          support: 54.0
+        samples avg:
+          f1-score: 0.23141405220230568
+          precision: 0.1322906700031893
+          recall: 0.9809376609994849
+          support: 720.0
+        ship:
+          f1-score: 0.07048458149779736
+          precision: 0.03686635944700461
+          recall: 0.8
+          support: 20.0
+        trade:
+          f1-score: 0.10818713450292397
+          precision: 0.0571870170015456
+          recall: 1.0
+          support: 37.0
+        weighted avg:
+          f1-score: 0.3884640443007882
+          precision: 0.2634766224153117
+          recall: 0.9680555555555556
+          support: 720.0
+        wheat:
+          f1-score: 0.06287425149700598
+          precision: 0.03245749613601236
+          recall: 1.0
+          support: 21.0
+      exact_match_accuracy: 0.0
+      f1_weighted: 0.3884640443007882
+      hamming_loss: 0.7166924265842349
+      precision_weighted: 0.2634766224153117
+      recall_weighted: 0.9680555555555556
+    num_samples: 647
+    saved_files:
+      csv: tests/experiments/4%/reuters_train4_20251209_163536/experiments/2025-12-09_16-35-36_reuters_train4_20251209_163536_roberta/predictions/validation_predictions_aa685a6f1bc6.csv
+      json: tests/experiments/4%/reuters_train4_20251209_163536/experiments/2025-12-09_16-35-36_reuters_train4_20251209_163536_roberta/predictions/validation_predictions_aa685a6f1bc6.json
+      metrics: tests/experiments/4%/reuters_train4_20251209_163536/experiments/2025-12-09_16-35-36_reuters_train4_20251209_163536_roberta/metrics/roberta_classifier_validation_metrics.yaml
+  validation_samples: 647

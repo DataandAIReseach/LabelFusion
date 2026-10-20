@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "experiment_id": "2026-09-24_14-45-31_predict_all_train_gpt-5-nano_zero_shot",
+    "model_name": "openai/gpt-5-nano",
+    "model_type": "llm",
+    "classification_type": "single_label",
+    "timestamp": "2026-09-24T14:46:48.042321",
+    "dataset_name": "prediction",
+    "dataset_hash": "7fd981d33b2e",
+    "num_predictions": 20,
+    "git_commit": "7736af7562551d176aa804a0bfc60c09bde4b192"
+  },
+  "predictions": [
+    "neutral",
+    "dovish",
+    "neutral",
+    "neutral",
+    "dovish",
+    "neutral",
+    "hawkish",
+    "hawkish",
+    "neutral",
+    "neutral",
+    "neutral",
+    "neutral",
+    "neutral",
+    "dovish",
+    "dovish",
+    "neutral",
+    "dovish",
+    "neutral",
+    "neutral",
+    "neutral"
+  ],
+  "probabilities": null,
+  "confidence_scores": null,
+  "metrics": {
+    "accuracy": 0.65,
+    "precision": 0.6384615384615385,
+    "recall": 0.5722222222222223,
+    "f1": 0.585419411506368,
+    "auc": 0.6804563492063491
+  }
+}

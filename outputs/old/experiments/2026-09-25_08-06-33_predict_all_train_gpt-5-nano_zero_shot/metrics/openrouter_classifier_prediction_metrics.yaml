@@ -1,0 +1,12 @@
+metadata:
+  dataset_name: prediction
+  experiment_id: 2026-09-25_08-06-33_predict_all_train_gpt-5-nano_zero_shot
+  git_commit: 7736af7562551d176aa804a0bfc60c09bde4b192
+  model_name: openrouter_classifier
+  timestamp: '2026-09-25T08:06:33.165834'
+metrics:
+  accuracy: 0.65
+  auc: 0.6804563492063491
+  f1: 0.585419411506368
+  precision: 0.6384615384615385
+  recall: 0.5722222222222223

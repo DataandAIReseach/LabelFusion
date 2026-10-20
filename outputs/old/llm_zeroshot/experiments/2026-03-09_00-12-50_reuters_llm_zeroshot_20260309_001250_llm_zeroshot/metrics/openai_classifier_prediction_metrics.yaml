@@ -1,0 +1,15 @@
+metadata:
+  dataset_name: prediction
+  experiment_id: 2026-03-09_00-12-50_reuters_llm_zeroshot_20260309_001250_llm_zeroshot
+  git_commit: ef38e6d61ac32ef6c4a6caf16cba4ec89ecdbd34
+  model_name: openai_classifier
+  timestamp: '2026-03-09T00:12:51.250553'
+metrics:
+  f1: 0.8384853168469868
+  hamming_loss: 0.03647604327666151
+  micro_f1: 0.9635239567233385
+  micro_precision: 0.9635239567233385
+  micro_recall: 0.9635239567233385
+  precision: 0.8717156105100463
+  recall: 0.822771767130345
+  subset_accuracy: 0.7774343122102009

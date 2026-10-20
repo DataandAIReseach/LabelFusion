@@ -19,7 +19,8 @@
 #   all other regimes     FROZEN encoders: roberta-large (pretrained, never fine-tuned), the TimesFM encoders and the time series
 #                         transformer are frozen, only MLPs are trained (and tuned with Optuna, --mlp-trials, default 30) on the
 #                         whole regime: roberta (embedding alone), fusion (+ LLM label), fusion_ts (+ pooled time series)
-# The LLM labels of the test sentences are the regime's (outputs/predictions_low_data_regimes/...), nothing is asked again.
+# No LLM is called: the LLM labels are read from the LLM caches in outputs/predict_low_data_regimes/llm_cache/ (zero-shot labels of
+# the training sentences, and the labels of the test sentences for every regime).
 # Output: outputs/predict_low_data_regimes/
 #
 # Before the run the job downloads roberta-large and the TimesFM model (google/timesfm-2.5-200m-transformers)

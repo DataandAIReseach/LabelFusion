@@ -1,0 +1,12 @@
+metadata:
+  dataset_name: test
+  experiment_id: 2026-09-24_14-34-55_predict_all_train_gemini-2.5-flash_zero_shot
+  git_commit: 7736af7562551d176aa804a0bfc60c09bde4b192
+  model_name: openrouter_classifier
+  timestamp: '2026-09-24T14:35:18.399956'
+metrics:
+  accuracy: 1.0
+  auc: 1.0
+  f1: 1.0
+  precision: 1.0
+  recall: 1.0

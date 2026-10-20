@@ -1,0 +1,126 @@
+created_at: '2025-12-09T16:32:56.952955'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq003
+    platform: Linux-4.18.0-553.81.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.12.3 | packaged by conda-forge | (main, Apr 15 2024, 18:38:13)
+      [GCC 12.3.0]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2025-12-09_16-32-37_reuters_train1_20251209_163237_roberta
+  git_commit: 9d0adf44b7826ffd0cd358a1c6df6b31a35bcae4
+  model_name: ''
+  model_type: ''
+  timestamp: '2025-12-09T16:32:37.513261'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/roberta_classifier_validation_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/validation_predictions_aa685a6f1bc6.csv
+  - predictions/validation_predictions_aa685a6f1bc6.json
+test_results: null
+training_results:
+  classes:
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  device: cuda
+  model_name: roberta-base
+  num_labels: 10
+  training_samples: 100
+  validation_predictions:
+    metrics:
+      classification_report:
+        acq:
+          f1-score: 0.4064039408866995
+          precision: 0.2550231839258114
+          recall: 1.0
+          support: 165.0
+        corn:
+          f1-score: 0.05413533834586466
+          precision: 0.027820710973724884
+          recall: 1.0
+          support: 18.0
+        crude:
+          f1-score: 0.11370262390670553
+          precision: 0.06027820710973725
+          recall: 1.0
+          support: 39.0
+        earn:
+          f1-score: 0.6160427807486631
+          precision: 0.44513137557959814
+          recall: 1.0
+          support: 288.0
+        grain:
+          f1-score: 0.1246376811594203
+          precision: 0.06646058732612056
+          recall: 1.0
+          support: 43.0
+        interest:
+          f1-score: 0.10263929618768329
+          precision: 0.05409582689335394
+          recall: 1.0
+          support: 35.0
+        macro avg:
+          f1-score: 0.1802658682769553
+          precision: 0.11128284389489955
+          recall: 1.0
+          support: 720.0
+        micro avg:
+          f1-score: 0.20027816411682892
+          precision: 0.11128284389489954
+          recall: 1.0
+          support: 720.0
+        money-fx:
+          f1-score: 0.15406562054208273
+          precision: 0.08346213292117466
+          recall: 1.0
+          support: 54.0
+        samples avg:
+          f1-score: 0.1986612048435851
+          precision: 0.11128284389489954
+          recall: 1.0
+          support: 720.0
+        ship:
+          f1-score: 0.05997001499250375
+          precision: 0.030911901081916538
+          recall: 1.0
+          support: 20.0
+        trade:
+          f1-score: 0.10818713450292397
+          precision: 0.0571870170015456
+          recall: 1.0
+          support: 37.0
+        weighted avg:
+          f1-score: 0.3801108781223601
+          precision: 0.2580585608792718
+          recall: 1.0
+          support: 720.0
+        wheat:
+          f1-score: 0.06287425149700598
+          precision: 0.03245749613601236
+          recall: 1.0
+          support: 21.0
+      exact_match_accuracy: 0.0
+      f1_weighted: 0.3801108781223601
+      hamming_loss: 0.8887171561051005
+      precision_weighted: 0.2580585608792718
+      recall_weighted: 1.0
+    num_samples: 647
+    saved_files:
+      csv: tests/experiments/1%/reuters_train1_20251209_163237/experiments/2025-12-09_16-32-37_reuters_train1_20251209_163237_roberta/predictions/validation_predictions_aa685a6f1bc6.csv
+      json: tests/experiments/1%/reuters_train1_20251209_163237/experiments/2025-12-09_16-32-37_reuters_train1_20251209_163237_roberta/predictions/validation_predictions_aa685a6f1bc6.json
+      metrics: tests/experiments/1%/reuters_train1_20251209_163237/experiments/2025-12-09_16-32-37_reuters_train1_20251209_163237_roberta/metrics/roberta_classifier_validation_metrics.yaml
+  validation_samples: 647

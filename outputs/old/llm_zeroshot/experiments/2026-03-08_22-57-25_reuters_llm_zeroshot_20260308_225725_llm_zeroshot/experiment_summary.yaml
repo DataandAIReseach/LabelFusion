@@ -1,0 +1,61 @@
+created_at: '2026-03-08T22:57:26.060716'
+experiment_metadata:
+  config: {}
+  dataset_hash: ''
+  environment:
+    hostname: agq006
+    platform: Linux-4.18.0-553.94.1.el8_10.x86_64-x86_64-with-glibc2.28
+    python_version: 3.11.13 (main, Aug 28 2025, 15:10:45) [GCC 8.5.0 20210514 (Red
+      Hat 8.5.0-28)]
+    working_directory: /scratch-scc/users/u19147/LabelFusion
+  experiment_id: 2026-03-08_22-57-25_reuters_llm_zeroshot_20260308_225725_llm_zeroshot
+  git_commit: ef38e6d61ac32ef6c4a6caf16cba4ec89ecdbd34
+  model_name: ''
+  model_type: ''
+  timestamp: '2026-03-08T22:57:25.500893'
+file_structure:
+  logs:
+  - logs/experiment.log
+  metrics:
+  - metrics/openai_classifier_test_metrics.yaml
+  - metrics/openai_classifier_prediction_metrics.yaml
+  models: []
+  plots: []
+  predictions:
+  - predictions/test_predictions_aa685a6f1bc6.csv
+  - predictions/test_predictions_aa685a6f1bc6.json
+  - predictions/prediction_predictions_aa685a6f1bc6.json
+  - predictions/prediction_predictions_aa685a6f1bc6.csv
+test_results: null
+training_results:
+  batch_size: 32
+  classes:
+  - earn
+  - acq
+  - money-fx
+  - grain
+  - crude
+  - trade
+  - interest
+  - ship
+  - wheat
+  - corn
+  classification_type: multi_label
+  completed: true
+  max_completion_tokens: 150
+  metrics:
+    f1: 0.8384853168469868
+    hamming_loss: 0.03647604327666151
+    micro_f1: 0.9635239567233385
+    micro_precision: 0.9635239567233385
+    micro_recall: 0.9635239567233385
+    precision: 0.8717156105100463
+    recall: 0.822771767130345
+    subset_accuracy: 0.7774343122102009
+  model_name: gpt-5-nano
+  model_type: llm
+  num_labels: 10
+  provider: openai
+  temperature: 0.1
+  test_samples: 647
+  train_samples: 0
