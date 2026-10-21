@@ -20,7 +20,7 @@
 #   --full-percents P...  only these get the full program, the others FROZEN encoders: roberta-large (pretrained, never fine-tuned), the TimesFM encoders and the time series
 #                         transformer are frozen, only MLPs are trained (and tuned with Optuna, --mlp-trials, default 30) on the
 #                         whole regime: roberta (embedding alone), fusion (+ LLM label), fusion_ts (+ pooled time series)
-# No LLM is called: the LLM labels are read from the LLM caches in outputs/predict_low_data_regimes/llm_cache/ (zero-shot labels of
+# No LLM is called: the LLM labels are read from the LLM caches in outputs/llm_cache/ (zero-shot labels of
 # the training sentences, and the labels of the test sentences for every regime).
 # Output: outputs/predict_low_data_regimes/
 #
@@ -58,6 +58,14 @@ PERCENT_ARGS=(--percents "${PERCENTS[@]}")
 for arg in "$@"; do
     [ "$arg" = "--percents" ] && PERCENT_ARGS=()
 done
+
+# the LLM caches are not in git (.gitignore: /outputs/): copy outputs/llm_cache/ to the cluster first
+LLM_CACHE=$BASE/outputs/llm_cache
+if ! ls "$LLM_CACHE"/predict_all_train_gpt-5-nano_zero_shot/cache_*.pkl > /dev/null 2>&1; then
+    echo "ERROR: no LLM cache in $LLM_CACHE (expected predict_all_train_gpt-5-nano_zero_shot/ and predict_all_test_gpt-5-nano_*)." >&2
+    echo "Copy it from your computer, e.g. rsync -av outputs/llm_cache/ <user>@<login-node>:$LLM_CACHE/" >&2
+    exit 1
+fi
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export PYTHONUNBUFFERED=1
