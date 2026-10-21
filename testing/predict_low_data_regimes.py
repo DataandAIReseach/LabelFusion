@@ -38,19 +38,17 @@ epochs tuned there for the same test file instead of tuning stage 1 again. The f
 Everything is scored on the full test set: weighted F1 (primary), macro-F1, accuracy.
 
 LLM cache: no LLM is called. The predictions are read from the LLM caches of predict_all_files_llm.py /
-predict_all_files_llm_low_data_regimes.py, which live INSIDE this script's output folder:
+predict_all_files_llm_low_data_regimes.py, which live in the shared outputs/llm_cache (--llm-cache-dir):
 
-    outputs/predict_low_data_regimes/llm_cache/
+    outputs/llm_cache/
         predict_all_train_gpt-5-nano_zero_shot/                      the zero-shot labels of all training sentences
         predict_all_test_gpt-5-nano_<k>_shot_<test file>_<p>/        the labels of the full test set for regime p
                                                                      (k = 2 examples per 10 % drawn from that regime)
-A cache folder that is not there yet is copied once from the legacy outputs/llm_cache (--legacy-llm-cache-dir); the
-legacy folder itself is never changed.
+The cache is only read, never copied or changed. (It is not in git, /outputs/ is ignored: copy it to the cluster by hand.)
 
 Several runs (e.g. one sbatch job per group of datasets) can run at the same time without influencing each other:
 every run has its own work folder (.work/<job id>) for the saved roberta-large models and the library's prediction
-caches, and every result file carries the start time of the run in its name. Everything lives in ./outputs/predict_low_data_regimes/:
-    llm_cache/                                                 the LLM caches of the regimes (above)
+caches, and every result file carries the start time of the run in its name. The results live in ./outputs/predict_low_data_regimes/:
     <test file>_<p>_low_data_regimes_<date_time>.csv / .json   per run: sentence, label, true, llm_pred, roberta_pred, fusion_pred, fusion_ts_pred
     summary_seeds_low_data_regimes_<date_time>.csv             one row per run (all metrics, "training", parameters used)
     summary_low_data_regimes_<date_time>.csv                   per dataset and regime: mean / std (ddof=1) over the seeds
@@ -114,8 +112,7 @@ stage1 = base.stage1
 REPO_ROOT = base.TEST_DIR.parent.parent
 TRAIN_REGIME_DIR = REPO_ROOT / "data" / "training_data_dated_low_data_regimes"
 TEST_DATED_DIR = REPO_ROOT / "data" / "test_data_dated"
-LLM_CACHE_DIR = RESULT_DIR / "llm_cache"  # the LLM caches of the regimes (set from --llm-cache-dir)
-LEGACY_LLM_CACHE_DIR = base.OUT_DIR / "llm_cache"  # where predict_all_files_llm*.py wrote them (set from --legacy-llm-cache-dir)
+LLM_CACHE_DIR = base.OUT_DIR / "llm_cache"  # the LLM caches (where predict_all_files_llm*.py wrote them; set from --llm-cache-dir)
 LLM_MODEL = "gpt-5-nano"  # the model name in the cache folder names (set from --llm-model)
 SHOTS_PER_10_PERCENT = 2
 TS_FILE = REPO_ROOT / "data" / "3 Ts" / "daily_series.csv"
@@ -251,21 +248,9 @@ def regime_cache_name(test_stem: str, percent: int) -> str:
 
 
 def find_cache(run_name: str) -> Path | None:
-    """The cache folder of an LLM run: in this script's llm_cache, else in the legacy outputs/llm_cache."""
-    for root in (LLM_CACHE_DIR, LEGACY_LLM_CACHE_DIR):
-        folder = root / f"predict_all_{run_name}"
-        if folder.is_dir() and any(folder.glob("cache_*.pkl")):
-            return folder
-    return None
-
-
-def import_cache(folder: Path) -> Path:
-    """Make sure the folder is inside this script's llm_cache: a legacy folder is copied once, never moved."""
-    target = LLM_CACHE_DIR / folder.name
-    if folder != target and not target.exists():
-        LLM_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(folder, target)
-    return target
+    """The cache folder of an LLM run in outputs/llm_cache (it must hold at least one cache_*.pkl)."""
+    folder = LLM_CACHE_DIR / f"predict_all_{run_name}"
+    return folder if folder.is_dir() and any(folder.glob("cache_*.pkl")) else None
 
 
 def read_cache(folder: Path) -> dict[str, str]:
@@ -288,8 +273,8 @@ def train_labels() -> dict[str, str]:
     if not _TRAIN_LABELS:
         folder = find_cache(train_cache_name())
         if folder is None:
-            raise FileNotFoundError(f"no zero-shot cache predict_all_{train_cache_name()} in {LLM_CACHE_DIR} or {LEGACY_LLM_CACHE_DIR}")
-        _TRAIN_LABELS.update(read_cache(import_cache(folder)))
+            raise FileNotFoundError(f"no zero-shot cache predict_all_{train_cache_name()} with a cache_*.pkl in {LLM_CACHE_DIR}")
+        _TRAIN_LABELS.update(read_cache(folder))
     return _TRAIN_LABELS
 
 
@@ -336,7 +321,7 @@ def prepare(test_path: Path, train_path: Path, llm_path: Path, percent: int):
     if missing:
         raise KeyError(f"{len(missing)} sentences of the regime have no zero-shot label in the LLM cache")
     llm_train = base.PrecomputedLLM(train_labels_)
-    llm_test = read_cache(import_cache(llm_path))  # the regime's labels of the test sentences
+    llm_test = read_cache(llm_path)  # the regime's labels of the test sentences
     missing = [t for t in test_df[base.TEXT_COLUMN] if t not in llm_test]
     if missing:
         raise KeyError(f"{len(missing)} test sentences have no label in the LLM cache {llm_path.name}")
@@ -466,14 +451,12 @@ def build_frozen_roberta(model_name: str):
 
 
 def main() -> None:
-    global LLM_CACHE_DIR, LEGACY_LLM_CACHE_DIR, LLM_MODEL
+    global LLM_CACHE_DIR, LLM_MODEL
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="*", help="only test files (name without seed) containing one of these")
     parser.add_argument("--percents", nargs="*", type=int, help="only these regimes (default: all found)")
     parser.add_argument("--llm-cache-dir", type=Path, default=LLM_CACHE_DIR,
-                        help="the LLM caches of the regimes (default: outputs/predict_low_data_regimes/llm_cache)")
-    parser.add_argument("--legacy-llm-cache-dir", type=Path, default=LEGACY_LLM_CACHE_DIR,
-                        help="where predict_all_files_llm*.py wrote them; cache folders missing in --llm-cache-dir are copied from here")
+                        help="the LLM caches (default: outputs/llm_cache)")
     parser.add_argument("--llm-model", default=LLM_MODEL,
                         help="the LLM whose cache folders are read (name as in the folder names, e.g. gpt-5-nano)")
     parser.add_argument("--dry-run", action="store_true", help="list the runs, nothing is trained")
@@ -506,13 +489,13 @@ def main() -> None:
     parser.add_argument("--ts-pooling", choices=("mean", "max"), default="mean", help="pooling of the three series embeddings")
     args = parser.parse_args()
     # absolute before main() changes into the work folder
-    for key in ("llm_cache_dir", "legacy_llm_cache_dir", "roberta_params_from"):
+    for key in ("llm_cache_dir", "roberta_params_from"):
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).resolve())
 
-    LLM_CACHE_DIR, LEGACY_LLM_CACHE_DIR, LLM_MODEL = args.llm_cache_dir, args.legacy_llm_cache_dir, args.llm_model
+    LLM_CACHE_DIR, LLM_MODEL = args.llm_cache_dir, args.llm_model
     if find_cache(train_cache_name()) is None:
-        raise SystemExit(f"no zero-shot cache predict_all_{train_cache_name()} in {LLM_CACHE_DIR} or {LEGACY_LLM_CACHE_DIR}")
+        raise SystemExit(f"no zero-shot cache predict_all_{train_cache_name()} with a cache_*.pkl in {LLM_CACHE_DIR}")
 
     todo = jobs(args)
     if not todo:
