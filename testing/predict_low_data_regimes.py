@@ -37,6 +37,15 @@ epochs tuned there for the same test file instead of tuning stage 1 again. The f
 
 Everything is scored on the full test set: weighted F1 (primary), macro-F1, accuracy.
 
+Interruptions: a job has a time limit (e.g. 48 h on the cluster), so nothing is lost when it is cut. Finished runs are
+skipped when the same command is started again (--no-resume repeats them), and the expensive calls of the run that was
+running are kept on disk after every call, in outputs/predict_low_data_regimes/checkpoints/<test file>_<p>.json: every
+Optuna trial of roberta-large (its validation predictions) and every fit of a fusion MLP (its predictions). Started
+again, the run replays its Optuna studies from these records (they are deterministic, so the same trials come up, each
+answered from the file in an instant) and trains only what was missing. Only the final fine-tuning of roberta-large
+of an interrupted run is done again. A checkpoint file is deleted when its run is finished, and ignored if the regime
+or the settings it was made with changed.
+
 LLM cache: no LLM is called. The predictions are read from the LLM caches of predict_all_files_llm.py /
 predict_all_files_llm_low_data_regimes.py, which live in the shared outputs/llm_cache (--llm-cache-dir):
 
@@ -70,6 +79,7 @@ import collections
 import copy
 import gc
 import hashlib
+import json
 import os
 import pickle
 import re
@@ -208,6 +218,93 @@ def run_pooled_ts_branch(self, dates):
     return tokens.mean(dim=1) if self.ts_pooling == "mean" else tokens.max(dim=1).values
 
 
+# ---- checkpoints: the expensive calls of the run in progress survive an interruption ----------------------------------
+
+CHECKPOINT_DIR = RESULT_DIR / "checkpoints"
+
+
+def text_hash(df: pd.DataFrame) -> str:
+    return hashlib.md5("\x1f".join(df[base.TEXT_COLUMN]).encode()).hexdigest()[:12]
+
+
+class Checkpoint:
+    """Results of the expensive calls of ONE run (a roberta-large Optuna trial, a fusion-MLP fit), kept in a json file that
+    is rewritten after every new result (temp file + rename, so a kill never leaves half a file)."""
+
+    def __init__(self):
+        self.path: Path | None = None
+        self.data: dict = {}
+        self.hits = self.misses = 0
+
+    def start(self, name: str, fingerprint: dict) -> None:
+        self.path = CHECKPOINT_DIR / f"{name}.json"
+        self.hits = self.misses = 0
+        self.fingerprint = hashlib.md5(json.dumps(fingerprint, sort_keys=True, default=str).encode()).hexdigest()
+        self.data = {}
+        if self.path.exists():
+            try:
+                saved = json.loads(self.path.read_text())
+                if saved.get("fingerprint") == self.fingerprint:
+                    self.data = saved["results"]
+                    print(f"### checkpoint: {len(self.data)} results of an interrupted run of {name} are reused")
+                else:
+                    print(f"### checkpoint of {name} was made with other settings or data: ignored")
+            except (json.JSONDecodeError, KeyError, OSError):
+                print(f"### checkpoint of {name} is unreadable: ignored")
+
+    def get(self, key: str):
+        if self.path is None or key not in self.data:
+            return None
+        self.hits += 1
+        return self.data[key]
+
+    def put(self, key: str, value) -> None:
+        if self.path is None:
+            return
+        self.misses += 1
+        self.data[key] = value
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"fingerprint": self.fingerprint, "results": self.data}))
+        os.replace(tmp, self.path)
+
+    def finish(self, delete: bool) -> None:
+        if delete and self.path is not None and self.path.exists():
+            self.path.unlink()
+        self.path = None
+
+
+CKPT = Checkpoint()
+
+
+def install_checkpoint_wrappers() -> None:
+    """Route the two expensive calls through the checkpoint: a roberta-large trial (stage1.fit_predict, used by the Optuna
+    objective) and a fusion-MLP fit (base.mlp_fit_predict, used by its Optuna objective and for the final fit)."""
+    plain_stage1_fit_predict = stage1.fit_predict
+    plain_mlp_fit_predict = base.mlp_fit_predict
+
+    def stage1_fit_predict(params, train_df, val_df, pred_df, retries=0):
+        key = f"roberta|{json.dumps(params, sort_keys=True, default=str)}|{text_hash(train_df)}|{text_hash(pred_df)}"
+        cached = CKPT.get(key)
+        if cached is not None:
+            return cached
+        preds = plain_stage1_fit_predict(params, train_df, val_df, pred_df, retries)
+        CKPT.put(key, list(preds))
+        return preds
+
+    def mlp_fit_predict(roberta, llm, mlp, rob_train_df, mlp_train_df, pred_df, pred_llm, name, tag, verbose):
+        key = f"mlp|{name}|{tag}|{json.dumps(mlp, sort_keys=True, default=str)}|{text_hash(mlp_train_df)}|{text_hash(pred_df)}"
+        cached = CKPT.get(key)
+        if cached is not None:
+            return cached
+        preds = plain_mlp_fit_predict(roberta, llm, mlp, rob_train_df, mlp_train_df, pred_df, pred_llm, name, tag, verbose)
+        CKPT.put(key, list(preds))
+        return preds
+
+    stage1.fit_predict = stage1_fit_predict
+    base.mlp_fit_predict = mlp_fit_predict
+
+
 # ---- data -------------------------------------------------------------------------------------------------------------
 
 def with_dates(raw: pd.DataFrame) -> pd.DataFrame:
@@ -257,11 +354,16 @@ def read_cache(folder: Path) -> dict[str, str]:
     """sentence -> predicted class name, from the classifier's prediction cache (only successful, unambiguous calls)."""
     preds: dict[str, str] = {}
     for pkl in sorted(folder.glob("cache_*.pkl")):
-        with open(pkl, "rb") as fh:
-            for entry in pickle.load(fh).values():
-                vec = entry.get("prediction")
-                if entry.get("success") and vec is not None and sum(vec) == 1:
-                    preds[entry["text"]] = base.LABEL_COLUMNS[list(vec).index(1)]
+        try:
+            with open(pkl, "rb") as fh:
+                entries = pickle.load(fh)
+        except (EOFError, pickle.UnpicklingError) as e:
+            raise RuntimeError(f"{pkl} is empty or truncated ({pkl.stat().st_size} bytes, {type(e).__name__}): the copy to this machine "
+                               f"was probably interrupted. Copy it again, e.g. rsync -av --checksum, and compare `ls -l` with the original.") from e
+        for entry in entries.values():
+            vec = entry.get("prediction")
+            if entry.get("success") and vec is not None and sum(vec) == 1:
+                preds[entry["text"]] = base.LABEL_COLUMNS[list(vec).index(1)]
     return preds
 
 
@@ -460,7 +562,8 @@ def main() -> None:
     parser.add_argument("--llm-model", default=LLM_MODEL,
                         help="the LLM whose cache folders are read (name as in the folder names, e.g. gpt-5-nano)")
     parser.add_argument("--dry-run", action="store_true", help="list the runs, nothing is trained")
-    parser.add_argument("--resume", action="store_true", help="skip runs that already have a result file in the output folder")
+    parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True,
+                        help="skip runs that already have a result file in the output folder (default; --no-resume repeats them)")
     parser.add_argument("--mlp-trials", type=int, default=30,
                         help="Optuna trials per run and model tuning the fusion MLP; 0 = the MLP's default configuration")
     parser.add_argument("--full-percents", nargs="*", type=int, default=None,
@@ -496,6 +599,10 @@ def main() -> None:
     LLM_CACHE_DIR, LLM_MODEL = args.llm_cache_dir, args.llm_model
     if find_cache(train_cache_name()) is None:
         raise SystemExit(f"no zero-shot cache predict_all_{train_cache_name()} with a cache_*.pkl in {LLM_CACHE_DIR}")
+    try:
+        print(f"zero-shot LLM labels of the training sentences: {len(train_labels())} (from {find_cache(train_cache_name())})")
+    except RuntimeError as e:  # an empty / truncated pickle would otherwise fail every single run in the same way
+        raise SystemExit(f"ERROR: {e}")
 
     todo = jobs(args)
     if not todo:
@@ -577,10 +684,14 @@ def main() -> None:
         stage1.tune = tune_or_reuse
         args.trials = max(args.trials, 1)  # tune() now only looks the parameters up
 
+    install_checkpoint_wrappers()
     rows, failures = [], []
     for test_path, train_path, llm_path, percent in todo:
         shutil.rmtree(WORK_DIR / "cache", ignore_errors=True)
         name = f"{test_path.stem}_{percent}"
+        CKPT.start(name, {"regime": hashlib.md5(train_path.read_bytes()).hexdigest(), "test": test_path.name, "percent": percent,
+                          "full": percent in args.full_percents, "epochs": args.epochs, "ml_proj_dim": args.ml_proj_dim,
+                          "llm_model": LLM_MODEL, "ts": [args.ts_window, args.ts_pooling, args.ts_dim], "no_ts": args.no_ts, "v": 1})
         try:
             if percent in args.full_percents:
                 row, out = run_job_full(test_path, train_path, llm_path, percent, args, branches)
@@ -590,6 +701,7 @@ def main() -> None:
                 row, out = run_job(test_path, train_path, llm_path, percent, args, frozen["roberta"], branches)
         except Exception as e:  # one failing run must not stop the sweep
             traceback.print_exc()
+            CKPT.finish(delete=False)  # keep what was computed: the next start of this run continues from it
             failures.append({"file": name, "error": f"{type(e).__name__}: {e}"})
             pd.DataFrame(failures).to_csv(RESULT_DIR / f"failures_{SUFFIX}.csv", index=False)
             gc.collect()
@@ -599,6 +711,8 @@ def main() -> None:
         out.to_csv(staging / f"{name}.csv", index=False)
         out.to_json(staging / f"{name}.json", orient="records", force_ascii=False, indent=2)
         publish(staging)
+        print(f"### {name}: {CKPT.hits} results from the checkpoint, {CKPT.misses} newly computed")
+        CKPT.finish(delete=True)  # the run is finished and published: its checkpoint is not needed any more
         rows.append(row)
         seed_rows = pd.DataFrame(rows)
         seed_rows.to_csv(RESULT_DIR / f"summary_seeds_{SUFFIX}.csv", index=False)
