@@ -23,19 +23,38 @@ regime (no train/validation split is needed to protect a fine-tuned encoder). Op
 on one half of the regime scored on the other half; the best parameters then train the MLP on the whole regime. Every
 sentence is embedded once for the whole sweep (roberta-large and TimesFM), so such a run costs only MLP trainings.
 
-FULL regimes (--full-percents, default every regime found; none with --full-percents and no value): the full program of
-predict_all_labelFusion.py. The regime is split 80/20 (stratified) into train and validation. Stage 1: roberta-large is
-fine-tuned alone; Optuna (--trials, default 24: the 16-point learning-rate x batch-size grid, then free refinement)
-over lr / batch size / epochs, weighted F1 on the validation split, with class weights, 10 % warmup, best-epoch
-selection and --retries (default 2) on a one-class collapse. Stage 2: the fine-tuned roberta-large is frozen and the
-fusion MLPs are tuned and trained on the VALIDATION split, which roberta-large never trained on: fusion with the
-fine-tuned roberta-large + the LLM label (--mlp-trials), fusion_ts additionally with the fine-tuned time series model,
-whose TimesFM encoders and CrossTSTransformer are trained together with the MLP (--ts-mlp-trials, default 10, because
-every trial fine-tunes three TimesFM encoders; the library trains them with the MLP's learning rate). --roberta-params-from <summary_seeds.csv of predict_all_labelFusion.py> takes the learning rate / batch size /
-epochs tuned there for the same test file instead of tuning stage 1 again. The fine-tuned "roberta" and the frozen
-"roberta" of the other regimes are different models: compare the curve across that boundary with care.
+FULL regimes (--full-percents, default every regime found; none with --full-percents and no value): the regime is split 80/20
+(stratified) into train and validation. roberta-large is fine-tuned ALONE on the train split (column roberta); Optuna (--trials,
+default 24: the 16-point learning-rate x batch-size grid, then free refinement) over lr / batch size / epochs, weighted F1 on the
+validation split, with class weights, 10 % warmup, best-epoch selection and --retries (default 2) on a one-class collapse.
+--roberta-params-from <summary_seeds.csv of predict_all_labelFusion.py> takes the learning rate / batch size / epochs tuned there
+for the same test file instead of tuning that again. The LabelFusion models of the full regimes are the JOINT ones (below). The
+two-stage fusion (frozen fine-tuned roberta-large, MLP on the validation split: fusion, and fusion_ts with the fine-tuned time series
+model, --mlp-trials / --ts-mlp-trials) is only computed with --two-stage. The fine-tuned "roberta" and the frozen "roberta" of the
+other regimes are different models: compare the curve across that boundary with care.
+
+JOINT models (--joint, on by default, --no-joint skips them; full regimes only; every trial is a complete fine-tuning of roberta-large): roberta-large
+and the fusion network are trained TOGETHER, end to end, on the TRAIN split (80 % of the regime): the fusion loss (cross-entropy on
+[roberta-large [CLS] embedding, LLM label as one-hot]) is back-propagated into roberta-large (own learning rate ml_lr) and the fusion MLP
+(fusion_lr), via FusionEnsemble's joint_training.
+  fusion_joint     roberta-large + LLM one-hot.
+  fusion_joint_ts  the same plus the time series model: the TimesFM encoders and the CrossTSTransformer (attention over DGS10 / T10Y2Y /
+                   VIXCLS) are trained in the same loop (all three parts with the same loss; needs much GPU memory, roughly roberta-large
+                   plus three TimesFM models with their optimizer states). Skipped with --no-ts.
+The validation split (20 %) is not trained on; it scores every Optuna trial (--joint-trials: ml_lr, fusion_lr, epochs, batch size, hidden
+layers) and the best trial's test predictions are taken, so the test file is never used for the choice. The LLM labels are the same
+as for fusion.
 
 Everything is scored on the full test set: weighted F1 (primary), macro-F1, accuracy.
+
+Interruptions: a job has a time limit (e.g. 48 h on the cluster), so nothing is lost when it is cut. Finished runs are
+skipped when the same command is started again (--no-resume repeats them), and the expensive calls of the run that was
+running are kept on disk after every call, in outputs/predict_low_data_regimes/checkpoints/<test file>_<p>.json: every
+Optuna trial of roberta-large (its validation predictions) and every fit of a fusion MLP (its predictions). Started
+again, the run replays its Optuna studies from these records (they are deterministic, so the same trials come up, each
+answered from the file in an instant) and trains only what was missing. Only the final fine-tuning of roberta-large
+of an interrupted run is done again. A checkpoint file is deleted when its run is finished, and ignored if the regime
+or the settings it was made with changed.
 
 LLM cache: no LLM is called. The predictions are read from the LLM caches of predict_all_files_llm.py /
 predict_all_files_llm_low_data_regimes.py, which live in the shared outputs/llm_cache (--llm-cache-dir):
@@ -67,9 +86,12 @@ from __future__ import annotations
 import argparse
 import atexit
 import collections
+import contextlib
 import copy
 import gc
+import io
 import hashlib
+import json
 import os
 import pickle
 import re
@@ -101,6 +123,8 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 import torch  # noqa: E402
 import torch.nn as nn  # noqa: E402
+import optuna  # noqa: E402
+from sklearn.metrics import f1_score  # noqa: E402
 from sklearn.model_selection import train_test_split  # noqa: E402
 
 from test_textclassify_llm import _add_onehot_labels  # noqa: E402
@@ -119,7 +143,7 @@ TS_FILE = REPO_ROOT / "data" / "3 Ts" / "daily_series.csv"
 TS_SERIES = ["DGS10", "T10Y2Y", "VIXCLS"]
 DATE_COLUMN = "date"
 FULL_HISTORY = 10**6  # window_days that reaches back to the beginning of every series
-WHO = ("llm", "roberta", "fusion", "fusion_ts")
+WHO = ("llm", "roberta", "fusion", "fusion_ts", "fusion_joint", "fusion_joint_ts")
 METRICS = [f"{who}_{m}" for who in WHO for m in ("f1_weighted", "f1_macro", "accuracy")]
 REGIME_RE = re.compile(r"_(?P<percent>\d+)$")
 
@@ -208,6 +232,93 @@ def run_pooled_ts_branch(self, dates):
     return tokens.mean(dim=1) if self.ts_pooling == "mean" else tokens.max(dim=1).values
 
 
+# ---- checkpoints: the expensive calls of the run in progress survive an interruption ----------------------------------
+
+CHECKPOINT_DIR = RESULT_DIR / "checkpoints"
+
+
+def text_hash(df: pd.DataFrame) -> str:
+    return hashlib.md5("\x1f".join(df[base.TEXT_COLUMN]).encode()).hexdigest()[:12]
+
+
+class Checkpoint:
+    """Results of the expensive calls of ONE run (a roberta-large Optuna trial, a fusion-MLP fit), kept in a json file that
+    is rewritten after every new result (temp file + rename, so a kill never leaves half a file)."""
+
+    def __init__(self):
+        self.path: Path | None = None
+        self.data: dict = {}
+        self.hits = self.misses = 0
+
+    def start(self, name: str, fingerprint: dict) -> None:
+        self.path = CHECKPOINT_DIR / f"{name}.json"
+        self.hits = self.misses = 0
+        self.fingerprint = hashlib.md5(json.dumps(fingerprint, sort_keys=True, default=str).encode()).hexdigest()
+        self.data = {}
+        if self.path.exists():
+            try:
+                saved = json.loads(self.path.read_text())
+                if saved.get("fingerprint") == self.fingerprint:
+                    self.data = saved["results"]
+                    print(f"### checkpoint: {len(self.data)} results of an interrupted run of {name} are reused")
+                else:
+                    print(f"### checkpoint of {name} was made with other settings or data: ignored")
+            except (json.JSONDecodeError, KeyError, OSError):
+                print(f"### checkpoint of {name} is unreadable: ignored")
+
+    def get(self, key: str):
+        if self.path is None or key not in self.data:
+            return None
+        self.hits += 1
+        return self.data[key]
+
+    def put(self, key: str, value) -> None:
+        if self.path is None:
+            return
+        self.misses += 1
+        self.data[key] = value
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"fingerprint": self.fingerprint, "results": self.data}))
+        os.replace(tmp, self.path)
+
+    def finish(self, delete: bool) -> None:
+        if delete and self.path is not None and self.path.exists():
+            self.path.unlink()
+        self.path = None
+
+
+CKPT = Checkpoint()
+
+
+def install_checkpoint_wrappers() -> None:
+    """Route the two expensive calls through the checkpoint: a roberta-large trial (stage1.fit_predict, used by the Optuna
+    objective) and a fusion-MLP fit (base.mlp_fit_predict, used by its Optuna objective and for the final fit)."""
+    plain_stage1_fit_predict = stage1.fit_predict
+    plain_mlp_fit_predict = base.mlp_fit_predict
+
+    def stage1_fit_predict(params, train_df, val_df, pred_df, retries=0):
+        key = f"roberta|{json.dumps(params, sort_keys=True, default=str)}|{text_hash(train_df)}|{text_hash(pred_df)}"
+        cached = CKPT.get(key)
+        if cached is not None:
+            return cached
+        preds = plain_stage1_fit_predict(params, train_df, val_df, pred_df, retries)
+        CKPT.put(key, list(preds))
+        return preds
+
+    def mlp_fit_predict(roberta, llm, mlp, rob_train_df, mlp_train_df, pred_df, pred_llm, name, tag, verbose):
+        key = f"mlp|{name}|{tag}|{json.dumps(mlp, sort_keys=True, default=str)}|{text_hash(mlp_train_df)}|{text_hash(pred_df)}"
+        cached = CKPT.get(key)
+        if cached is not None:
+            return cached
+        preds = plain_mlp_fit_predict(roberta, llm, mlp, rob_train_df, mlp_train_df, pred_df, pred_llm, name, tag, verbose)
+        CKPT.put(key, list(preds))
+        return preds
+
+    stage1.fit_predict = stage1_fit_predict
+    base.mlp_fit_predict = mlp_fit_predict
+
+
 # ---- data -------------------------------------------------------------------------------------------------------------
 
 def with_dates(raw: pd.DataFrame) -> pd.DataFrame:
@@ -257,11 +368,16 @@ def read_cache(folder: Path) -> dict[str, str]:
     """sentence -> predicted class name, from the classifier's prediction cache (only successful, unambiguous calls)."""
     preds: dict[str, str] = {}
     for pkl in sorted(folder.glob("cache_*.pkl")):
-        with open(pkl, "rb") as fh:
-            for entry in pickle.load(fh).values():
-                vec = entry.get("prediction")
-                if entry.get("success") and vec is not None and sum(vec) == 1:
-                    preds[entry["text"]] = base.LABEL_COLUMNS[list(vec).index(1)]
+        try:
+            with open(pkl, "rb") as fh:
+                entries = pickle.load(fh)
+        except (EOFError, pickle.UnpicklingError) as e:
+            raise RuntimeError(f"{pkl} is empty or truncated ({pkl.stat().st_size} bytes, {type(e).__name__}): the copy to this machine "
+                               f"was probably interrupted. Copy it again, e.g. rsync -av --checksum, and compare `ls -l` with the original.") from e
+        for entry in entries.values():
+            vec = entry.get("prediction")
+            if entry.get("success") and vec is not None and sum(vec) == 1:
+                preds[entry["text"]] = base.LABEL_COLUMNS[list(vec).index(1)]
     return preds
 
 
@@ -392,12 +508,14 @@ def run_job_full(test_path: Path, train_path: Path, llm_path: Path, percent: int
     row.update({"roberta_lr": rob["learning_rate"], "roberta_batch_size": rob["batch_size"],
                 "roberta_epochs": rob["num_epochs"], "roberta_val_f1": roberta_val_f1})
 
-    # Stage 2: roberta-large frozen, the fusion MLPs are tuned and trained on the validation split
-    # fusion: the fine-tuned roberta-large + LLM label. fusion_ts: additionally the FINE-TUNED time series model
-    # (TimesFM encoders + CrossTSTransformer, trained with the MLP); that is far more expensive per MLP trial.
-    models = [("fusion", branches["plain"], args.mlp_trials)]
-    if "ts_finetuned" in branches:
-        models.append(("fusion_ts", branches["ts_finetuned"], args.ts_mlp_trials))
+    # Two-stage fusion (only with --two-stage): the fine-tuned roberta-large is frozen, the fusion MLPs are tuned and trained on the
+    # validation split. fusion: + LLM label. fusion_ts: additionally the FINE-TUNED time series model (TimesFM encoders +
+    # CrossTSTransformer, trained with the MLP); far more expensive per MLP trial.
+    models = []
+    if args.two_stage:
+        models.append(("fusion", branches["plain"], args.mlp_trials))
+        if "ts_finetuned" in branches:
+            models.append(("fusion_ts", branches["ts_finetuned"], args.ts_mlp_trials))
     for who, build, trials in models:
         base.build_fusion = build
         fname = name if who == "fusion" else f"{name}_{who}"
@@ -412,6 +530,19 @@ def run_job_full(test_path: Path, train_path: Path, llm_path: Path, percent: int
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+
+    # Joint models (the LabelFusion models of the full regimes), trained end to end on the train split and chosen on the validation split:
+    #   fusion_joint     roberta-large + LLM one-hot -> fusion MLP
+    #   fusion_joint_ts  the same + the time series model (TimesFM encoders + CrossTSTransformer), all trained together
+    if args.joint:
+        joint_models = [("fusion_joint", branches["plain"])]
+        if "ts_finetuned" in branches:
+            joint_models.append(("fusion_joint_ts", branches["ts_finetuned"]))
+        for who, build in joint_models:
+            preds, jp, jv = tune_joint(f"{name}_{who}", train_df, val_df, test_df, llm_train, llm_test_preds, args, build)
+            out[f"{who}_pred"] = preds
+            row.update({f"{who}_ml_lr": jp["ml_lr"], f"{who}_mlp_lr": jp["fusion_lr"], f"{who}_epochs": jp["epochs"],
+                        f"{who}_batch_size": jp["batch_size"], f"{who}_hidden": jp["hidden_dims"], f"{who}_val_f1": jv})
     return finish(row, out, t0)
 
 
@@ -438,16 +569,74 @@ def publish(staging: Path) -> None:
             shutil.move(path, target_dir / f"{path.stem}_{SUFFIX}{path.suffix}")
 
 
-def build_frozen_roberta(model_name: str):
-    """The pretrained roberta-large, never fine-tuned and frozen, with its embeddings memoised per sentence for the
-    whole sweep (FusionEnsemble asks for them on every fit() / predict())."""
+def build_frozen_roberta(model_name: str, memoise: bool = True):
+    """The pretrained roberta-large, never fine-tuned, with its embeddings memoised per sentence for the whole sweep
+    (FusionEnsemble asks for them on every fit() / predict()). Without the memo (joint training) its weights change
+    during training, so nothing may be cached."""
     config = ModelConfig(model_name="roberta-large", model_type=ModelType.TRADITIONAL_ML,
                          parameters={"model_name": model_name, "max_length": 128, "batch_size": 32})
     roberta = RoBERTaLargeClassifier(config=config, text_column=base.TEXT_COLUMN, label_columns=base.LABEL_COLUMNS,
                                      multi_label=False, auto_save_results=False, cache_dir=str(WORK_DIR / "models"))
     roberta.load_pretrained()
-    base.EmbeddingMemo(roberta)
+    if memoise:
+        base.EmbeddingMemo(roberta)
     return roberta
+
+
+def joint_trial(params: dict, name: str, tag: str, train_df, val_df, test_df, llm_train, llm_test_preds, args, build) -> dict:
+    """One end-to-end training: a fresh pretrained roberta-large and the fusion MLP trained together on train_df;
+    returns the predictions for the validation split and for the test set. Checkpointed like the other expensive calls."""
+    key = f"joint|{name}|{json.dumps(params, sort_keys=True, default=str)}|{text_hash(train_df)}|{text_hash(val_df)}"
+    cached = CKPT.get(key)
+    if cached is not None:
+        return cached
+    fus = {"fusion_hidden_dims": base.HIDDEN_DIMS[params["hidden_dims"]], "fusion_lr": params["fusion_lr"],
+           "ml_lr": params["ml_lr"], "num_epochs": params["epochs"], "batch_size": params["batch_size"], "joint_training": True}
+    if args.ml_proj_dim:
+        fus["ml_proj_dim"] = args.ml_proj_dim
+    roberta = build_frozen_roberta(args.roberta_model, memoise=False)
+    fusion = build(roberta, llm_train, fus, name, tag, False)
+    with contextlib.redirect_stdout(io.StringIO()):  # the library's progress prints
+        fusion.fit(train_df, train_df)  # roberta counts as trained -> the fusion trains on train_df, roberta-large with it
+        val_preds = fusion.predict(val_df, train_df=train_df, test_llm_predictions=llm_train.lookup(val_df)).predictions
+        test_preds = fusion.predict(test_df, train_df=train_df, test_llm_predictions=llm_test_preds).predictions
+    del fusion, roberta
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    result = {"val": list(val_preds), "test": list(test_preds)}
+    CKPT.put(key, result)
+    return result
+
+
+def tune_joint(name: str, train_df, val_df, test_df, llm_train, llm_test_preds, args, build) -> tuple[list, dict, float]:
+    """Optuna over the joint model: every trial trains roberta-large + fusion MLP on train_df and is scored by weighted F1 on
+    val_df. Returns the test predictions of the best trial, its parameters and its validation F1."""
+    val_true = val_df["label"].map(base.LABEL_MAP).tolist()
+    results = {}
+    print(f"### joint training on {name}: train {len(train_df)} / val {len(val_df)}, {args.joint_trials} trials")
+
+    def objective(trial: optuna.Trial) -> float:
+        params = {"ml_lr": trial.suggest_float("ml_lr", 1e-6, 5e-5, log=True),
+                  "fusion_lr": trial.suggest_float("fusion_lr", 1e-4, 1e-2, log=True),
+                  "epochs": trial.suggest_int("epochs", 2, args.joint_max_epochs),
+                  "batch_size": trial.suggest_categorical("batch_size", [8, 16, 32]),
+                  "hidden_dims": trial.suggest_categorical("hidden_dims", list(base.HIDDEN_DIMS))}
+        result = joint_trial(params, name, f"joint{trial.number}", train_df, val_df, test_df, llm_train, llm_test_preds, args, build)
+        results[trial.number] = result
+        return f1_score(val_true, result["val"], average="weighted")
+
+    study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=base.RANDOM_STATE))
+    study.enqueue_trial({"ml_lr": 1e-5, "fusion_lr": 1e-3, "epochs": min(4, args.joint_max_epochs), "batch_size": 16, "hidden_dims": "64-32"})
+    study.optimize(objective, n_trials=args.joint_trials)
+
+    path = base.RESULT_DIR / "trials" / f"{name}_joint_trials.csv"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    study.trials_dataframe(attrs=("number", "value", "params", "state", "duration")).rename(
+        columns={"value": "val_f1_weighted"}).to_csv(path, index=False)
+    best = study.best_trial
+    print(f"### best joint weighted F1 {study.best_value:.3f} after {len(study.trials)} trials: {best.params}")
+    return results[best.number]["test"], best.params, study.best_value
 
 
 def main() -> None:
@@ -460,12 +649,22 @@ def main() -> None:
     parser.add_argument("--llm-model", default=LLM_MODEL,
                         help="the LLM whose cache folders are read (name as in the folder names, e.g. gpt-5-nano)")
     parser.add_argument("--dry-run", action="store_true", help="list the runs, nothing is trained")
-    parser.add_argument("--resume", action="store_true", help="skip runs that already have a result file in the output folder")
+    parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True,
+                        help="skip runs that already have a result file in the output folder (default; --no-resume repeats them)")
     parser.add_argument("--mlp-trials", type=int, default=30,
                         help="Optuna trials per run and model tuning the fusion MLP; 0 = the MLP's default configuration")
     parser.add_argument("--full-percents", nargs="*", type=int, default=None,
                         help="regimes that get the full program (fine-tuned roberta-large with Optuna, warmup, class weights, "
                              "best epoch, retries; MLPs on the validation split). Default: every regime; give no value for none")
+    parser.add_argument("--two-stage", action="store_true",
+                        help="full regimes: also compute the two-stage fusion models fusion / fusion_ts (frozen fine-tuned roberta-large, "
+                             "MLP on the validation split). Off by default: the fusion models of the full regimes are the joint ones")
+    parser.add_argument("--joint", action=argparse.BooleanOptionalAction, default=True,
+                        help="full regimes: train roberta-large, the LLM one-hot and the fusion MLP TOGETHER, end to end, on the train split "
+                             "(columns fusion_joint, and fusion_joint_ts with the time series model). On by default; --no-joint skips them. "
+                             "Every trial is a complete fine-tuning")
+    parser.add_argument("--joint-trials", type=int, default=12, help="Optuna trials of the joint model per run")
+    parser.add_argument("--joint-max-epochs", type=int, default=8, help="upper bound of the joint model's epochs in the search")
     parser.add_argument("--ts-mlp-trials", type=int, default=10,
                         help="full regimes: Optuna trials for the fusion MLP WITH the fine-tuned time series model (every trial "
                              "fine-tunes three TimesFM encoders, so this is much more expensive than --mlp-trials); 0 = defaults")
@@ -496,6 +695,10 @@ def main() -> None:
     LLM_CACHE_DIR, LLM_MODEL = args.llm_cache_dir, args.llm_model
     if find_cache(train_cache_name()) is None:
         raise SystemExit(f"no zero-shot cache predict_all_{train_cache_name()} with a cache_*.pkl in {LLM_CACHE_DIR}")
+    try:
+        print(f"zero-shot LLM labels of the training sentences: {len(train_labels())} (from {find_cache(train_cache_name())})")
+    except RuntimeError as e:  # an empty / truncated pickle would otherwise fail every single run in the same way
+        raise SystemExit(f"ERROR: {e}")
 
     todo = jobs(args)
     if not todo:
@@ -577,10 +780,14 @@ def main() -> None:
         stage1.tune = tune_or_reuse
         args.trials = max(args.trials, 1)  # tune() now only looks the parameters up
 
+    install_checkpoint_wrappers()
     rows, failures = [], []
     for test_path, train_path, llm_path, percent in todo:
         shutil.rmtree(WORK_DIR / "cache", ignore_errors=True)
         name = f"{test_path.stem}_{percent}"
+        CKPT.start(name, {"regime": hashlib.md5(train_path.read_bytes()).hexdigest(), "test": test_path.name, "percent": percent,
+                          "full": percent in args.full_percents, "epochs": args.epochs, "ml_proj_dim": args.ml_proj_dim,
+                          "llm_model": LLM_MODEL, "ts": [args.ts_window, args.ts_pooling, args.ts_dim], "no_ts": args.no_ts, "joint": [args.joint, args.joint_max_epochs], "two_stage": args.two_stage, "v": 1})
         try:
             if percent in args.full_percents:
                 row, out = run_job_full(test_path, train_path, llm_path, percent, args, branches)
@@ -590,6 +797,7 @@ def main() -> None:
                 row, out = run_job(test_path, train_path, llm_path, percent, args, frozen["roberta"], branches)
         except Exception as e:  # one failing run must not stop the sweep
             traceback.print_exc()
+            CKPT.finish(delete=False)  # keep what was computed: the next start of this run continues from it
             failures.append({"file": name, "error": f"{type(e).__name__}: {e}"})
             pd.DataFrame(failures).to_csv(RESULT_DIR / f"failures_{SUFFIX}.csv", index=False)
             gc.collect()
@@ -599,6 +807,8 @@ def main() -> None:
         out.to_csv(staging / f"{name}.csv", index=False)
         out.to_json(staging / f"{name}.json", orient="records", force_ascii=False, indent=2)
         publish(staging)
+        print(f"### {name}: {CKPT.hits} results from the checkpoint, {CKPT.misses} newly computed")
+        CKPT.finish(delete=True)  # the run is finished and published: its checkpoint is not needed any more
         rows.append(row)
         seed_rows = pd.DataFrame(rows)
         seed_rows.to_csv(RESULT_DIR / f"summary_seeds_{SUFFIX}.csv", index=False)
