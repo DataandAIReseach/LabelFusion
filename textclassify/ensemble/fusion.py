@@ -41,6 +41,27 @@ class _FusionDatasetWithDates(torch.utils.data.Dataset):
         return self.ml_tensor[idx], self.llm_tensor[idx], self.dates[idx], self.labels_tensor[idx]
 
 
+class _FusionDatasetWithDatesAndTexts(torch.utils.data.Dataset):
+    """Carries BOTH the raw date string (for the TS branch) and the raw text (for the jointly trained ML model) per row,
+    so that joint_training works together with a TS branch: each mini-batch computes fresh, gradient-tracked embeddings for
+    both. Items are (ml_tensor, llm_tensor, date, text, label)."""
+
+    def __init__(self, ml_tensor: torch.Tensor, llm_tensor: torch.Tensor, dates: List[str], texts: List[str],
+                 labels_tensor: torch.Tensor):
+        assert len(dates) == len(texts) == ml_tensor.shape[0] == llm_tensor.shape[0] == labels_tensor.shape[0]
+        self.ml_tensor = ml_tensor
+        self.llm_tensor = llm_tensor
+        self.dates = dates
+        self.texts = texts
+        self.labels_tensor = labels_tensor
+
+    def __len__(self) -> int:
+        return len(self.dates)
+
+    def __getitem__(self, idx: int):
+        return self.ml_tensor[idx], self.llm_tensor[idx], self.dates[idx], self.texts[idx], self.labels_tensor[idx]
+
+
 class FusionMLP(nn.Module):
     """Trainable MLP for fusing ML and LLM predictions."""
     
@@ -212,8 +233,9 @@ class FusionEnsemble(BaseEnsemble):
         # If True, the ML model (e.g. RoBERTa) is fine-tuned jointly with the fusion MLP
         # (gradients flow through both, two param groups at ml_lr / fusion_lr) instead of
         # being frozen after its own separate training stage. Default False keeps the
-        # original frozen-feature-extractor behaviour. Not supported together with a TS
-        # branch (add_ts_model) -- see _train_fusion_mlp_on_val.
+        # original frozen-feature-extractor behaviour. Together with a TS branch (add_ts_model)
+        # the ML model, the TimesFM encoders and the CrossTSTransformer are all trained
+        # end to end with the fusion loss -- see _train_fusion_mlp_on_val.
         self.joint_training = ensemble_config.parameters.get('joint_training', False)
         self.num_epochs = ensemble_config.parameters.get('num_epochs', 10)
         self.batch_size = ensemble_config.parameters.get('batch_size', 16)
@@ -2070,12 +2092,6 @@ class FusionEnsemble(BaseEnsemble):
 
         has_ts = self.ts_transformer is not None
 
-        if self.joint_training and has_ts:
-            raise EnsembleError(
-                "joint_training=True is not supported together with a TS branch (add_ts_model)",
-                "FusionEnsemble"
-            )
-
         # Dates for the TS branch (aligned 1:1 with the ml/llm prediction slices above),
         # used to compute fresh, gradient-tracked TS embeddings per mini-batch below.
         fusion_train_ts_dates = fusion_train_df[self.ts_date_column].tolist() if has_ts else None
@@ -2149,7 +2165,11 @@ class FusionEnsemble(BaseEnsemble):
             # Training phase
             total_train_loss = 0
             for batch in train_loader:
-                if has_ts:
+                if has_ts and self.joint_training:
+                    _, llm_predictions, dates_batch, texts_batch, labels = batch
+                    ml_predictions = self.fusion_wrapper.ml_model.embed_texts_for_training(list(texts_batch))
+                    ts_predictions = self._get_ts_embeddings_for_training(list(dates_batch))
+                elif has_ts:
                     ml_predictions, llm_predictions, dates_batch, labels = batch
                     ts_predictions = self._get_ts_embeddings_for_training(list(dates_batch))
                 elif self.joint_training:
@@ -2188,7 +2208,11 @@ class FusionEnsemble(BaseEnsemble):
             total_val_loss = 0
             with torch.no_grad():
                 for batch in val_loader:
-                    if has_ts:
+                    if has_ts and self.joint_training:
+                        _, llm_predictions, dates_batch, texts_batch, labels = batch
+                        ml_predictions = self.fusion_wrapper.ml_model.embed_texts_for_training(list(texts_batch))
+                        ts_predictions = self._get_ts_embeddings_for_training(list(dates_batch))
+                    elif has_ts:
                         ml_predictions, llm_predictions, dates_batch, labels = batch
                         ts_predictions = self._get_ts_embeddings_for_training(list(dates_batch))
                     elif self.joint_training:
@@ -2255,17 +2279,16 @@ class FusionEnsemble(BaseEnsemble):
                       order. Used when joint_training=True so RoBERTa embeddings are
                       computed fresh (with gradients) per mini-batch, instead of the
                       precomputed/frozen ones baked into ml_predictions. Mutually
-                      exclusive with ts_dates/ts_embeddings (reuses the same
-                      _FusionDatasetWithDates carrier, which just stores a List[str]
-                      alongside the tensors regardless of whether it holds dates or texts).
+                      exclusive with ts_embeddings. Together with ts_dates (joint_training + TS branch)
+                      both lists travel in _FusionDatasetWithDatesAndTexts.
 
         Returns:
             TensorDataset (or _FusionDatasetWithDates if ts_dates/texts_for_training is
             given) with matched embeddings and predictions
         """
-        if sum(x is not None for x in (ts_embeddings, ts_dates, texts_for_training)) > 1:
+        if ts_embeddings is not None and (ts_dates is not None or texts_for_training is not None):
             raise EnsembleError(
-                "ts_embeddings, ts_dates and texts_for_training are mutually exclusive", "FusionEnsemble"
+                "ts_embeddings is mutually exclusive with ts_dates and texts_for_training (ts_dates and texts_for_training may be given together: joint_training + TS branch)", "FusionEnsemble"
             )
         
         # Check if predictions have hash information (new format)
@@ -2383,6 +2406,14 @@ class FusionEnsemble(BaseEnsemble):
         
         # Create tensor dataset
         labels_tensor = torch.FloatTensor(labels)
+
+        if ts_dates is not None and texts_for_training is not None:  # joint_training + TS branch
+            if len(ts_dates) != len(texts) or len(texts_for_training) != len(texts):
+                raise EnsembleError(
+                    f"TS dates ({len(ts_dates)}) / texts_for_training ({len(texts_for_training)}) don't match texts ({len(texts)})",
+                    "FusionEnsemble"
+                )
+            return _FusionDatasetWithDatesAndTexts(ml_tensor, llm_tensor, ts_dates, texts_for_training, labels_tensor)
 
         if ts_dates is not None:
             if len(ts_dates) != len(texts):

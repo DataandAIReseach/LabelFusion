@@ -12,11 +12,12 @@
 # Low-data regimes (testing/predict_low_data_regimes.py): for every test file and every regime
 # p = 10, 20, ..., 70 % of its training file models are trained on the regime and scored on the full test set. Only these
 # regimes (PERCENTS below) are run by default; --percents ... on the command line replaces them, e.g. --percents 80 90 100.
-#   every regime (default) the FULL program of predict_all_labelFusion.py: roberta-large is FINE-TUNED (Optuna over lr x batch
-#                         size x epochs, class weights, warmup, best epoch, retries), then the fusion MLPs are tuned with Optuna and
-#                         trained on the validation split: fusion = fine-tuned roberta-large + LLM label, fusion_ts = additionally the
-#                         FINE-TUNED time series model (DGS10 / T10Y2Y / VIXCLS: TimesFM encoders + CrossTSTransformer trained with the
-#                         MLP; --ts-mlp-trials, default 10, because every trial fine-tunes three TimesFM encoders)
+#   every regime (default) the FULL program: roberta-large is FINE-TUNED alone (column roberta; Optuna over lr x batch size x epochs,
+#                         class weights, warmup, best epoch, retries), and the LabelFusion models are trained END TO END on the train
+#                         split (80 %), chosen on the validation split (20 %): fusion_joint = roberta-large + LLM one-hot -> fusion MLP,
+#                         fusion_joint_ts = the same + the time series model (DGS10 / T10Y2Y / VIXCLS: TimesFM encoders +
+#                         CrossTSTransformer), all parts trained together. --no-joint skips them; --two-stage ALSO computes the old
+#                         two-stage models fusion / fusion_ts (frozen fine-tuned roberta-large, MLP on the validation split).
 #   --full-percents P...  only these get the full program, the others FROZEN encoders: roberta-large (pretrained, never fine-tuned), the TimesFM encoders and the time series
 #                         transformer are frozen, only MLPs are trained (and tuned with Optuna, --mlp-trials, default 30) on the
 #                         whole regime: roberta (embedding alone), fusion (+ LLM label), fusion_ts (+ pooled time series)
@@ -39,6 +40,8 @@
 #   sbatch scripts/run_predict_low_data_regimes.sh --full-percents                            # frozen everywhere (no value = none)
 #   sbatch scripts/run_predict_low_data_regimes.sh --no-resume                                # repeat runs that already have a result (default: skipped)
 #   sbatch scripts/run_predict_low_data_regimes.sh --no-ts                                    # without the time series model
+#   sbatch scripts/run_predict_low_data_regimes.sh --no-joint --two-stage                     # the old two-stage fusion models instead of the end-to-end ones
+#   sbatch scripts/run_predict_low_data_regimes.sh --joint-trials 6                           # fewer Optuna trials of the end-to-end models (default 12 each)
 #   sbatch scripts/run_predict_low_data_regimes.sh --mlp-trials 10 --trials 16 --ts-mlp-trials 5   # fewer Optuna trials per run
 #
 # 168 runs (all with the full program) do not fit into one job: split them by --datasets and/or --percents. If a job is cut by the
