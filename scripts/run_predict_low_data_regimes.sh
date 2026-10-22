@@ -37,12 +37,14 @@
 #   sbatch scripts/run_predict_low_data_regimes.sh --percents 10 40                           # only these regimes (instead of 10 to 70 %)
 #   sbatch scripts/run_predict_low_data_regimes.sh --full-percents 80 100                     # full program only at 80 / 100 %, frozen elsewhere
 #   sbatch scripts/run_predict_low_data_regimes.sh --full-percents                            # frozen everywhere (no value = none)
-#   sbatch scripts/run_predict_low_data_regimes.sh --resume                                   # skip runs that already have a result
+#   sbatch scripts/run_predict_low_data_regimes.sh --no-resume                                # repeat runs that already have a result (default: skipped)
 #   sbatch scripts/run_predict_low_data_regimes.sh --no-ts                                    # without the time series model
 #   sbatch scripts/run_predict_low_data_regimes.sh --mlp-trials 10 --trials 16 --ts-mlp-trials 5   # fewer Optuna trials per run
 #
-# 168 runs (all with the full program) do not fit into one job: split them by --datasets and/or --percents and use
-# --resume to go on. Jobs can run in parallel (each on its own datasets): every result file carries the start time of the
+# 168 runs (all with the full program) do not fit into one job: split them by --datasets and/or --percents. If a job is cut by the
+# time limit, just submit the SAME command again: finished runs are skipped, and the run that was in progress continues from its
+# checkpoint (outputs/predict_low_data_regimes/checkpoints/): every Optuna trial and MLP fit that was done is read from disk, only the
+# final fine-tuning of roberta-large of that run is repeated. Jobs can run in parallel (each on its own datasets): every result file carries the start time of the
 # run in its name (<test file>_<p>_low_data_regimes_<YYYYMMDD_HHMMSS>.csv/.json), so runs never overwrite each other.
 # Every run's summary_*.csv only holds that run's runs.
 

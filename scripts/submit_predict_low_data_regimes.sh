@@ -2,10 +2,11 @@
 # Submits the 168 runs of testing/predict_low_data_regimes.py (24 test files x the regimes 10 to 70 %, roberta-large tuned in
 # every regime) as 7 jobs of scripts/run_predict_low_data_regimes.sh with a 48 h limit each. The split follows the size of the
 # training files (combine / split-combine are about half of all data, so each of them gets its own job). The jobs run in parallel without influencing each other (own work folder per job).
-# A job that hits the time limit: submit the same line again with --resume, finished runs are skipped.
+# A job that hits the time limit: submit the same line again. Finished runs are skipped (that is the default), and the run that
+# was in progress continues from its checkpoint instead of starting over (outputs/predict_low_data_regimes/checkpoints/).
 #
 #   bash scripts/submit_predict_low_data_regimes.sh                 # all 7 jobs
-#   bash scripts/submit_predict_low_data_regimes.sh --resume        # extra arguments go to every job
+#   bash scripts/submit_predict_low_data_regimes.sh --no-resume     # extra arguments go to every job (here: repeat finished runs)
 #
 # --datasets matches substrings of the test file name without the seed: "manual-combine-test" is not
 # "split-combine-test", "mm-test" is not "mm-split-test".
