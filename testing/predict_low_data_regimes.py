@@ -33,6 +33,10 @@ two-stage fusion (frozen fine-tuned roberta-large, MLP on the validation split: 
 model, --mlp-trials / --ts-mlp-trials) is only computed with --two-stage. The fine-tuned "roberta" and the frozen "roberta" of the
 other regimes are different models: compare the curve across that boundary with care.
 
+JOINT models start from the roberta-large that stage 1 fine-tuned on the same train split (--joint-init finetuned, default; --joint-init
+pretrained starts them from the pretrained model), so they are at least as good a starting point as the column roberta. They then
+continue to train with the fusion loss. (An end-to-end model that starts from the pretrained model has to learn the task from
+scratch with fewer epochs and no class weights, and tends to end up below the fine-tuned roberta.)
 JOINT models (--joint, on by default, --no-joint skips them; full regimes only; every trial is a complete fine-tuning of roberta-large): roberta-large
 and the fusion network are trained TOGETHER, end to end, on the TRAIN split (80 % of the regime): the fusion loss (cross-entropy on
 [roberta-large [CLS] embedding, LLM label as one-hot]) is back-propagated into roberta-large (own learning rate ml_lr) and the fusion MLP
@@ -526,6 +530,9 @@ def run_job_full(test_path: Path, train_path: Path, llm_path: Path, percent: int
         out[f"{who}_pred"] = base.mlp_fit_predict(roberta, llm_train, mlp, train_df, val_df, test_df, llm_test_preds, fname, "final", verbose=False)
         row.update({f"{who}_mlp_lr": mlp["fusion_lr"], f"{who}_mlp_epochs": mlp["num_epochs"],
                     f"{who}_mlp_batch_size": mlp["batch_size"], f"{who}_mlp_val_f1": mlp_val_f1})
+    # the weights of the fine-tuned roberta-large (CPU copy): the joint models start from them (--joint-init finetuned)
+    fine_tuned_state = ({k: v.detach().cpu().clone() for k, v in roberta.model.state_dict().items()}
+                        if args.joint and args.joint_init == "finetuned" else None)
     del roberta, memo
     gc.collect()
     if torch.cuda.is_available():
@@ -535,11 +542,12 @@ def run_job_full(test_path: Path, train_path: Path, llm_path: Path, percent: int
     #   fusion_joint     roberta-large + LLM one-hot -> fusion MLP
     #   fusion_joint_ts  the same + the time series model (TimesFM encoders + CrossTSTransformer), all trained together
     if args.joint:
+        row["joint_init"] = args.joint_init
         joint_models = [("fusion_joint", branches["plain"])]
         if "ts_finetuned" in branches:
             joint_models.append(("fusion_joint_ts", branches["ts_finetuned"]))
         for who, build in joint_models:
-            preds, jp, jv = tune_joint(f"{name}_{who}", train_df, val_df, test_df, llm_train, llm_test_preds, args, build)
+            preds, jp, jv = tune_joint(f"{name}_{who}", train_df, val_df, test_df, llm_train, llm_test_preds, args, build, fine_tuned_state)
             out[f"{who}_pred"] = preds
             row.update({f"{who}_ml_lr": jp["ml_lr"], f"{who}_mlp_lr": jp["fusion_lr"], f"{who}_epochs": jp["epochs"],
                         f"{who}_batch_size": jp["batch_size"], f"{who}_hidden": jp["hidden_dims"], f"{who}_val_f1": jv})
@@ -583,9 +591,10 @@ def build_frozen_roberta(model_name: str, memoise: bool = True):
     return roberta
 
 
-def joint_trial(params: dict, name: str, tag: str, train_df, val_df, test_df, llm_train, llm_test_preds, args, build) -> dict:
-    """One end-to-end training: a fresh pretrained roberta-large and the fusion MLP trained together on train_df;
-    returns the predictions for the validation split and for the test set. Checkpointed like the other expensive calls."""
+def joint_trial(params: dict, name: str, tag: str, train_df, val_df, test_df, llm_train, llm_test_preds, args, build, init_state=None) -> dict:
+    """One end-to-end training: roberta-large and the fusion MLP trained together on train_df; returns the predictions for the
+    validation split and for the test set. roberta-large starts from init_state (the weights fine-tuned on train_df in stage 1,
+    --joint-init finetuned) or, without it, from the pretrained model. Checkpointed like the other expensive calls."""
     key = f"joint|{name}|{json.dumps(params, sort_keys=True, default=str)}|{text_hash(train_df)}|{text_hash(val_df)}"
     cached = CKPT.get(key)
     if cached is not None:
@@ -595,6 +604,8 @@ def joint_trial(params: dict, name: str, tag: str, train_df, val_df, test_df, ll
     if args.ml_proj_dim:
         fus["ml_proj_dim"] = args.ml_proj_dim
     roberta = build_frozen_roberta(args.roberta_model, memoise=False)
+    if init_state is not None:
+        roberta.model.load_state_dict(init_state)  # start from the roberta-large fine-tuned on this regime's train split
     fusion = build(roberta, llm_train, fus, name, tag, False)
     with contextlib.redirect_stdout(io.StringIO()):  # the library's progress prints
         fusion.fit(train_df, train_df)  # roberta counts as trained -> the fusion trains on train_df, roberta-large with it
@@ -609,7 +620,7 @@ def joint_trial(params: dict, name: str, tag: str, train_df, val_df, test_df, ll
     return result
 
 
-def tune_joint(name: str, train_df, val_df, test_df, llm_train, llm_test_preds, args, build) -> tuple[list, dict, float]:
+def tune_joint(name: str, train_df, val_df, test_df, llm_train, llm_test_preds, args, build, init_state=None) -> tuple[list, dict, float]:
     """Optuna over the joint model: every trial trains roberta-large + fusion MLP on train_df and is scored by weighted F1 on
     val_df. Returns the test predictions of the best trial, its parameters and its validation F1."""
     val_true = val_df["label"].map(base.LABEL_MAP).tolist()
@@ -622,12 +633,12 @@ def tune_joint(name: str, train_df, val_df, test_df, llm_train, llm_test_preds, 
                   "epochs": trial.suggest_int("epochs", 2, args.joint_max_epochs),
                   "batch_size": trial.suggest_categorical("batch_size", [8, 16, 32]),
                   "hidden_dims": trial.suggest_categorical("hidden_dims", list(base.HIDDEN_DIMS))}
-        result = joint_trial(params, name, f"joint{trial.number}", train_df, val_df, test_df, llm_train, llm_test_preds, args, build)
+        result = joint_trial(params, name, f"joint{trial.number}", train_df, val_df, test_df, llm_train, llm_test_preds, args, build, init_state)
         results[trial.number] = result
         return f1_score(val_true, result["val"], average="weighted")
 
     study = optuna.create_study(direction="maximize", sampler=optuna.samplers.TPESampler(seed=base.RANDOM_STATE))
-    study.enqueue_trial({"ml_lr": 1e-5, "fusion_lr": 1e-3, "epochs": min(4, args.joint_max_epochs), "batch_size": 16, "hidden_dims": "64-32"})
+    study.enqueue_trial({"ml_lr": 5e-6 if init_state is not None else 1e-5, "fusion_lr": 1e-3, "epochs": min(4, args.joint_max_epochs), "batch_size": 16, "hidden_dims": "64-32"})
     study.optimize(objective, n_trials=args.joint_trials)
 
     path = base.RESULT_DIR / "trials" / f"{name}_joint_trials.csv"
@@ -665,6 +676,9 @@ def main() -> None:
                              "Every trial is a complete fine-tuning")
     parser.add_argument("--joint-trials", type=int, default=12, help="Optuna trials of the joint model per run")
     parser.add_argument("--joint-max-epochs", type=int, default=8, help="upper bound of the joint model's epochs in the search")
+    parser.add_argument("--joint-init", choices=("finetuned", "pretrained"), default="finetuned",
+                        help="where roberta-large starts in the joint models: from the roberta-large fine-tuned on the train split in "
+                             "stage 1 (default), or from the pretrained model")
     parser.add_argument("--ts-mlp-trials", type=int, default=10,
                         help="full regimes: Optuna trials for the fusion MLP WITH the fine-tuned time series model (every trial "
                              "fine-tunes three TimesFM encoders, so this is much more expensive than --mlp-trials); 0 = defaults")
@@ -679,8 +693,8 @@ def main() -> None:
     parser.add_argument("--roberta-params-from", type=Path,
                         help="full regimes: summary_seeds.csv of a predict_all_labelFusion.py run, lr / batch size / epochs per test "
                              "file instead of tuning stage 1")
-    parser.add_argument("--ml-proj-dim", type=int, default=768,
-                        help="project roberta-large's 1024-dim [CLS] embedding down to this size before the MLP; 0 disables")
+    parser.add_argument("--ml-proj-dim", type=int, default=32,
+                        help="project roberta-large's 1024-dim [CLS] embedding down to this size before the MLP (default 32: a small bottleneck gives the 3-dim LLM label more weight); 0 disables")
     parser.add_argument("--roberta-model", default="roberta-large", help="the (frozen) encoder; roberta-large unless testing")
     parser.add_argument("--no-ts", action="store_true", help="skip the fusion model with the time series branch")
     parser.add_argument("--ts-window", type=int, default=21,
@@ -787,7 +801,7 @@ def main() -> None:
         name = f"{test_path.stem}_{percent}"
         CKPT.start(name, {"regime": hashlib.md5(train_path.read_bytes()).hexdigest(), "test": test_path.name, "percent": percent,
                           "full": percent in args.full_percents, "epochs": args.epochs, "ml_proj_dim": args.ml_proj_dim,
-                          "llm_model": LLM_MODEL, "ts": [args.ts_window, args.ts_pooling, args.ts_dim], "no_ts": args.no_ts, "joint": [args.joint, args.joint_max_epochs], "two_stage": args.two_stage, "v": 1})
+                          "llm_model": LLM_MODEL, "ts": [args.ts_window, args.ts_pooling, args.ts_dim], "no_ts": args.no_ts, "joint": [args.joint, args.joint_max_epochs, args.joint_init], "two_stage": args.two_stage, "v": 1})
         try:
             if percent in args.full_percents:
                 row, out = run_job_full(test_path, train_path, llm_path, percent, args, branches)

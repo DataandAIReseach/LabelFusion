@@ -16,7 +16,8 @@
 #                         class weights, warmup, best epoch, retries), and the LabelFusion models are trained END TO END on the train
 #                         split (80 %), chosen on the validation split (20 %): fusion_joint = roberta-large + LLM one-hot -> fusion MLP,
 #                         fusion_joint_ts = the same + the time series model (DGS10 / T10Y2Y / VIXCLS: TimesFM encoders +
-#                         CrossTSTransformer), all parts trained together. --no-joint skips them; --two-stage ALSO computes the old
+#                         CrossTSTransformer), all parts trained together. They START FROM the roberta-large fine-tuned on the same train
+#                         split (--joint-init pretrained: from the pretrained model). --no-joint skips them; --two-stage ALSO computes the old
 #                         two-stage models fusion / fusion_ts (frozen fine-tuned roberta-large, MLP on the validation split).
 #   --full-percents P...  only these get the full program, the others FROZEN encoders: roberta-large (pretrained, never fine-tuned), the TimesFM encoders and the time series
 #                         transformer are frozen, only MLPs are trained (and tuned with Optuna, --mlp-trials, default 30) on the
