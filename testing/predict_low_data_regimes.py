@@ -72,10 +72,10 @@ The cache is only read, never copied or changed. (It is not in git, /outputs/ is
 Several runs (e.g. one sbatch job per group of datasets) can run at the same time without influencing each other:
 every run has its own work folder (.work/<job id>) for the saved roberta-large models and the library's prediction
 caches, and every result file carries the start time of the run in its name. The results live in ./outputs/predict_low_data_regimes/:
-    <test file>_<p>_low_data_regimes_<date_time>.csv / .json   per run: sentence, label, true, llm_pred, roberta_pred, fusion_pred, fusion_ts_pred
-    summary_seeds_low_data_regimes_<date_time>.csv             one row per run (all metrics, "training", parameters used)
-    summary_low_data_regimes_<date_time>.csv                   per dataset and regime: mean / std (ddof=1) over the seeds
-    failures_low_data_regimes_<date_time>.csv                  runs that raised an error (the sweep goes on)
+    <test file>_<p>_low_data_regimes_<date_time>_<job id>.csv / .json   per run: sentence, label, true, llm_pred, roberta_pred, fusion_pred, fusion_ts_pred
+    summary_seeds_low_data_regimes_<date_time>_<job id>.csv             one row per run (all metrics, "training", parameters used)
+    summary_low_data_regimes_<date_time>_<job id>.csv                   per dataset and regime: mean / std (ddof=1) over the seeds
+    failures_low_data_regimes_<date_time>_<job id>.csv                  runs that raised an error (the sweep goes on)
     trials/...                                                 Optuna trials
 
     python testing/predict_low_data_regimes.py --dry-run                                  # which runs, nothing is trained
@@ -118,7 +118,7 @@ RUN_ID = os.environ.get("SLURM_JOB_ID") or f"pid{os.getpid()}"
 WORK_DIR = RESULT_DIR / ".work" / RUN_ID
 os.environ["LABELFUSION_MODEL_CACHE"] = str(WORK_DIR / "models")  # set before the modules below read it
 atexit.register(shutil.rmtree, WORK_DIR, ignore_errors=True)
-SUFFIX = f"low_data_regimes_{datetime.now():%Y%m%d_%H%M%S}"
+SUFFIX = f"low_data_regimes_{datetime.now():%Y%m%d_%H%M%S}_{RUN_ID}"  # start time + job id: parallel jobs never share a file name
 
 import predict_all_files_labelFusion as files  # noqa: E402
 import predict_all_labelFusion as base  # noqa: E402
@@ -721,7 +721,7 @@ def main() -> None:
     if args.full_percents is None:  # default: the full program at every regime
         args.full_percents = sorted({j[3] for j in todo})
     if args.resume:
-        done = {re.sub(r"_low_data_regimes_\d{8}_\d{6}$", "", p.stem) for p in RESULT_DIR.glob("lab-manual-*_low_data_regimes_*.csv")}
+        done = {re.sub(r"_low_data_regimes_\d{8}_\d{6}(_\w+)?$", "", p.stem) for p in RESULT_DIR.glob("lab-manual-*_low_data_regimes_*.csv")}
         todo = [j for j in todo if f"{j[0].stem}_{j[3]}" not in done]
     print(f"{len(todo)} runs ({', '.join(sorted({str(j[3]) + '%' for j in todo}, key=lambda s: int(s[:-1])))}) "
           f"on {len({j[0] for j in todo})} test files; models: roberta, fusion{'' if args.no_ts else ', fusion_ts'} "
