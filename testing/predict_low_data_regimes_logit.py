@@ -112,8 +112,12 @@ def run_job(test_path: Path, train_path: Path, llm_path: Path, percent: int, arg
     else:
         params, val_f1 = stage1.default_params(args), None
     roberta, memo = base.train_roberta(params, train_df, val_df, retries=args.retries)
-    rob_val = roberta.predict_without_saving(val_df)
-    rob_test = roberta.predict_without_saving(test_df)
+    # base.train_roberta wraps the model in EmbeddingMemo, whose predict() returns only labels and embeddings: the class's own method
+    # (called on the instance, bypassing the memo) also returns the class probabilities
+    rob_val = plr.RoBERTaLargeClassifier.predict_without_saving(roberta, val_df)
+    rob_test = plr.RoBERTaLargeClassifier.predict_without_saving(roberta, test_df)
+    if rob_val.probabilities is None or rob_test.probabilities is None:
+        raise RuntimeError("roberta-large returned no class probabilities")
     out["roberta_pred"] = rob_test.predictions
     row.update({"roberta_lr": params["learning_rate"], "roberta_batch_size": params["batch_size"],
                 "roberta_epochs": params["num_epochs"], "roberta_val_f1": val_f1})
