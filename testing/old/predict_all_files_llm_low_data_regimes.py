@@ -39,8 +39,9 @@ from sklearn.metrics import accuracy_score, f1_score
 
 TESTING_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTING_DIR))
+sys.path.insert(0, str(TESTING_DIR.parent))  # predict_all_files_llm.py now lives in testing/
 
-import predict_all_files_llm as llm  # noqa: E402
+import testing.predict_all_files_llm as llm  # noqa: E402
 from test_textclassify_llm import (  # noqa: E402
     LABEL_COLUMNS, LABEL_MAP, RANDOM_STATE, REPO_ROOT, TEXT_COLUMN, _add_onehot_labels,
 )

@@ -37,6 +37,7 @@ from sklearn.metrics import accuracy_score, f1_score
 
 TESTING_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTING_DIR))
+sys.path.insert(0, str(TESTING_DIR / "old"))  # test_textclassify_llm.py (labels, columns, .env loading) lives there
 
 from test_textclassify_llm import (  # noqa: E402  (also loads .env)
     LABEL_COLUMNS, LABEL_MAP, RANDOM_STATE, REPO_ROOT, TEXT_COLUMN, _add_onehot_labels,
