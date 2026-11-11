@@ -24,7 +24,10 @@ The validation split is small (38 to 229 sentences for 10 to 60 %), but 6 inputs
 epoch on this split, so its logits there are slightly optimistic (not trained on, but selected on).
 
 Resumable like predict_low_data_regimes.py (checkpoints/: every Optuna trial that was done is read from disk, finished runs are
-skipped; only the final fine-tuning of an interrupted run is repeated). Output: ./outputs/predict_low_data_regimes_logit/
+skipped; only the final fine-tuning of an interrupted run is repeated). Which test files were already predicted (per regime) is tracked
+in completed_runs.json: a run is skipped only if it is listed there with the same settings (trials, epochs, LLM model); result files
+of older jobs without an entry count as done. Output: ./outputs/predict_low_data_regimes_logit/
+    completed_runs.json                                      <test file>_<p> -> when, job, settings, metrics of every finished run
     <test file>_<p>_logit_<date_time>_<job id>.csv / .json   per run: sentence, label, true, llm_pred, roberta_pred, fusion_logit_pred, logit_only_pred
     summary_seeds_logit_<date_time>_<job id>.csv             one row per run (all metrics, roberta parameters, C of the logistic regressions)
     summary_logit_<date_time>_<job id>.csv                   per dataset and regime: mean / std (ddof=1) over the seeds
@@ -39,8 +42,10 @@ from __future__ import annotations
 
 import argparse
 import atexit
+import fcntl
 import gc
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -74,6 +79,36 @@ atexit.register(shutil.rmtree, WORK_DIR, ignore_errors=True)
 # predict_low_data_regimes.py's helpers read these module globals when they are called: point them at this script's folders
 plr.RESULT_DIR, plr.WORK_DIR, plr.SUFFIX, plr.CHECKPOINT_DIR = RESULT_DIR, WORK_DIR, SUFFIX, RESULT_DIR / "checkpoints"
 plr.WHO, plr.METRICS = WHO, METRICS
+
+
+MANIFEST = RESULT_DIR / "completed_runs.json"
+MANIFEST_LOCK = RESULT_DIR / ".completed_runs.lock"
+
+
+def load_manifest() -> dict:
+    try:
+        return json.loads(MANIFEST.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def settings_of(args) -> dict:
+    """What changes a run's result: a run done with other settings is not skipped."""
+    return {"trials": args.trials, "epochs": args.epochs, "llm_model": plr.LLM_MODEL}
+
+
+def record_done(name: str, args, row: dict) -> None:
+    """Add a finished run to completed_runs.json. Parallel jobs write to the same file: lock, re-read, write atomically."""
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    with open(MANIFEST_LOCK, "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        done = load_manifest()
+        done[name] = {"finished": datetime.now().isoformat(timespec="seconds"), "job": plr.RUN_ID, "suffix": SUFFIX,
+                      "settings": settings_of(args),
+                      "metrics": {k: row[k] for k in METRICS if k in row and row[k] == row[k]}}
+        tmp = MANIFEST.with_name(f".{MANIFEST.name}.{plr.RUN_ID}.tmp")
+        tmp.write_text(json.dumps(done, indent=2, sort_keys=True))
+        os.replace(tmp, MANIFEST)
 
 
 def stack_features(probabilities: list[dict], llm_labels: list[str] | None = None) -> np.ndarray:
@@ -164,8 +199,15 @@ def main() -> None:
     if not todo:
         raise SystemExit("no runs found (are the regimes of dataset_scripts/make_low_data_regimes.py and the LLM caches there?)")
     if args.resume:
-        done = {re.sub(r"_logit_\d{8}_\d{6}(_\w+)?$", "", p.stem) for p in RESULT_DIR.glob("lab-manual-*_logit_*.csv")}
+        manifest = load_manifest()
+        legacy = {re.sub(r"_logit_\d{8}_\d{6}(_\w+)?$", "", p.stem) for p in RESULT_DIR.glob("lab-manual-*_logit_*.csv")}
+        wanted = settings_of(args)
+        changed = [n for n, e in manifest.items() if e.get("settings") != wanted]
+        done = {n for n, e in manifest.items() if e.get("settings") == wanted} | (legacy - set(manifest))
+        n_all = len(todo)
         todo = [j for j in todo if f"{j[0].stem}_{j[3]}" not in done]
+        print(f"already predicted (completed_runs.json): {n_all - len(todo)} of {n_all} runs"
+              + (f"; {len(changed)} recorded with other settings are repeated" if changed else ""))
     print(f"{len(todo)} runs ({', '.join(sorted({str(j[3]) + '%' for j in todo}, key=lambda s: int(s[:-1])))}) "
           f"on {len({j[0] for j in todo})} test files; models: llm, roberta, fusion_logit, logit_only "
           f"(roberta-large fine-tuned with {args.trials} Optuna trials per run, then logistic regressions)")
@@ -203,6 +245,7 @@ def main() -> None:
         out.to_csv(staging / f"{name}.csv", index=False)
         out.to_json(staging / f"{name}.json", orient="records", force_ascii=False, indent=2)
         plr.publish(staging)
+        record_done(name, args, row)
         print(f"### {name}: {plr.CKPT.hits} results from the checkpoint, {plr.CKPT.misses} newly computed")
         plr.CKPT.finish(delete=True)  # the run is finished and published: its checkpoint is not needed any more
         rows.append(row)
