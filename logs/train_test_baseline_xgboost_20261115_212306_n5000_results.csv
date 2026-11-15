@@ -1,0 +1,4 @@
+stage,split,cv_f1_macro,accuracy,f1_macro,f1_weighted,dataset
+majority,TEST,,0.45,0.20689655172413793,0.2793103448275862,articles_all_commodities_baseline_seed7_n5000_20261115_205224.json
+baseline,TEST,0.7304458453912834,0.743,0.7281087631525679,0.7415326622886071,articles_all_commodities_baseline_seed7_n5000_20261115_205224.json
+best,TEST,0.7418308205169689,0.754,0.7389985349255314,0.752617970051853,articles_all_commodities_baseline_seed7_n5000_20261115_205224.json

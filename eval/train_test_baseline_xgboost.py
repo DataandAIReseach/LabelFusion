@@ -1,9 +1,24 @@
 """
-Baseline XGBoost multi-label classifier for the commodity articles dataset,
-plus Optuna hyperparameter optimization on the val split.
+Baseline XGBoost classifier for the stance of the synthetic inflation /
+unemployment articles (dovish / hawkish / neutral), plus Optuna
+hyperparameter optimization.
 
-Fuses the data-prep/baseline-training logic (cell 3.1 in
-eval_silver_gold_oil_gas.ipynb) with the Optuna search (cell 3.2).
+Data: the articles JSON written by dataset_scripts/data_gen/article_creation.ipynb
+(dataset_scripts/data/articles/jsons/*.json). Each article carries its stance in
+"label" ("dovish" | "hawkish" | "neutral") and "label_id" (0 dovish, 1 hawkish,
+2 neutral -- the lab-manual coding of the FOMC data).
+
+Input text is the article body only (the headline is empty for these texts).
+
+Splits (the datasets are small, e.g. 200 articles):
+  - 80 % dev / 20 % test, stratified by label.
+  - The fixed-parameter baseline and the Optuna search are scored with
+    stratified 5-fold cross-validation on the dev part (macro-F1), so tuning
+    never sees the test articles and is not decided on a 20-article val split.
+  - The best parameters are refit on the whole dev part and scored on test.
+TF-IDF sits inside the pipeline, so it is fitted on the training folds only.
+
+Outputs in ./logs/: the log, the confusion matrices (PNG) and a results CSV.
 """
 
 import logging
@@ -14,27 +29,30 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+import json
+
 import matplotlib.pyplot as plt
 import numpy as np
 import optuna
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.multioutput import MultiOutputClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, f1_score
+from sklearn.metrics import (ConfusionMatrixDisplay, accuracy_score, classification_report,
+                             confusion_matrix, f1_score)
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
+from sklearn.pipeline import Pipeline
 from xgboost import XGBClassifier
 
-from eval.convert_jsons_to_csvs import build_dataframe_from_latest_json, _flatten_articles_json
-
-ALL_COMMODITIES = ["gold", "silver", "oil", "gas"]
-N_TRIALS = 10
+CLASSES = ["dovish", "hawkish", "neutral"]   # index = label_id (0 dovish, 1 hawkish, 2 neutral)
+N_TRIALS = 30
+CV_FOLDS = 5
+TEST_FRAC = 0.2
+RANDOM_STATE = 42
 LOGS_DIR = REPO_ROOT / "logs"
+JSONS_DIR = REPO_ROOT / "dataset_scripts" / "data" / "articles" / "jsons"
 
 # Optional: set to a specific articles JSON path to use that file instead of
-# the most recently modified one in data/articles/jsons. Relative paths are
-# resolved against the repo root, not the current working directory, so this
-# works no matter where you launch the script from. Leave as None to use the
-# most recently added JSON in data/articles/jsons.
+# the most recently modified one in JSONS_DIR. Relative paths are resolved
+# against the repo root, not the current working directory.
 JSON_PATH = None
 
 logger = logging.getLogger(__name__)
@@ -62,168 +80,154 @@ def _setup_logging(timestamp: str) -> Path:
     return log_file
 
 
-def load_and_split(json_path=None):
-    """json_path is optional -- if given, load that specific articles JSON
-    directly (resolved against REPO_ROOT if relative); otherwise fall back to
-    the most recently modified JSON in data/articles/jsons
-    (build_dataframe_from_latest_json's default)."""
-    if json_path is not None:
+def _latest_json() -> Path:
+    files = sorted(JSONS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime)
+    if not files:
+        raise FileNotFoundError(f"No articles JSON found in {JSONS_DIR} -- run article_creation.ipynb first")
+    return files[-1]
+
+
+def load_articles(json_path=None) -> tuple[pd.DataFrame, Path]:
+    """One row per article: text, label (0/1/2), and a few metadata columns for the log."""
+    if json_path is None:
+        json_path = _latest_json()
+    else:
         json_path = Path(json_path)
         if not json_path.is_absolute():
             json_path = REPO_ROOT / json_path
-        df = _flatten_articles_json(json_path)
-    else:
-        df, json_path = build_dataframe_from_latest_json()
 
-    print(f"Dataset JSON: {json_path}", flush=True)
-    logger.info(f"Dataset JSON: {json_path}")
+    with open(json_path, encoding="utf-8") as f:
+        articles = json.load(f)
 
-    # Combine headline + body as input text
-    df["text"] = df["headline"].fillna("") + " " + df["body"].fillna("")
+    rows = []
+    for art in articles:
+        meta = art["metadata"]
+        label = art.get("label_id", meta.get("label"))
+        if label is None:
+            raise ValueError(f"{json_path}: article {meta.get('obs_id')} has no label -- "
+                             "is this an articles file of the inflation/unemployment generator?")
+        rows.append({
+            "obs_id":    meta["obs_id"],
+            "date":      meta["article_date"],
+            "topic":     meta.get("commodity", ""),
+            "IN":        meta.get("IN"),
+            "text":      " ".join(s for s in (art.get("headline", ""), art.get("body", "")) if s).strip(),
+            "label":     int(label),
+        })
+    df = pd.DataFrame(rows)
 
-    # TF-IDF features
-    vectorizer = TfidfVectorizer(max_features=10000, ngram_range=(1, 2))
-    X = vectorizer.fit_transform(df["text"])
-    y = df[ALL_COMMODITIES].values
+    empty = (df["text"] == "").sum()
+    if empty:
+        logger.info(f"Dropping {empty} articles with an empty text")
+        df = df[df["text"] != ""].reset_index(drop=True)
 
-    # 70/10/20 train/val/test split: split off the 70% train first, then split
-    # the remaining 30% into val (10% overall) / test (20% overall).
-    X_train, X_rest, y_train, y_rest = train_test_split(
-        X, y, train_size=0.7, random_state=42)
-    X_val, X_test, y_val, y_test = train_test_split(
-        X_rest, y_rest, train_size=1/3, random_state=42)
-
-    logger.info(f"Train: {X_train.shape[0]}  Val: {X_val.shape[0]}  Test: {X_test.shape[0]}")
-
-    return X_train, X_val, X_test, y_train, y_val, y_test
+    return df, json_path
 
 
-def _combo_labels(y):
-    """Collapse a (n, len(ALL_COMMODITIES)) binary label matrix into single
-    commodity-combination class labels, e.g. row [1,1,0,0] -> 'gold+silver'.
-    Needed because the underlying problem is multi-label (rows can have
-    several active commodities at once) -- this turns it into a genuine
-    multiclass label so a standard confusion matrix applies."""
-    return np.array([
-        "+".join(c for c, v in zip(ALL_COMMODITIES, row) if v == 1) or "none"
-        for row in y
+def make_pipeline(**xgb_params) -> Pipeline:
+    return Pipeline([
+        ("tfidf", TfidfVectorizer(ngram_range=(1, 2), min_df=1, sublinear_tf=True)),
+        ("xgb", XGBClassifier(
+            objective    = "multi:softprob",
+            num_class    = len(CLASSES),
+            eval_metric  = "mlogloss",
+            random_state = RANDOM_STATE,
+            tree_method  = "hist",
+            **xgb_params,
+        )),
     ])
 
 
-def plot_confusion_matrix(y_split, y_pred, split_name, timestamp, n_obs):
-    """Multiclass confusion matrix over commodity-combination labels (e.g.
-    'gold', 'gold+silver', 'oil+gas+silver', ...) for the BEST (tuned) model
-    only -- logged and saved as a PNG to logs/, named with the run's
-    timestamp and the total number of observations in the dataset so
-    different runs never overwrite each other's plots."""
-    y_true_combo = _combo_labels(y_split)
-    y_pred_combo = _combo_labels(y_pred)
-    combo_labels = sorted(set(y_true_combo) | set(y_pred_combo))
+BASELINE_PARAMS = {"n_estimators": 200, "max_depth": 6, "learning_rate": 0.1}
 
-    cm = confusion_matrix(y_true_combo, y_pred_combo, labels=combo_labels)
-    logger.info(f"\nMulticlass confusion matrix over commodity combinations (best {split_name}):")
-    logger.info("\n" + pd.DataFrame(cm, index=combo_labels, columns=combo_labels).to_string())
+
+def _cv():
+    return StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+
+
+def cv_score(params, X_dev, y_dev) -> float:
+    """Mean macro-F1 over stratified CV folds of the dev split."""
+    return cross_val_score(make_pipeline(**params), X_dev, y_dev, cv=_cv(),
+                           scoring="f1_macro").mean()
+
+
+def plot_confusion_matrix(y_true, y_pred, stage, timestamp, n_obs):
+    """3x3 confusion matrix on the test split, logged and saved as a PNG in logs/."""
+    cm = confusion_matrix(y_true, y_pred, labels=range(len(CLASSES)))
+    logger.info(f"\nConfusion matrix ({stage}, TEST) -- rows = true, columns = predicted:")
+    logger.info("\n" + pd.DataFrame(cm, index=CLASSES, columns=CLASSES).to_string())
 
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = LOGS_DIR / f"confusion_matrix_best_{split_name.lower()}_{timestamp}_n{n_obs}.png"
-
-    fig, ax = plt.subplots(figsize=(max(6, len(combo_labels) * 0.6), max(5, len(combo_labels) * 0.6)))
-    ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=combo_labels).plot(
-        ax=ax, xticks_rotation=45, cmap="Blues", colorbar=False)
-    ax.set_title(f"Commodity-combination confusion matrix — best model, {split_name}\n"
-                 f"{timestamp}  (n={n_obs})")
+    out_path = LOGS_DIR / f"confusion_matrix_{stage}_test_{timestamp}_n{n_obs}.png"
+    fig, ax = plt.subplots(figsize=(5, 4.5))
+    ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CLASSES).plot(
+        ax=ax, cmap="Blues", colorbar=False)
+    ax.set_title(f"Stance confusion matrix -- {stage}, TEST\n{timestamp}  (n={n_obs})")
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
     plt.close(fig)
     logger.info(f"Saved confusion matrix plot: {out_path}")
 
 
-def evaluate(clf, X_split, y_split, split_name, stage, timestamp=None, n_obs=None):
-    """stage: "baseline" or "best". A confusion matrix is only plotted for
-    the best (tuned) model -- timestamp/n_obs are required in that case."""
-    logger.info(f"\n{'='*20} {stage.upper()} {split_name} {'='*20}")
-    y_pred = clf.predict(X_split)
+def evaluate(model, X_test, y_test, stage, timestamp, n_obs, cv_f1=None) -> dict:
+    """Scores on the held-out test split. stage: "majority", "baseline" or "best"."""
+    logger.info(f"\n{'=' * 20} {stage.upper()} TEST {'=' * 20}")
+    y_pred = model.predict(X_test)
 
-    for i, c in enumerate(ALL_COMMODITIES):
-        logger.info(f"=== {c.upper()} ===")
-        logger.info(classification_report(y_split[:, i], y_pred[:, i]))
-
-    exact_match = np.all(y_split == y_pred, axis=1).mean()
-    mean_acc    = (y_split == y_pred).mean()
-    f1_micro    = f1_score(y_split, y_pred, average='micro', zero_division=0)
-    f1_macro    = f1_score(y_split, y_pred, average='macro', zero_division=0)
-    f1_weighted = f1_score(y_split, y_pred, average='weighted', zero_division=0)
-    f1_samples  = f1_score(y_split, y_pred, average='samples', zero_division=0)
-
-    logger.info(f"Exact match (all {len(ALL_COMMODITIES)} correct): {exact_match:.3f}")
-    logger.info(f"Mean per-label accuracy: {mean_acc:.3f}")
-    logger.info(f"F1 (micro):    {f1_micro:.3f}")
-    logger.info(f"F1 (macro):    {f1_macro:.3f}")
-    logger.info(f"F1 (weighted): {f1_weighted:.3f}")
-    logger.info(f"F1 (samples):  {f1_samples:.3f}")
-
-    if stage == "best":
-        plot_confusion_matrix(y_split, y_pred, split_name, timestamp, n_obs)
-
-    return {
-        "stage": stage,
-        "split": split_name,
-        "exact_match": exact_match,
-        "mean_accuracy": mean_acc,
-        "f1_micro": f1_micro,
-        "f1_macro": f1_macro,
-        "f1_weighted": f1_weighted,
-        "f1_samples": f1_samples,
+    logger.info(classification_report(y_test, y_pred, labels=range(len(CLASSES)),
+                                      target_names=CLASSES, zero_division=0))
+    result = {
+        "stage":       stage,
+        "split":       "TEST",
+        "cv_f1_macro": cv_f1,
+        "accuracy":    accuracy_score(y_test, y_pred),
+        "f1_macro":    f1_score(y_test, y_pred, average="macro", zero_division=0),
+        "f1_weighted": f1_score(y_test, y_pred, average="weighted", zero_division=0),
     }
+    logger.info(f"Accuracy:      {result['accuracy']:.3f}")
+    logger.info(f"F1 (macro):    {result['f1_macro']:.3f}")
+    logger.info(f"F1 (weighted): {result['f1_weighted']:.3f}")
+
+    if stage != "majority":
+        plot_confusion_matrix(y_test, y_pred, stage, timestamp, n_obs)
+    return result
 
 
-def train_baseline(X_train, y_train):
-    # Multi-label XGBoost
-    clf = MultiOutputClassifier(XGBClassifier(
-        n_estimators   = 200,
-        max_depth      = 6,
-        learning_rate  = 0.1,
-        eval_metric    = "logloss",
-        random_state   = 42,
-        tree_method    = "hist",
-    ))
-    clf.fit(X_train, y_train)
-    return clf
+class MajorityClass:
+    """Predicts the most frequent dev label for every article -- the floor any model has to beat."""
+
+    def fit(self, X, y):
+        self.label_ = int(pd.Series(y).mode()[0])
+        return self
+
+    def predict(self, X):
+        return np.full(len(X), self.label_)
 
 
-def optimize(X_train, y_train, X_val, y_val, n_trials=N_TRIALS):
-    # Optimize XGBoost hyperparameters against the val split.
-    # Objective: mean per-label accuracy on val, matching the metric printed above.
+def optimize(X_dev, y_dev, n_trials=N_TRIALS):
+    """Optuna over the XGBoost hyperparameters, objective = CV macro-F1 on the dev split."""
     def objective(trial: optuna.Trial) -> float:
         params = {
             "n_estimators":     trial.suggest_int("n_estimators", 50, 400),
-            "max_depth":        trial.suggest_int("max_depth", 3, 10),
+            "max_depth":        trial.suggest_int("max_depth", 2, 8),
             "learning_rate":    trial.suggest_float("learning_rate", 0.01, 0.3, log=True),
             "subsample":        trial.suggest_float("subsample", 0.6, 1.0),
-            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.3, 1.0),
             "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
             "reg_alpha":        trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
             "reg_lambda":       trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True),
         }
+        return cv_score(params, X_dev, y_dev)
 
-        model = MultiOutputClassifier(XGBClassifier(
-            **params,
-            eval_metric="logloss",
-            random_state=42,
-            tree_method="hist",
-        ))
-        model.fit(X_train, y_train)
-        y_val_pred = model.predict(X_val)
-        return (y_val == y_val_pred).mean()
-
-    study = optuna.create_study(direction="maximize", study_name="xgboost_commodity_multilabel")
+    study = optuna.create_study(direction="maximize", study_name="xgboost_stance",
+                                sampler=optuna.samplers.TPESampler(seed=RANDOM_STATE))
+    study.enqueue_trial(BASELINE_PARAMS)   # the baseline configuration is always a candidate
     study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
 
-    logger.info(f"\nBest val mean per-label accuracy: {study.best_value:.4f}")
+    logger.info(f"\nBest CV macro-F1 on dev: {study.best_value:.4f}")
     logger.info("Best params:")
     for k, v in study.best_params.items():
         logger.info(f"  {k}: {v}")
-
     return study
 
 
@@ -232,35 +236,38 @@ def main():
     log_file = _setup_logging(timestamp)
     logger.info(f"Logging to: {log_file}")
 
-    X_train, X_val, X_test, y_train, y_val, y_test = load_and_split(JSON_PATH)
-    n_obs = X_train.shape[0] + X_val.shape[0] + X_test.shape[0]
+    df, json_path = load_articles(JSON_PATH)
+    n_obs = len(df)
+    logger.info(f"Dataset JSON: {json_path}")
+    logger.info(f"Articles: {n_obs}  |  labels: "
+                + ", ".join(f"{c} {int((df['label'] == i).sum())}" for i, c in enumerate(CLASSES)))
+
+    X_dev, X_test, y_dev, y_test = train_test_split(
+        df["text"], df["label"].to_numpy(), test_size=TEST_FRAC,
+        random_state=RANDOM_STATE, stratify=df["label"])
+    logger.info(f"Dev: {len(X_dev)} ({CV_FOLDS}-fold CV for tuning)  Test: {len(X_test)}")
+
+    results = []
+
+    logger.info("\n=== Majority class (reference) ===")
+    results.append(evaluate(MajorityClass().fit(X_dev, y_dev), X_test, y_test,
+                            "majority", timestamp, n_obs))
 
     logger.info("\n=== Baseline XGBoost (fixed hyperparameters) ===")
-    baseline_clf = train_baseline(X_train, y_train)
-    baseline_val_results  = evaluate(baseline_clf, X_val, y_val, "VAL", stage="baseline")
-    baseline_test_results = evaluate(baseline_clf, X_test, y_test, "TEST", stage="baseline")
+    baseline_cv = cv_score(BASELINE_PARAMS, X_dev, y_dev)
+    logger.info(f"CV macro-F1 on dev: {baseline_cv:.4f}")
+    baseline = make_pipeline(**BASELINE_PARAMS).fit(X_dev, y_dev)
+    results.append(evaluate(baseline, X_test, y_test, "baseline", timestamp, n_obs, baseline_cv))
 
     logger.info("\n=== Optuna hyperparameter optimization ===")
-    study = optimize(X_train, y_train, X_val, y_val)
+    study = optimize(X_dev, y_dev)
 
-    logger.info("\n=== Best XGBoost (best Optuna params) ===")
-    best_clf = MultiOutputClassifier(XGBClassifier(
-        **study.best_params,
-        eval_metric  = "logloss",
-        random_state = 42,
-        tree_method  = "hist",
-    ))
-    best_clf.fit(X_train, y_train)
-    best_val_results  = evaluate(best_clf, X_val, y_val, "VAL", stage="best",
-                                  timestamp=timestamp, n_obs=n_obs)
-    best_test_results = evaluate(best_clf, X_test, y_test, "TEST", stage="best",
-                                  timestamp=timestamp, n_obs=n_obs)
+    logger.info("\n=== Best XGBoost (best Optuna params, refit on all dev articles) ===")
+    best = make_pipeline(**study.best_params).fit(X_dev, y_dev)
+    results.append(evaluate(best, X_test, y_test, "best", timestamp, n_obs, study.best_value))
 
     results_file = LOGS_DIR / f"train_test_baseline_xgboost_{timestamp}_n{n_obs}_results.csv"
-    pd.DataFrame([
-        baseline_val_results, baseline_test_results,
-        best_val_results, best_test_results,
-    ]).to_csv(results_file, index=False)
+    pd.DataFrame(results).assign(dataset=json_path.name).to_csv(results_file, index=False)
     logger.info(f"\nResults saved to: {results_file}")
 
 
