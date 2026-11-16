@@ -9,7 +9,7 @@
 #SBATCH -e /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.err
 #SBATCH --constraint=inet
 
-# Fusion on the LOGITS of roberta-large (testing/predict_low_data_regimes_logit.py) instead of its embedding. For every test file and
+# Fusion on the LOGITS of roberta-large (testing/old/predict_low_data_regimes_logit.py) instead of its embedding. For every test file and
 # every regime p = 10, 20, ..., 100 % roberta-large is fine-tuned ALONE on the train split (80 % of the regime; Optuna over lr x batch size x
 # epochs, class weights, warmup, best epoch, retries; the column "roberta" of predict_low_data_regimes.py). A logistic regression
 # fitted on the validation split (20 %) then fuses roberta-large's 3 log-probabilities with the LLM label (one-hot):
@@ -62,4 +62,4 @@ print("downloading roberta-large ->", snapshot_download("roberta-large"))
 PY
 
 srun $PYTHON \
-     $BASE/testing/predict_low_data_regimes_logit.py "$@"
+     $BASE/testing/old/predict_low_data_regimes_logit.py "$@"

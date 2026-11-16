@@ -10,7 +10,7 @@
 #SBATCH --constraint=inet
 
 # Do roberta-large and the LLM complement each other, or do they get the same sentences wrong?
-# (testing/roberta_llm_label_compare.py) For every test file and every training-data regime p = 10, 20, ..., 100 % roberta-large is
+# (testing/old/roberta_llm_label_compare.py) For every test file and every training-data regime p = 10, 20, ..., 100 % roberta-large is
 # fine-tuned ALONE on the regime (80/20 train/validation split, Optuna over lr x batch size x epochs, class weights, warmup, best
 # epoch, retries; the same as the column "roberta" of predict_low_data_regimes.py) and labels the full test set. Its labels are stored
 # next to the LLM's labels of the same sentences and compared: per sentence both_correct / only_roberta / only_llm / both_wrong_same /
@@ -63,4 +63,4 @@ print("downloading roberta-large ->", snapshot_download("roberta-large"))
 PY
 
 srun $PYTHON \
-     $BASE/testing/roberta_llm_label_compare.py "$@"
+     $BASE/testing/old/roberta_llm_label_compare.py "$@"

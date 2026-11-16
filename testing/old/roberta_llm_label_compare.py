@@ -34,9 +34,9 @@ skipped; only the final fine-tuning of an interrupted run is repeated). Output: 
     summary_by_class_roberta_llm_compare_<date_time>_<job id>.csv  outcome counts per run and true class
     failures_roberta_llm_compare_<date_time>_<job id>.csv, trials/...
 
-    python testing/roberta_llm_label_compare.py --dry-run
-    python testing/roberta_llm_label_compare.py --datasets pc-split-test --percents 10 100 --trials 0 --epochs 2   # smoke test
-    python testing/roberta_llm_label_compare.py                                                                  # everything
+    python testing/old/roberta_llm_label_compare.py --dry-run
+    python testing/old/roberta_llm_label_compare.py --datasets pc-split-test --percents 10 100 --trials 0 --epochs 2   # smoke test
+    python testing/old/roberta_llm_label_compare.py                                                                  # everything
 """
 
 from __future__ import annotations
@@ -54,7 +54,8 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-TESTING_DIR = Path(__file__).resolve().parent
+TESTING_DIR = Path(__file__).resolve().parent.parent  # testing/ (this file lives in testing/old; old/ has a stale
+                                                     # copy of predict_low_data_regimes.py, the current one is in testing/)
 sys.path.insert(0, str(TESTING_DIR))
 
 import predict_low_data_regimes as plr  # noqa: E402  (its data, cache and checkpoint helpers; it also puts testing/old on sys.path)
