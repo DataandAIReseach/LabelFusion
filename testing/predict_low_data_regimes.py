@@ -78,7 +78,20 @@ caches, and every result file carries the start time of the run in its name. The
     failures_low_data_regimes_<date_time>_<job id>.csv                  runs that raised an error (the sweep goes on)
     trials/...                                                 Optuna trials
 
+JSON mode (--json <articles json>): instead of the Excel / CSV files the texts come from an articles JSON of
+dataset_scripts/data_gen/article_creation.ipynb, read by dataset_scripts/json_dataset.py into the same table (sentence, label,
+one-hot, date). For every seed in --json-seeds the JSON is split 80/20 (stratified, --json-test-size) into a training and a
+test part, and the training part into the nested regimes (same algorithm as make_low_data_regimes.py); the runs are named
+<json name>-test-<seed>_<p>. The LLM labels come from caches of their own,
+    predict_all_train_<model>_zero_shot_<json name>/               the zero-shot labels of all texts of the JSON
+    predict_all_test_<model>_<k>_shot_<json name>-test-<seed>_<p>/  the labels of the test part for regime p
+which --make-llm-labels creates (OpenRouter, --llm-model-id; this calls the paid API, only for texts that are not cached yet).
+The time series default to the synthetic inflation / unemployment series of data_gen.ipynb (--ts-file, --ts-series,
+--ts-date-column). The per-run CSV/JSON also carries the columns filler and label_flipped of the JSON.
+
     python testing/predict_low_data_regimes.py --dry-run                                  # which runs, nothing is trained
+    python testing/predict_low_data_regimes.py --json dataset_scripts/data/articles/jsons/<file>.json --dry-run
+    python testing/predict_low_data_regimes.py --json dataset_scripts/data/articles/jsons/<file>.json --make-llm-labels --percents 10 50 100
     python testing/predict_low_data_regimes.py --datasets pc-split-test --percents 10 80  # a first look: two regimes
     python testing/predict_low_data_regimes.py                                            # everything
     python testing/predict_low_data_regimes.py --no-ts --mlp-trials 10 --full-percents 100   # without the time series, fewer trials
@@ -92,6 +105,7 @@ import atexit
 import collections
 import contextlib
 import copy
+import dataclasses
 import gc
 import io
 import hashlib
@@ -109,6 +123,7 @@ from pathlib import Path
 
 TESTING_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTING_DIR / "old"))  # the helper modules (predict_all_labelFusion.py, ...) live in testing/old
+sys.path.insert(0, str(TESTING_DIR.parent / "dataset_scripts"))  # json_dataset.py (JSON mode)
 
 # Everything this script writes lives in RESULT_DIR. Every run gets its own work folder (.work/<job id>) there for the
 # saved roberta-large models and the library's prediction caches (the library names them after the train texts, so two
@@ -132,6 +147,7 @@ from sklearn.metrics import f1_score  # noqa: E402
 from sklearn.model_selection import train_test_split  # noqa: E402
 
 from test_textclassify_llm import _add_onehot_labels  # noqa: E402
+import json_dataset  # noqa: E402  (dataset_scripts/json_dataset.py: the articles JSON as a table)
 from textclassify import RoBERTaLargeClassifier  # noqa: E402
 from textclassify.core.types import ModelConfig, ModelType  # noqa: E402
 from textclassify.timeseries import CrossTSTransformer, TS, TSEmbedder  # noqa: E402
@@ -145,6 +161,12 @@ LLM_MODEL = "gpt-5-nano"  # the model name in the cache folder names (set from -
 SHOTS_PER_10_PERCENT = 2
 TS_FILE = REPO_ROOT / "data" / "3 Ts" / "daily_series.csv"
 TS_SERIES = ["DGS10", "T10Y2Y", "VIXCLS"]
+TS_DATE_COLUMN = "DATE"  # the date column of TS_FILE (set from --ts-file / --ts-series / --ts-date-column)
+# JSON mode: the synthetic series the articles were generated from (data_gen.ipynb)
+JSON_TS_FILE = REPO_ROOT / "dataset_scripts" / "data" / "stock_prices" / "full_series" / "full_baseline_inflation_unemployment_trial_seed7.csv"
+JSON_TS_SERIES = ["inflation_price", "unemployment_price"]
+JSON_TS_DATE_COLUMN = "date"
+JSON_NAME = ""  # JSON mode: the name of the JSON in its runs and LLM cache folders (empty in file mode)
 DATE_COLUMN = "date"
 FULL_HISTORY = 10**6  # window_days that reaches back to the beginning of every series
 WHO = ("llm", "roberta", "fusion", "fusion_ts", "fusion_joint", "fusion_joint_ts")
@@ -157,12 +179,14 @@ REGIME_RE = re.compile(r"_(?P<percent>\d+)$")
 class DailySeries(TS):
     """textclassify's TS loader on one CSV with a DATE column and one column per series."""
 
-    def __init__(self, csv_path: Path, series_names: list[str]):
+    def __init__(self, csv_path: Path, series_names: list[str], date_col: str = "DATE"):
         super().__init__(data_dir=csv_path.parent, stock_symbols=list(series_names), date_column="DATE", price_column="value")
         self.csv_path = csv_path
+        self.date_col = date_col  # the file's date column; the loaded frames always call it DATE
 
     def load_all(self) -> None:
-        raw = pd.read_csv(self.csv_path, parse_dates=["DATE"]).sort_values("DATE")
+        raw = (pd.read_csv(self.csv_path, parse_dates=[self.date_col])
+               .rename(columns={self.date_col: "DATE"}).sort_values("DATE"))
         for name in self.stock_symbols:
             series = raw[["DATE", name]].rename(columns={name: "value"})
             series["value"] = series["value"].ffill()  # holidays: the last known value
@@ -200,7 +224,7 @@ class TSBranch:
                        Optuna trial and the final MLP start from the pretrained TimesFM weights."""
 
     def __init__(self, args):
-        self.loader = DailySeries(TS_FILE, TS_SERIES)
+        self.loader = DailySeries(TS_FILE, TS_SERIES, TS_DATE_COLUMN)
         self.loader.load_all()
         self.pretrained = {name: TSEmbedder(pooling="mean") for name in TS_SERIES}
         for enc in self.pretrained.values():
@@ -355,7 +379,8 @@ def shots_for(percent: int) -> int:
 
 
 def train_cache_name() -> str:
-    return f"train_{LLM_MODEL}_zero_shot"
+    # JSON mode: one zero-shot cache per JSON (its texts are not in the shared cache of the FOMC training files)
+    return f"train_{LLM_MODEL}_zero_shot" + (f"_{JSON_NAME}" if JSON_NAME else "")
 
 
 def regime_cache_name(test_stem: str, percent: int) -> str:
@@ -398,8 +423,49 @@ def train_labels() -> dict[str, str]:
     return _TRAIN_LABELS
 
 
-def jobs(args) -> list[tuple[Path, Path, Path, int]]:
-    """(test file, train regime file, the regime's LLM cache folder, percent) for every run that can be made."""
+@dataclasses.dataclass
+class Job:
+    """One run: a regime of a training set and the full test set it is scored on. The tables come either from the
+    Excel / CSV files (file mode) or from an articles JSON (JSON mode); everything after prepare() is the same."""
+    test_stem: str                         # <dataset>-<seed>, e.g. lab-manual-mm-test-5768 or <json name>-test-5768
+    percent: int
+    regime: callable                       # () -> regime table (sentence, label, one-hot, date, ...)
+    test: callable                         # () -> full test table
+    fingerprint: str                       # changes when the regime's data change (checkpoint validity)
+    source: str                            # where the regime comes from (for --dry-run)
+    test_path: Path | None = None          # file mode only: the test file and the regime CSV
+    train_path: Path | None = None
+
+    @property
+    def name(self) -> str:
+        return f"{self.test_stem}_{self.percent}"
+
+    @property
+    def llm_cache(self) -> Path | None:
+        return find_cache(regime_cache_name(self.test_stem, self.percent))
+
+    # The scripts built on this one (testing/old/predict_low_data_regimes_logit.py, ..._llm_mlp.py,
+    # roberta_llm_label_compare.py) use the jobs of file mode as (test file, regime file, LLM cache, percent) tuples.
+    def _legacy(self) -> tuple:
+        return (self.test_path, self.train_path, self.llm_cache, self.percent)
+
+    def __iter__(self):
+        return iter(self._legacy())
+
+    def __getitem__(self, i):
+        return self._legacy()[i]
+
+
+def file_job(test_path: Path, train_path: Path, percent: int) -> Job:
+    """The Job of one test file and one regime CSV (file mode)."""
+    return Job(test_stem=test_path.stem, percent=percent,
+               regime=lambda: load_regime(train_path), test=lambda: load_test(test_path),
+               fingerprint=hashlib.md5(train_path.read_bytes()).hexdigest(), source=train_path.name,
+               test_path=test_path, train_path=train_path)
+
+
+def jobs(args) -> list[Job]:
+    """A Job for every run that can be made from the files (test file, regime CSV, the regime's LLM cache)."""
     found = []
     for test_path in sorted(base.TEST_DIR.glob("lab-manual-*-test-*.xlsx")):
         m = base.SEED_RE.match(test_path.stem)
@@ -417,8 +483,61 @@ def jobs(args) -> list[tuple[Path, Path, Path, int]]:
             if missing:
                 print(f"skip {test_path.stem}_{percent}: missing {', '.join(map(str, missing))}")
                 continue
-            found.append((test_path, train_path, llm_path, percent))
-    return sorted(found, key=lambda j: (j[0].stem, j[3]))
+            found.append(file_job(test_path, train_path, percent))
+    return sorted(found, key=lambda j: (j.test_stem, j.percent))
+
+
+JSON_KEEP = json_dataset.MODEL_COLUMNS + ["obs_id", "filler", "label_flipped"]  # the models' table + columns for split and results
+
+
+def json_jobs(args) -> tuple[list[Job], pd.DataFrame]:
+    """JSON mode: a Job for every seed in --json-seeds and every regime, from the articles JSON (no files are written).
+    Per seed: stratified train / test split, then the nested regimes of the training part. Also returns the whole table
+    (its texts are what the zero-shot LLM cache must cover)."""
+    df = json_dataset.read_articles_json(args.json, drop_meta_text=args.json_drop_meta_text)[JSON_KEEP]
+    percents = sorted(args.percents) if args.percents else list(range(10, 101, 10))
+    found = []
+    for seed in args.json_seeds:
+        train_df, test_df = json_dataset.split_train_test(df, test_size=args.json_test_size, seed=seed)
+        test_df = test_df[JSON_KEEP]
+        for percent, regime_df in json_dataset.low_data_regimes(train_df, percents=percents, seed=seed).items():
+            regime_df = regime_df[JSON_KEEP]
+            found.append(Job(test_stem=f"{JSON_NAME}-test-{seed}", percent=percent,
+                             regime=lambda r=regime_df: r.copy(), test=lambda t=test_df: t.copy(),
+                             fingerprint=hashlib.md5(regime_df.to_csv(index=False).encode()).hexdigest(),
+                             source=f"{Path(args.json).name}, seed {seed}, {len(regime_df)} of {len(train_df)} training texts"))
+    return found, df
+
+
+def make_llm_labels(todo: list[Job], all_texts: pd.DataFrame, args) -> None:
+    """JSON mode, --make-llm-labels: create the missing LLM labels via OpenRouter, as predict_all_files_llm.py and
+    predict_all_files_llm_low_data_regimes.py do for the FOMC files -- zero-shot for all texts of the JSON, few-shot
+    (2 examples per 10 %, drawn from the regime) for the test part of every regime. Texts already in a cache are not
+    sent again (the classifier's own prediction cache)."""
+    import predict_all_files_llm as llm_files  # OpenRouter classifier with the cache layout read by this script
+
+    known = read_cache(find_cache(train_cache_name())) if find_cache(train_cache_name()) else {}
+    zero = all_texts[~all_texts[base.TEXT_COLUMN].isin(known)][json_dataset.MODEL_COLUMNS]
+    few = []
+    for job in todo:
+        cached = read_cache(job.llm_cache) if job.llm_cache else {}
+        n_missing = int((~job.test()[base.TEXT_COLUMN].isin(cached)).sum())
+        if n_missing:
+            few.append((job, n_missing))
+    calls = len(zero) + sum(n for _, n in few)
+    print(f"--make-llm-labels: {len(zero)} zero-shot texts + {sum(n for _, n in few)} few-shot test texts "
+          f"({len(few)} regimes) = {calls} calls to {args.llm_model_id}")
+    if len(zero):
+        llm_files.build(args.llm_model_id, train_cache_name(), 0).predict(train_df=None, test_df=zero)
+    for job, _ in few:
+        regime = job.regime()
+        k = min(shots_for(job.percent), len(regime))
+        shots = regime.sample(n=k, random_state=base.RANDOM_STATE)[json_dataset.MODEL_COLUMNS].reset_index(drop=True)
+        print(f"[{job.name}] {k} examples from the regime ({len(regime)} texts)")
+        clf = llm_files.build(args.llm_model_id, regime_cache_name(job.test_stem, job.percent), k)
+        clf.fit(shots)
+        clf.predict(train_df=shots, test_df=job.test()[json_dataset.MODEL_COLUMNS])
+    _TRAIN_LABELS.clear()  # re-read the zero-shot cache
 
 
 # ---- one run ----------------------------------------------------------------------------------------------------------
@@ -431,11 +550,18 @@ class ConstantLLM(base.PrecomputedLLM):
         super().__init__(collections.defaultdict(lambda: base.LABEL_COLUMNS[-1]))
 
 
-def prepare(test_path: Path, train_path: Path, llm_path: Path, percent: int):
-    """The regime, the full test set, the LLM labels, the start of the output frame and the summary row."""
-    name = f"{test_path.stem}_{percent}"
-    regime_df = load_regime(train_path)
-    test_df = load_test(test_path)
+def prepare(job: Job | Path, train_path: Path | None = None, llm_path: Path | None = None, percent: int | None = None):
+    """The regime, the full test set, the LLM labels, the start of the output frame and the summary row.
+    Takes a Job, or (as the scripts built on this one call it) test file, regime file, LLM cache and percent."""
+    if not isinstance(job, Job):
+        job = file_job(job, train_path, percent)
+    name, percent = job.name, job.percent
+    regime_df = job.regime()
+    test_df = job.test()
+    llm_path = job.llm_cache
+    if llm_path is None:
+        raise FileNotFoundError(f"no LLM cache predict_all_{regime_cache_name(job.test_stem, percent)} in {LLM_CACHE_DIR}"
+                                + (" (create it with --make-llm-labels)" if JSON_NAME else ""))
     train_labels_ = train_labels()
     missing = [t for t in regime_df[base.TEXT_COLUMN] if t not in train_labels_]
     if missing:
@@ -450,7 +576,10 @@ def prepare(test_path: Path, train_path: Path, llm_path: Path, percent: int):
         base.TEXT_COLUMN: test_df[base.TEXT_COLUMN], "label": test_df["label"], "true": test_df["label"].map(base.LABEL_MAP),
         "llm_pred": llm_test_preds,
     })
-    m = base.SEED_RE.match(test_path.stem)
+    for col in ("filler", "label_flipped"):  # JSON mode: which test texts were content-free / have a wrong label
+        if col in test_df:
+            out[col] = test_df[col].values
+    m = base.SEED_RE.match(job.test_stem)
     row = {"dataset": m["dataset"], "seed": m["seed"], "file": name, "percent": percent,
            "regime_rows": len(regime_df), "test_rows": len(test_df),
            "llm_examples": shots_for(percent)}  # the examples of the regime's LLM labels
@@ -466,10 +595,10 @@ def finish(row: dict, out: pd.DataFrame, t0: float) -> tuple[dict, pd.DataFrame]
     return row, out
 
 
-def run_job(test_path: Path, train_path: Path, llm_path: Path, percent: int, args, roberta, branches) -> tuple[dict, pd.DataFrame]:
+def run_job(job: Job, args, roberta, branches) -> tuple[dict, pd.DataFrame]:
     """FROZEN regime: only MLPs are trained, on the whole regime."""
     t0 = time.time()
-    name, regime_df, test_df, llm_train, llm_test_preds, out, row = prepare(test_path, train_path, llm_path, percent)
+    name, regime_df, test_df, llm_train, llm_test_preds, out, row = prepare(job)
     print(f"\n=== {name} (frozen encoders): regime {len(regime_df)} / test {len(test_df)} ===")
     row["training"] = "frozen"
     constant = ConstantLLM()
@@ -494,10 +623,10 @@ def run_job(test_path: Path, train_path: Path, llm_path: Path, percent: int, arg
     return finish(row, out, t0)
 
 
-def run_job_full(test_path: Path, train_path: Path, llm_path: Path, percent: int, args, branches) -> tuple[dict, pd.DataFrame]:
+def run_job_full(job: Job, args, branches) -> tuple[dict, pd.DataFrame]:
     """FULL regime: the program of predict_all_labelFusion.py (+ the time series model) on the regime."""
     t0 = time.time()
-    name, regime_df, test_df, llm_train, llm_test_preds, out, row = prepare(test_path, train_path, llm_path, percent)
+    name, regime_df, test_df, llm_train, llm_test_preds, out, row = prepare(job)
     train_df, val_df = split_regime(regime_df)
     print(f"\n=== {name} (full program): train {len(train_df)} / val {len(val_df)} / test {len(test_df)} ===")
     row.update({"training": "finetuned", "train_rows": len(train_df), "val_rows": len(val_df)})
@@ -651,8 +780,24 @@ def tune_joint(name: str, train_df, val_df, test_df, llm_train, llm_test_preds, 
 
 
 def main() -> None:
-    global LLM_CACHE_DIR, LLM_MODEL
+    global LLM_CACHE_DIR, LLM_MODEL, TS_FILE, TS_SERIES, TS_DATE_COLUMN, JSON_NAME
     parser = argparse.ArgumentParser()
+    parser.add_argument("--json", type=Path,
+                        help="JSON mode: an articles JSON of article_creation.ipynb instead of the Excel / CSV files (see the docstring)")
+    parser.add_argument("--json-name", help="JSON mode: name of the dataset in the run names and LLM cache folders (default: the JSON's file name)")
+    parser.add_argument("--json-seeds", nargs="*", type=int, default=[5768],
+                        help="JSON mode: one train / test split (and set of regimes) per seed (default: 5768)")
+    parser.add_argument("--json-test-size", type=float, default=0.2, help="JSON mode: share of the texts in the test part")
+    parser.add_argument("--json-drop-meta-text", action="store_true",
+                        help="JSON mode: drop the few texts in which the generator left notes about its own answer")
+    parser.add_argument("--make-llm-labels", action="store_true",
+                        help="JSON mode: create the missing LLM labels via OpenRouter before the runs (calls the paid API, "
+                             "only for texts that are not cached yet)")
+    parser.add_argument("--llm-model-id", help="JSON mode, --make-llm-labels: OpenRouter id of the LLM (default: openai/<--llm-model>)")
+    parser.add_argument("--ts-file", type=Path, help="time series CSV (default: data/3 Ts/daily_series.csv; JSON mode: the synthetic "
+                                                     "inflation / unemployment series of data_gen.ipynb)")
+    parser.add_argument("--ts-series", nargs="*", help="the series columns of --ts-file used by the time series branch")
+    parser.add_argument("--ts-date-column", help="the date column of --ts-file")
     parser.add_argument("--datasets", nargs="*", help="only test files (name without seed) containing one of these")
     parser.add_argument("--percents", nargs="*", type=int, help="only these regimes (default: all found)")
     parser.add_argument("--llm-cache-dir", type=Path, default=LLM_CACHE_DIR,
@@ -702,35 +847,60 @@ def main() -> None:
     parser.add_argument("--ts-pooling", choices=("mean", "max"), default="mean", help="pooling of the three series embeddings")
     args = parser.parse_args()
     # absolute before main() changes into the work folder
-    for key in ("llm_cache_dir", "roberta_params_from"):
+    for key in ("llm_cache_dir", "roberta_params_from", "json", "ts_file"):
         if getattr(args, key) is not None:
             setattr(args, key, getattr(args, key).resolve())
 
     LLM_CACHE_DIR, LLM_MODEL = args.llm_cache_dir, args.llm_model
-    if find_cache(train_cache_name()) is None:
-        raise SystemExit(f"no zero-shot cache predict_all_{train_cache_name()} with a cache_*.pkl in {LLM_CACHE_DIR}")
-    try:
-        print(f"zero-shot LLM labels of the training sentences: {len(train_labels())} (from {find_cache(train_cache_name())})")
-    except RuntimeError as e:  # an empty / truncated pickle would otherwise fail every single run in the same way
-        raise SystemExit(f"ERROR: {e}")
-
-    todo = jobs(args)
+    if args.json:  # JSON mode: texts from the articles JSON, the synthetic series as time series
+        JSON_NAME = args.json_name or args.json.stem
+        TS_FILE = args.ts_file or JSON_TS_FILE
+        TS_SERIES = args.ts_series or JSON_TS_SERIES
+        TS_DATE_COLUMN = args.ts_date_column or JSON_TS_DATE_COLUMN
+        args.llm_model_id = args.llm_model_id or f"openai/{LLM_MODEL}"
+        todo, all_texts = json_jobs(args)
+        print(f"JSON mode: {args.json.name} as '{JSON_NAME}', {len(all_texts)} texts, seeds {args.json_seeds}, "
+              f"time series {', '.join(TS_SERIES)} from {TS_FILE.name}")
+    else:
+        if args.make_llm_labels:
+            raise SystemExit("--make-llm-labels only works in JSON mode (--json); in file mode the caches come from "
+                             "predict_all_files_llm.py / predict_all_files_llm_low_data_regimes.py")
+        TS_FILE = args.ts_file or TS_FILE
+        TS_SERIES = args.ts_series or TS_SERIES
+        TS_DATE_COLUMN = args.ts_date_column or TS_DATE_COLUMN
+        todo = jobs(args)
     if not todo:
         raise SystemExit("no runs found (are the regimes of dataset_scripts/make_low_data_regimes.py and the LLM "
                          "LLM caches of predict_all_files_llm_low_data_regimes.py there?)")
     if args.full_percents is None:  # default: the full program at every regime
-        args.full_percents = sorted({j[3] for j in todo})
+        args.full_percents = sorted({j.percent for j in todo})
     if args.resume:
-        done = {re.sub(r"_low_data_regimes_\d{8}_\d{6}(_\w+)?$", "", p.stem) for p in RESULT_DIR.glob("lab-manual-*_low_data_regimes_*.csv")}
-        todo = [j for j in todo if f"{j[0].stem}_{j[3]}" not in done]
-    print(f"{len(todo)} runs ({', '.join(sorted({str(j[3]) + '%' for j in todo}, key=lambda s: int(s[:-1])))}) "
-          f"on {len({j[0] for j in todo})} test files; models: roberta, fusion{'' if args.no_ts else ', fusion_ts'} "
+        done = {re.sub(r"_low_data_regimes_\d{8}_\d{6}(_\w+)?$", "", p.stem) for p in RESULT_DIR.glob("*_low_data_regimes_*.csv")
+                if not p.name.startswith(("summary", "failures"))}
+        todo = [j for j in todo if j.name not in done]
+
+    if args.json and args.make_llm_labels and not args.dry_run and todo:
+        make_llm_labels(todo, all_texts, args)
+    if find_cache(train_cache_name()) is None:
+        msg = f"no zero-shot cache predict_all_{train_cache_name()} with a cache_*.pkl in {LLM_CACHE_DIR}"
+        if not args.dry_run:
+            raise SystemExit(msg + (" -- create it with --make-llm-labels" if args.json else ""))
+        print(f"WARNING: {msg}")
+    else:
+        try:
+            print(f"zero-shot LLM labels of the training sentences: {len(train_labels())} (from {find_cache(train_cache_name())})")
+        except RuntimeError as e:  # an empty / truncated pickle would otherwise fail every single run in the same way
+            raise SystemExit(f"ERROR: {e}")
+
+    print(f"{len(todo)} runs ({', '.join(sorted({str(j.percent) + '%' for j in todo}, key=lambda s: int(s[:-1])))}) "
+          f"on {len({j.test_stem for j in todo})} test files; models: roberta, fusion{'' if args.no_ts else ', fusion_ts'} "
           f"(full program at {', '.join(str(p) + '%' for p in args.full_percents) or 'no regime'}, frozen encoders + "
           f"MLP tuned with {args.mlp_trials} Optuna trials at the others)")
     if args.dry_run:
-        for test_path, train_path, llm_path, percent in todo[:10]:
-            print(f"  {test_path.stem}_{percent} ({'full program' if percent in args.full_percents else 'frozen'}): "
-                  f"train {train_path.name}, LLM cache {llm_path.parent.name}/{llm_path.name}")
+        for job in todo[:10]:
+            cache = job.llm_cache
+            print(f"  {job.name} ({'full program' if job.percent in args.full_percents else 'frozen'}): "
+                  f"train {job.source}, LLM cache {cache.name if cache else 'MISSING predict_all_' + regime_cache_name(job.test_stem, job.percent)}")
         print("  ..." if len(todo) > 10 else "")
         return
     if not todo:
@@ -796,19 +966,19 @@ def main() -> None:
 
     install_checkpoint_wrappers()
     rows, failures = [], []
-    for test_path, train_path, llm_path, percent in todo:
+    for job in todo:
         shutil.rmtree(WORK_DIR / "cache", ignore_errors=True)
-        name = f"{test_path.stem}_{percent}"
-        CKPT.start(name, {"regime": hashlib.md5(train_path.read_bytes()).hexdigest(), "test": test_path.name, "percent": percent,
+        name, percent = job.name, job.percent
+        CKPT.start(name, {"regime": job.fingerprint, "test": job.test_stem, "percent": percent,
                           "full": percent in args.full_percents, "epochs": args.epochs, "ml_proj_dim": args.ml_proj_dim,
                           "llm_model": LLM_MODEL, "ts": [args.ts_window, args.ts_pooling, args.ts_dim], "no_ts": args.no_ts, "joint": [args.joint, args.joint_max_epochs, args.joint_init], "two_stage": args.two_stage, "v": 1})
         try:
             if percent in args.full_percents:
-                row, out = run_job_full(test_path, train_path, llm_path, percent, args, branches)
+                row, out = run_job_full(job, args, branches)
             else:
                 if "roberta" not in frozen:
                     frozen["roberta"] = build_frozen_roberta(args.roberta_model)
-                row, out = run_job(test_path, train_path, llm_path, percent, args, frozen["roberta"], branches)
+                row, out = run_job(job, args, frozen["roberta"], branches)
         except Exception as e:  # one failing run must not stop the sweep
             traceback.print_exc()
             CKPT.finish(delete=False)  # keep what was computed: the next start of this run continues from it

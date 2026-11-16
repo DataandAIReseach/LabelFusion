@@ -8,7 +8,7 @@
 #SBATCH -o /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.out
 #SBATCH -e /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.err
 
-# Check of the MLP training (testing/predict_low_data_regimes_llm_mlp.py): the LLM's label + a downstream fusion MLP, and NOTHING else is
+# Check of the MLP training (testing/old/predict_low_data_regimes_llm_mlp.py): the LLM's label + a downstream fusion MLP, and NOTHING else is
 # trained (no roberta-large, no TimesFM, no fine-tuning). For every test file and regime p = 10, 20, ..., 70 % of its training file:
 #   llm           the LLM labels of the regime on the full test set (reference, not trained)
 #   llm_lookup    LLM label -> most frequent true class of the regime (the best a function of the LLM label alone can do, no training procedure)
@@ -56,5 +56,5 @@ export PYTHONUNBUFFERED=1
 srun nvidia-smi -L
 
 srun $PYTHON \
-     $BASE/testing/predict_low_data_regimes_llm_mlp.py \
+     $BASE/testing/old/predict_low_data_regimes_llm_mlp.py \
      ${PERCENT_ARGS[@]+"${PERCENT_ARGS[@]}"} "$@"
