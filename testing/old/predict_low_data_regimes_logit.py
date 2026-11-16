@@ -33,9 +33,9 @@ of older jobs without an entry count as done. Output: ./outputs/predict_low_data
     summary_logit_<date_time>_<job id>.csv                   per dataset and regime: mean / std (ddof=1) over the seeds
     failures_logit_<date_time>_<job id>.csv, trials/...
 
-    python testing/predict_low_data_regimes_logit.py --dry-run
-    python testing/predict_low_data_regimes_logit.py --datasets pc-split-test --percents 10 70 --trials 0 --epochs 2   # smoke test
-    python testing/predict_low_data_regimes_logit.py                                                                  # everything
+    python testing/old/predict_low_data_regimes_logit.py --dry-run
+    python testing/old/predict_low_data_regimes_logit.py --datasets pc-split-test --percents 10 70 --trials 0 --epochs 2   # smoke test
+    python testing/old/predict_low_data_regimes_logit.py                                                                  # everything
 """
 
 from __future__ import annotations
@@ -55,7 +55,8 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-TESTING_DIR = Path(__file__).resolve().parent
+TESTING_DIR = Path(__file__).resolve().parent.parent  # testing/ (this file lives in testing/old; old/ has a stale
+                                                     # copy of predict_low_data_regimes.py, the current one is in testing/)
 sys.path.insert(0, str(TESTING_DIR))
 
 import predict_low_data_regimes as plr  # noqa: E402  (its data, cache and checkpoint helpers; it also puts testing/old on sys.path)
