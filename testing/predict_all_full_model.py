@@ -1,4 +1,4 @@
-"""LLM predictions + roberta-large embeddings fused by an MLP, on the full synthetic dataset (5-fold cross-validation).
+"""LLM predictions + roberta-large embeddings fused by an MLP, on fixed-test training regimes.
 
 For every text of an articles JSON (dataset_scripts/article_creation.ipynb, read by dataset_scripts/json_dataset.py):
 
@@ -7,31 +7,31 @@ For every text of an articles JSON (dataset_scripts/article_creation.ipynb, read
               missing ones). The same zero-shot setting for training and test texts, so the fusion is trained on the
               kind of LLM label it later sees.
 
-and per fold of a stratified 5-fold cross-validation (the folds of the logistic-regression benchmark:
-StratifiedKFold(5, shuffle=True, random_state=42) over the texts in obs_id order) the columns
+The data is split once into a stratified training set and a held-out test set. Each model is then trained
+on 10, 20, ..., 100 percent of the training set and evaluated on the same full test set.
 
   llm          the LLM label itself (no training)
   logreg       TF-IDF + logistic regression (standard settings), the text-only reference
+  xgboost      TF-IDF + XGBoost with the fixed baseline configuration
   roberta_mlp  MLP on the roberta-large embedding alone (the LLM input is zeroed)
   fusion_mlp   MLP on the roberta-large embedding + the LLM label as one-hot: LabelFusion
 
 The two MLPs have the same architecture (as textclassify's FusionWrapper): the 1024-dim embedding is projected to
 --proj-dim (default 32) by Linear + ReLU, concatenated with the 3-dim LLM one-hot, one hidden layer (--hidden) and the
-3-class output. Trained with AdamW and cross-entropy on 90 % of the training folds, early stopping on the other 10 %
-(--patience); the test fold is never used for any choice.
+3-class output. Trained with AdamW and cross-entropy on 90 % of each regime, early stopping on the other 10 %
+(--patience); the fixed test set is never used for any choice.
 
-Scores: accuracy, macro-F1, weighted-F1 per fold and mean +- std, also split by text type (clean content texts,
+Scores: accuracy, macro-F1, and weighted-F1 per training regime, also split by text type (clean content texts,
 content-free fillers with a random label, content texts with a deliberately flipped label).
 
 Writes to ./outputs/predict_all_full_model/ (repo root):
-    <name>_predictions.csv    one row per text: fold, true label, the prediction of every model, filler, label_flipped
-    <name>_folds.csv          one row per fold and model: the metrics
-    <name>_summary.csv        per model: mean and std over the folds, overall and per text type
+    <name>_regime_predictions.csv  one row per test text, model, and training percentage
+    <name>_regime_scores.csv       one row per training percentage, model, and text type
     embeddings/<model>_<hash>.npy   the cached embeddings (keyed by model and texts)
 
     python testing/predict_all_full_model.py                        # missing LLM labels via OpenRouter (key from .env), then the rest
     python testing/predict_all_full_model.py --no-make-llm-labels   # never call the API: stop if LLM labels are missing
-    python testing/predict_all_full_model.py --json data/<articles>.json --limit 300 --roberta-model roberta-base   # smoke test
+    python testing/predict_all_full_model.py --json data/<articles>.json --roberta-model roberta-base --limit 300   # smoke test
 """
 
 from __future__ import annotations
@@ -56,8 +56,9 @@ import torch.nn as nn  # noqa: E402
 from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: E402
 from sklearn.linear_model import LogisticRegression  # noqa: E402
 from sklearn.metrics import accuracy_score, f1_score  # noqa: E402
-from sklearn.model_selection import StratifiedKFold, train_test_split  # noqa: E402
+from sklearn.model_selection import train_test_split  # noqa: E402
 from sklearn.pipeline import Pipeline  # noqa: E402
+from xgboost import XGBClassifier  # noqa: E402
 
 import json_dataset  # noqa: E402
 from dotenv import load_dotenv  # noqa: E402
@@ -69,7 +70,12 @@ TEXT = json_dataset.TEXT_COLUMN
 OUT_DIR = REPO_ROOT / "outputs" / "predict_all_full_model"
 LLM_CACHE_DIR = REPO_ROOT / "outputs" / "llm_cache"
 DATA_DIR = REPO_ROOT / "data"                            # default: the newest articles JSON here
-MODELS = ("llm", "logreg", "roberta_mlp", "fusion_mlp")
+MODELS = ("llm", "logreg", "xgboost", "roberta_mlp", "fusion_mlp")
+XGBOOST_PARAMS = {
+    "n_estimators": 200,
+    "max_depth": 6,
+    "learning_rate": 0.1,
+}
 
 
 # ---- LLM labels -------------------------------------------------------------------------------------------------------
@@ -154,7 +160,7 @@ def onehot(labels: np.ndarray) -> np.ndarray:
 
 
 def train_predict_mlp(emb_tr, llm_tr, y_tr, emb_te, llm_te, args, seed: int) -> np.ndarray:
-    """Train on 90 % of the training folds with early stopping on the other 10 %, predict the test fold."""
+    """Train on 90 % of a regime with early stopping on the other 10 %, then predict the test set."""
     torch.manual_seed(seed)
     idx_fit, idx_val = train_test_split(np.arange(len(y_tr)), test_size=0.1, random_state=seed, stratify=y_tr)
     mean, std = emb_tr[idx_fit].mean(0), emb_tr[idx_fit].std(0) + 1e-6   # standardised on the fitting part only
@@ -189,6 +195,19 @@ def train_predict_mlp(emb_tr, llm_tr, y_tr, emb_te, llm_te, args, seed: int) -> 
         return model(E(emb_te), t(llm_te)).argmax(1).numpy()
 
 
+def stratified_regime_indices(train_idx: np.ndarray, y: np.ndarray, percent: int,
+                              seed: int) -> np.ndarray:
+    """Return a reproducible stratified subset of the fixed training set."""
+    rng = np.random.default_rng(seed)
+    selected = []
+    for label in np.unique(y[train_idx]):
+        label_idx = train_idx[y[train_idx] == label].copy()
+        rng.shuffle(label_idx)
+        count = max(1, round(len(label_idx) * percent / 100))
+        selected.append(label_idx[:count])
+    return np.concatenate(selected)
+
+
 # ---- evaluation -------------------------------------------------------------------------------------------------------
 
 def scores(y, p) -> dict:
@@ -207,8 +226,11 @@ def main() -> None:
     parser.add_argument("--llm-model-id", help="OpenRouter id for --make-llm-labels (default: openai/<--llm-model>)")
     parser.add_argument("--roberta-model", default="roberta-large", help="the frozen encoder (roberta-base for a quick test)")
     parser.add_argument("--max-length", type=int, default=128, help="tokens per text for the encoder")
-    parser.add_argument("--folds", type=int, default=5)
-    parser.add_argument("--seed", type=int, default=42, help="seed of the folds (42 = the folds of the logistic-regression benchmark)")
+    parser.add_argument("--test-size", type=float, default=0.2,
+                        help="fraction held out once as the full test set (default: 0.2)")
+    parser.add_argument("--train-percents", type=int, nargs="+", default=list(range(10, 101, 10)),
+                        help="training-set percentages to evaluate (default: 10 20 ... 100)")
+    parser.add_argument("--seed", type=int, default=42, help="seed for the fixed stratified split and regimes")
     parser.add_argument("--limit", type=int, help="only the first N texts (smoke test)")
     parser.add_argument("--drop-meta-text", action="store_true", help="drop texts in which the generator left notes")
     parser.add_argument("--proj-dim", type=int, default=32, help="size the 1024-dim embedding is projected to")
@@ -234,45 +256,68 @@ def main() -> None:
     llm = llm_labels(df, args)
     emb = embeddings(df, args)
     llm_1h, zeros = onehot(llm), np.zeros((len(df), len(LABELS)), dtype=np.float32)
+    all_idx = np.arange(len(df))
+    train_idx, test_idx = train_test_split(
+        all_idx, test_size=args.test_size, random_state=args.seed, stratify=y)
+    groups = {
+        "all": np.ones(len(test_idx), bool),
+        "clean": ~(df["filler"].iloc[test_idx] | df["label_flipped"].iloc[test_idx]).to_numpy(),
+        "filler": df["filler"].iloc[test_idx].to_numpy(),
+        "flipped": df["label_flipped"].iloc[test_idx].to_numpy(),
+    }
 
-    preds = {m: np.full(len(df), -1) for m in MODELS}
-    fold_of = np.full(len(df), -1)
-    folds = StratifiedKFold(args.folds, shuffle=True, random_state=args.seed)
-    for k, (tr, te) in enumerate(folds.split(df[TEXT], y)):
+    prediction_rows, score_rows = [], []
+    for percent in args.train_percents:
+        if not 1 <= percent <= 100:
+            raise SystemExit(f"--train-percents must be between 1 and 100: {percent}")
+        tr = stratified_regime_indices(train_idx, y, percent, args.seed)
         t0 = time.time()
-        fold_of[te] = k
-        preds["llm"][te] = llm[te]
-        logreg = Pipeline([("tfidf", TfidfVectorizer()), ("lr", LogisticRegression(max_iter=1000))]).fit(df[TEXT].iloc[tr], y[tr])
-        preds["logreg"][te] = logreg.predict(df[TEXT].iloc[te])
-        preds["roberta_mlp"][te] = train_predict_mlp(emb[tr], zeros[tr], y[tr], emb[te], zeros[te], args, seed=k)
-        preds["fusion_mlp"][te] = train_predict_mlp(emb[tr], llm_1h[tr], y[tr], emb[te], llm_1h[te], args, seed=k)
-        print(f"fold {k + 1}/{args.folds} ({time.time() - t0:.0f}s): " + "  ".join(
-            f"{m} {f1_score(y[te], preds[m][te], average='macro'):.3f}" for m in MODELS))
+        preds = {"llm": llm[test_idx]}
+        logreg = Pipeline([("tfidf", TfidfVectorizer()), ("lr", LogisticRegression(max_iter=1000))]).fit(
+            df[TEXT].iloc[tr], y[tr])
+        preds["logreg"] = logreg.predict(df[TEXT].iloc[test_idx])
+        xgboost = Pipeline([
+            ("tfidf", TfidfVectorizer(ngram_range=(1, 2), min_df=1, sublinear_tf=True)),
+            ("xgb", XGBClassifier(objective="multi:softprob", num_class=len(LABELS),
+                                  eval_metric="mlogloss", random_state=args.seed,
+                                  tree_method="hist", **XGBOOST_PARAMS)),
+        ]).fit(df[TEXT].iloc[tr], y[tr])
+        preds["xgboost"] = xgboost.predict(df[TEXT].iloc[test_idx])
+        preds["roberta_mlp"] = train_predict_mlp(
+            emb[tr], zeros[tr], y[tr], emb[test_idx], zeros[test_idx], args, seed=args.seed + percent)
+        preds["fusion_mlp"] = train_predict_mlp(
+            emb[tr], llm_1h[tr], y[tr], emb[test_idx], llm_1h[test_idx], args, seed=args.seed + percent)
+        for model in MODELS:
+            for group, mask in groups.items():
+                if mask.any():
+                    score_rows.append({
+                        "train_percent": percent, "train_texts": len(tr),
+                        "model": model, "texts": group,
+                        **scores(y[test_idx][mask], preds[model][mask]),
+                    })
+            for row_idx, original_idx in enumerate(test_idx):
+                prediction_rows.append({
+                    "train_percent": percent, "model": model,
+                    TEXT: df[TEXT].iloc[original_idx], "obs_id": df["obs_id"].iloc[original_idx],
+                    "label": y[original_idx], "true": json_dataset.LABEL_MAP[y[original_idx]],
+                    "prediction": json_dataset.LABEL_MAP[preds[model][row_idx]],
+                    "filler": df["filler"].iloc[original_idx],
+                    "label_flipped": df["label_flipped"].iloc[original_idx],
+                })
+        print(f"train {percent:3d}% ({len(tr)} texts, {time.time() - t0:.0f}s): " +
+              "  ".join(f"{m} {scores(y[test_idx], preds[m])['f1_macro']:.3f}" for m in MODELS))
 
-    # ---- outputs ----
-    out = df[[TEXT, "obs_id", "label", "filler", "label_flipped"]].assign(fold=fold_of, true=df["label"].map(json_dataset.LABEL_MAP))
-    for m in MODELS:
-        out[f"{m}_pred"] = pd.Series(preds[m]).map(json_dataset.LABEL_MAP)
-    out.to_csv(OUT_DIR / f"{args.name}_predictions.csv", index=False)
-
-    groups = {"all": np.ones(len(df), bool), "clean": ~(df["filler"] | df["label_flipped"]).to_numpy(),
-              "filler": df["filler"].to_numpy(), "flipped": df["label_flipped"].to_numpy()}
-    fold_rows = [{"fold": k, "model": m, "texts": g, **scores(y[(fold_of == k) & mask], preds[m][(fold_of == k) & mask])}
-                 for k in range(args.folds) for m in MODELS for g, mask in groups.items() if ((fold_of == k) & mask).any()]
-    folds_df = pd.DataFrame(fold_rows)
-    folds_df.to_csv(OUT_DIR / f"{args.name}_folds.csv", index=False)
-    summary = folds_df.groupby(["texts", "model"])[["accuracy", "f1_macro", "f1_weighted"]].agg(["mean", "std"])
-    summary.columns = [f"{a}_{b}" for a, b in summary.columns]
-    summary = summary.reset_index()
-    summary.to_csv(OUT_DIR / f"{args.name}_summary.csv", index=False)
-
-    print(f"\n=== {args.folds}-fold CV, macro-F1 mean +- std (accuracy) ===")
-    for g in groups:
-        rows = summary[summary["texts"] == g].set_index("model")
-        if len(rows):
-            print(f"{g:8s} " + "  ".join(f"{m} {rows.loc[m, 'f1_macro_mean']:.3f}+-{rows.loc[m, 'f1_macro_std']:.3f} "
-                                          f"({rows.loc[m, 'accuracy_mean']:.3f})" for m in MODELS if m in rows.index))
-    print(f"\nSaved in {OUT_DIR}: {args.name}_predictions.csv, {args.name}_folds.csv, {args.name}_summary.csv")
+    predictions = pd.DataFrame(prediction_rows)
+    scores_df = pd.DataFrame(score_rows)
+    predictions.to_csv(OUT_DIR / f"{args.name}_regime_predictions.csv", index=False)
+    scores_df.to_csv(OUT_DIR / f"{args.name}_regime_scores.csv", index=False)
+    print(f"\n=== Fixed test set ({len(test_idx)} texts), training regimes ===")
+    for percent in args.train_percents:
+        rows = scores_df[(scores_df["train_percent"] == percent) & (scores_df["texts"] == "all")].set_index("model")
+        print(f"{percent:3d}% " + "  ".join(
+            f"{m} {rows.loc[m, 'f1_macro']:.3f} ({rows.loc[m, 'accuracy']:.3f})"
+            for m in MODELS if m in rows.index))
+    print(f"\nSaved in {OUT_DIR}: {args.name}_regime_predictions.csv, {args.name}_regime_scores.csv")
 
 
 if __name__ == "__main__":
