@@ -9,18 +9,20 @@
 #SBATCH -e /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/logs/%x-%j.err
 #SBATCH --constraint=inet
 
-# Full synthetic dataset (testing/predict_all_full_model.py): 5-fold cross-validation over the articles JSON in data/ with
+# Full synthetic dataset (testing/predict_all_full_model.py): fixed stratified test set and
+# 10, 20, ..., 100 percent training regimes over the articles JSON in data/ with
 #   llm          the zero-shot GPT-5 nano label (read from the LLM cache)
 #   logreg       TF-IDF + logistic regression
+#   xgboost      TF-IDF + XGBoost with the fixed baseline configuration
 #   roberta_mlp  MLP on the frozen roberta-large [CLS] embedding alone
 #   fusion_mlp   MLP on the embedding + the LLM label (LabelFusion)
-# Output: outputs/predict_all_full_model/ (<name>_predictions.csv, _folds.csv, _summary.csv; embeddings/ = cached embeddings)
+# Output: outputs/predict_all_full_model/ (<name>_regime_predictions.csv, _regime_scores.csv; embeddings/ = cached embeddings)
 #
 # No LLM is called by default (--no-make-llm-labels): the labels are read from
 #   outputs/llm_cache/predict_all_train_gpt-5-nano_zero_shot_<JSON name>/
 # The LLM caches are not in git (.gitignore: /outputs/): copy that folder to the cluster first. --make-llm-labels creates
 # missing labels via OpenRouter instead (paid; needs OPENROUTER_API_KEY in $BASE/.env).
-# The embeddings of the 5000 texts take a few minutes on an A100, the 5 folds of MLPs and logistic regression a few more;
+# The embeddings of the 5000 texts take a few minutes on an A100, the ten regimes of MLPs and text models a few more;
 # a second run with the same texts reuses the cached embeddings.
 #
 #   sbatch scripts/run_predict_all_full_model.sh                                             # the newest articles JSON in data/

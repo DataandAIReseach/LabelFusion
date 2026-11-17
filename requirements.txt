@@ -168,6 +168,10 @@ virtualenv==20.32.0
 wcwidth==0.2.13
 websockets==16.0
 world-bank-data==0.1.4
+<<<<<<< HEAD
+=======
+xgboost>=2.0.0
+>>>>>>> 2d953d8e0d5fbb99640cc7f426df380e267d58f8
 xlrd==2.0.2
 xxhash==3.6.0
 yarl==1.20.1

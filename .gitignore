@@ -55,4 +55,11 @@ textclassify.egg-info/
 /notes/
 
 /env_LabelFusion/outputs/
+<<<<<<< HEAD
 /outputs/
+=======
+env_labelFusion/
+/outputs/
+outputs/
+*SFConflict*
+>>>>>>> 2d953d8e0d5fbb99640cc7f426df380e267d58f8

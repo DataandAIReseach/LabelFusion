@@ -52,6 +52,10 @@ import argparse
 import gc
 import json
 import math
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> 2d953d8e0d5fbb99640cc7f426df380e267d58f8
 import re
 import sys
 import time
@@ -60,6 +64,17 @@ from pathlib import Path
 TESTING_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(TESTING_DIR))
 
+<<<<<<< HEAD
+=======
+# Use the project-local Hugging Face cache and never touch the network (compute nodes have no
+# internet). Must be set before transformers / huggingface_hub are imported. Values exported
+# in the sbatch script take precedence because of setdefault.
+PROJECT_DIR = TESTING_DIR.parent
+os.environ.setdefault("HF_HOME", str(PROJECT_DIR / "hf_cache"))
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
+>>>>>>> 2d953d8e0d5fbb99640cc7f426df380e267d58f8
 from predict_all_files_labelFusion import (  # noqa: E402
     LABEL_COLUMNS, LABEL_MAP, MODEL_CACHE, OUT_DIR, RANDOM_STATE, TEST_DIR, TEXT_COLUMN,
     delete_saved_model, load, paired_train, scores, split_pair,
@@ -282,4 +297,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     main()
+=======
+    main()
+>>>>>>> 2d953d8e0d5fbb99640cc7f426df380e267d58f8
