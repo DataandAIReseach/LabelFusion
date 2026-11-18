@@ -26,9 +26,11 @@ on 10, 20, ..., 100 percent of the training set and evaluated on the same full t
                  embedding. The TimesFM encoders stay FROZEN (their embeddings are cached); only the transformer and the
                  MLP are trained (not with --no-ts or --no-ts-cross)
 
-The MLPs have the same architecture (as textclassify's FusionWrapper): the 1024-dim embedding is projected to
---proj-dim (default 32) by Linear + ReLU, concatenated with the 3-dim LLM one-hot (and, for fusion_ts_mlp, the time series
-embedding projected to --proj-dim in the same way), one hidden layer (--hidden) and the 3-class output. Trained with AdamW and cross-entropy on 90 % of each regime, early stopping on the other 10 %
+The MLPs have the same architecture (as textclassify's FusionWrapper), TWO layers: the 1024-dim roberta [CLS] embedding
+(raw) is concatenated with the 3-dim LLM one-hot (and, for the time series models, the time series embedding projected to
+--ts-proj-dim (default 32) by Linear + ReLU) = 1027 values -> Linear(--hidden, default 8) + ReLU + Dropout -> Linear(3 classes).
+(--proj-dim N would first project the roberta embedding to N dims.) Trained with AdamW and cross-entropy on 90 % of each
+regime, early stopping on the other 10 %
 (--patience); the fixed test set is never used for any choice.
 
 Scores: accuracy, macro-F1, and weighted-F1 per training regime, also split by text type (clean content texts,
@@ -253,20 +255,25 @@ class CrossTSHead(nn.Module):
 
 
 class FusionMLP(nn.Module):
-    """embedding -> Linear(proj_dim) + ReLU, concatenated with the LLM one-hot (and, with ts_dim, the time series
-    embedding projected the same way) -> hidden layer -> 3 classes. With ts_head the time series input is the
+    """embedding (raw, or Linear(proj_dim) + ReLU), concatenated with the LLM one-hot (and, with ts_dim, the time series
+    embedding projected the same way) -> [hidden layer, only if hidden > 0] -> 3 classes. With ts_head the time series input is the
     (B, series, 1280) tensor of per-series embeddings, passed through the trainable CrossTSHead first."""
 
     def __init__(self, emb_dim: int, proj_dim: int, hidden: int, dropout: float, ts_dim: int = 0,
-                 ts_head: CrossTSHead | None = None):
+                 ts_head: CrossTSHead | None = None, ts_proj_dim: int = 32):
         super().__init__()
         self.ts_head = ts_head
         if ts_head is not None:
             ts_dim = ts_head.transformer.output_dim
-        self.proj = nn.Sequential(nn.Linear(emb_dim, proj_dim), nn.ReLU())
-        self.ts_proj = nn.Sequential(nn.Linear(ts_dim, proj_dim), nn.ReLU()) if ts_dim else None
-        self.head = nn.Sequential(nn.Linear(proj_dim * (2 if ts_dim else 1) + len(LABELS), hidden), nn.ReLU(),
-                                  nn.Dropout(dropout), nn.Linear(hidden, len(LABELS)))
+        # proj_dim 0: the roberta embedding goes in RAW (all emb_dim values), no projection
+        self.proj = nn.Sequential(nn.Linear(emb_dim, proj_dim), nn.ReLU()) if proj_dim else nn.Identity()
+        self.ts_proj = nn.Sequential(nn.Linear(ts_dim, ts_proj_dim), nn.ReLU()) if ts_dim else None
+        width = (proj_dim or emb_dim) + (ts_proj_dim if ts_dim else 0) + len(LABELS)
+        if hidden:                                          # projection -> hidden layer -> classes
+            self.head = nn.Sequential(nn.Linear(width, hidden), nn.ReLU(), nn.Dropout(dropout),
+                                      nn.Linear(hidden, len(LABELS)))
+        else:                                               # shallow: projection -> classes (no hidden layer)
+            self.head = nn.Sequential(nn.Dropout(dropout), nn.Linear(width, len(LABELS)))
 
     def forward(self, emb, llm_onehot, ts=None):
         if self.ts_head is not None:
@@ -277,7 +284,7 @@ class FusionMLP(nn.Module):
 
 def make_ts_head(args, in_dim: int) -> CrossTSHead:
     return CrossTSHead(args.ts_series, in_dim, args.cross_hidden, args.cross_layers, args.cross_heads,
-                       out_dim=args.proj_dim, dropout=args.dropout)
+                       out_dim=args.ts_proj_dim, dropout=args.dropout)
 
 
 def onehot(labels: np.ndarray) -> np.ndarray:
@@ -308,7 +315,8 @@ def train_predict_mlp(emb_tr, llm_tr, y_tr, emb_te, llm_te, args, seed: int, ts_
     if ts_tr is not None and ts_tr.ndim == 3:                             # (texts, series, 1280): the trainable transformer
         ts_head = make_ts_head(args, ts_tr.shape[2])
     model = FusionMLP(emb_tr.shape[1], args.proj_dim, args.hidden, args.dropout,
-                      ts_dim=ts_tr.shape[1] if ts_tr is not None and ts_head is None else 0, ts_head=ts_head)
+                      ts_dim=ts_tr.shape[1] if ts_tr is not None and ts_head is None else 0, ts_head=ts_head,
+                      ts_proj_dim=args.ts_proj_dim)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     loss_fn = nn.CrossEntropyLoss()
     best_f1, best_state, bad = -1.0, None, 0
@@ -361,7 +369,8 @@ class JointFusion(nn.Module):
     def __init__(self, encoder: nn.Module, args, ts_dim: int = 0):
         super().__init__()
         self.encoder = encoder
-        self.head = FusionMLP(encoder.config.hidden_size, args.proj_dim, args.hidden, args.dropout, ts_dim=ts_dim)
+        self.head = FusionMLP(encoder.config.hidden_size, args.proj_dim, args.hidden, args.dropout, ts_dim=ts_dim,
+                              ts_proj_dim=args.ts_proj_dim)
 
     def forward(self, input_ids, attention_mask, llm_onehot, ts=None):
         cls = self.encoder(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state[:, 0, :]
@@ -504,8 +513,13 @@ def main() -> None:
     parser.add_argument("--ft-patience", type=int, default=3,
                         help="epochs without a better validation macro-F1 before stopping, when roberta learns")
     parser.add_argument("--ft-warmup", type=float, default=0.1, help="fraction of the steps with linear learning-rate warm-up")
-    parser.add_argument("--proj-dim", type=int, default=32, help="size the embeddings are projected to")
-    parser.add_argument("--hidden", type=int, default=64)
+    parser.add_argument("--proj-dim", type=int, default=0,
+                        help="size the roberta embedding is projected to by Linear + ReLU BEFORE it meets the LLM one-hot; "
+                             "0 (default) = raw: the 1024 values and the one-hot enter the first layer together")
+    parser.add_argument("--ts-proj-dim", type=int, default=32, help="size the time series embedding is projected to")
+    parser.add_argument("--hidden", type=int, default=8,
+                        help="size of the first layer (Linear + ReLU) over the concatenated inputs: 1024 roberta + 3 LLM one-hot "
+                             "= 1027 values; the second layer maps it to the 3 classes. 0 = a single linear layer")
     parser.add_argument("--dropout", type=float, default=0.1)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-2)
