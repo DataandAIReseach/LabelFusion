@@ -237,6 +237,13 @@ class FusionEnsemble(BaseEnsemble):
         # the ML model, the TimesFM encoders and the CrossTSTransformer are all trained
         # end to end with the fusion loss -- see _train_fusion_mlp_on_val.
         self.joint_training = ensemble_config.parameters.get('joint_training', False)
+        # If True, the per-series TimesFM encoders of the timeseries branch (~200M parameters
+        # each) are FROZEN: no gradients, always in eval mode, not in the optimizer, and their
+        # embeddings are computed once per (series, date) and cached. Only the CrossTSTransformer
+        # (and the fusion MLP) are trained. Default False keeps the old behaviour (encoders are
+        # fine-tuned together with the transformer).
+        self.freeze_ts_embedders = ensemble_config.parameters.get('freeze_ts_embedders', False)
+        self._ts_embedding_cache = {}   # {series: {(date, window_days): (hidden_size,) tensor}}, frozen encoders only
         self.num_epochs = ensemble_config.parameters.get('num_epochs', 10)
         self.batch_size = ensemble_config.parameters.get('batch_size', 16)
         self.save_intermediate_llm_predictions = save_intermediate_llm_predictions
@@ -251,7 +258,7 @@ class FusionEnsemble(BaseEnsemble):
 
         # Timeseries branch components (optional, registered via add_ts_model)
         self.ts_loader = None
-        self.ts_embedders = None  # Dict[str, TSEmbedder], one per series, fine-tuned
+        self.ts_embedders = None  # Dict[str, TSEmbedder], one per series; fine-tuned unless freeze_ts_embedders
         self.ts_transformer = None
         self.ts_date_column = None
         self.ts_window_days = 21
@@ -342,6 +349,11 @@ class FusionEnsemble(BaseEnsemble):
         ts_embedders = {name: embedder.to(self.device) for name, embedder in ts_embedders.items()}
         ts_transformer = ts_transformer.to(self.device)
 
+        if self.freeze_ts_embedders:
+            for embedder in ts_embedders.values():
+                embedder.requires_grad_(False)
+                embedder.eval()
+
         self.ts_loader = ts_loader
         self.ts_embedders = ts_embedders
         self.ts_transformer = ts_transformer
@@ -368,17 +380,13 @@ class FusionEnsemble(BaseEnsemble):
         dates = df[self.ts_date_column].tolist()
 
         was_training = self.ts_transformer.training
-        for embedder in self.ts_embedders.values():
-            embedder.eval()
-        self.ts_transformer.eval()
+        self._set_ts_train_mode(False)
 
         with torch.no_grad():
             fused_output = self._run_ts_branch(dates)
 
         if was_training:
-            for embedder in self.ts_embedders.values():
-                embedder.train()
-            self.ts_transformer.train()
+            self._set_ts_train_mode(True)
 
         return fused_output.detach().cpu()
 
@@ -389,6 +397,34 @@ class FusionEnsemble(BaseEnsemble):
         CrossTSTransformer can be fine-tuned via backprop through the fusion loss.
         """
         return self._run_ts_branch(dates)
+
+    def _set_ts_train_mode(self, train: bool) -> None:
+        """Train/eval mode of the TS branch. Frozen TimesFM encoders always stay in eval mode."""
+        self.ts_transformer.train(train)
+        for embedder in self.ts_embedders.values():
+            embedder.train(train and not self.freeze_ts_embedders)
+
+    def _ts_trainable_params(self) -> list:
+        """Parameters of the TS branch the optimizer updates: the CrossTSTransformer always,
+        the TimesFM encoders only if they are not frozen."""
+        params = list(self.ts_transformer.parameters())
+        if not self.freeze_ts_embedders:
+            for embedder in self.ts_embedders.values():
+                params += list(embedder.parameters())
+        return params
+
+    def _frozen_series_embeddings(self, name: str, dates: List[str], windows: list) -> torch.Tensor:
+        """Embeddings of one series from a FROZEN encoder: no gradients, computed once per
+        (date, window) and cached. Returns (len(dates), hidden_size)."""
+        cache = self._ts_embedding_cache.setdefault(name, {})
+        keys = [(str(d)[:10], self.ts_window_days) for d in dates]
+        missing = [i for i, k in enumerate(keys) if k not in cache]
+        if missing:
+            with torch.no_grad():
+                out = self.ts_embedders[name]([windows[i] for i in missing])["embeddings"].detach()
+            for j, i in enumerate(missing):
+                cache[keys[i]] = out[j]
+        return torch.stack([cache[k] for k in keys]).to(self.device)
 
     def _run_ts_branch(self, dates: List[str]) -> torch.Tensor:
         """Shared orchestration: TS.get_series_batch -> per-series TSEmbedder -> CrossTSTransformer.
@@ -404,8 +440,11 @@ class FusionEnsemble(BaseEnsemble):
 
         embeddings_dict = {}
         for name in series_names:
-            out = self.ts_embedders[name](series_batch[name])
-            embeddings_dict[name] = out["embeddings"].to(self.device)
+            if self.freeze_ts_embedders:
+                embeddings_dict[name] = self._frozen_series_embeddings(name, dates, series_batch[name])
+            else:
+                out = self.ts_embedders[name](series_batch[name])
+                embeddings_dict[name] = out["embeddings"].to(self.device)
 
         fused = self.ts_transformer(embeddings_dict)
         return fused["output"]
@@ -2132,15 +2171,12 @@ class FusionEnsemble(BaseEnsemble):
         for param in self.fusion_wrapper.ml_model.model.parameters():
             param.requires_grad = self.joint_training
 
-        # Setup optimizer: fusion MLP always (at fusion_lr); TS embedders + CrossTSTransformer
-        # (at fusion_lr) if a TS branch is registered; the ML model (at the smaller ml_lr) if
+        # Setup optimizer: fusion MLP always (at fusion_lr); CrossTSTransformer + TS embedders (the
+        # latter unless freeze_ts_embedders) at fusion_lr if a TS branch is registered; the ML model (at the smaller ml_lr) if
         # joint_training -- so it fine-tunes jointly with the fusion loss instead of staying frozen.
         param_groups = [{"params": list(self.fusion_wrapper.fusion_mlp.parameters()), "lr": self.fusion_lr}]
         if has_ts:
-            ts_params = list(self.ts_transformer.parameters())
-            for embedder in self.ts_embedders.values():
-                ts_params += list(embedder.parameters())
-            param_groups.append({"params": ts_params, "lr": self.fusion_lr})
+            param_groups.append({"params": self._ts_trainable_params(), "lr": self.fusion_lr})
         if self.joint_training:
             param_groups.append({"params": list(self.fusion_wrapper.ml_model.model.parameters()), "lr": self.ml_lr})
         optimizer = torch.optim.AdamW(param_groups)
@@ -2154,9 +2190,7 @@ class FusionEnsemble(BaseEnsemble):
         # Training loop with validation monitoring
         self.fusion_wrapper.train()
         if has_ts:
-            self.ts_transformer.train()
-            for embedder in self.ts_embedders.values():
-                embedder.train()
+            self._set_ts_train_mode(True)
         if self.joint_training:
             self.fusion_wrapper.ml_model.model.train()
         best_val_loss = float('inf')
@@ -2200,9 +2234,7 @@ class FusionEnsemble(BaseEnsemble):
             # Validation phase
             self.fusion_wrapper.eval()
             if has_ts:
-                self.ts_transformer.eval()
-                for embedder in self.ts_embedders.values():
-                    embedder.eval()
+                self._set_ts_train_mode(False)
             if self.joint_training:
                 self.fusion_wrapper.ml_model.model.eval()
             total_val_loss = 0
@@ -2247,9 +2279,7 @@ class FusionEnsemble(BaseEnsemble):
 
             self.fusion_wrapper.train()  # Back to training mode
             if has_ts:
-                self.ts_transformer.train()
-                for embedder in self.ts_embedders.values():
-                    embedder.train()
+                self._set_ts_train_mode(True)
             if self.joint_training:
                 self.fusion_wrapper.ml_model.model.train()
 

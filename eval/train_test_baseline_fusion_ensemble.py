@@ -51,7 +51,7 @@ ROBERTA_MODEL = "roberta-base"
 
 TS_DATA_DIR = REPO_ROOT / "data" / "TSs"
 TS_SERIES_NAMES = LABEL_COLUMNS  # gold/silver/oil/gas match the label columns exactly
-TS_WINDOW_DAYS = 21  # matches the "prices_21d_*" convention already in the article CSV
+TS_WINDOW_DAYS = 60  # trading days of history per series (TimesFM: 60 values = 2 patches of 32)
 
 
 def load_split_data():
@@ -122,8 +122,9 @@ def build_llm_model() -> OpenAIClassifier:
 def build_ts_branch():
     """Build the TS -> per-commodity TSEmbedders -> CrossTSTransformer trio for add_ts_model().
 
-    Each commodity gets its own TSEmbedder instance (not a shared one), so they can be
-    fine-tuned independently during fusion training instead of staying frozen.
+    Each commodity gets its own TSEmbedder instance (not a shared one). With
+    "freeze_ts_embedders": True (see build_fusion_ensemble) they stay frozen and only the
+    CrossTSTransformer is trained.
     """
     ts_loader = TS(
         data_dir=str(TS_DATA_DIR),
@@ -153,6 +154,7 @@ def build_fusion_ensemble(ml_model, llm_model, ts_branch=None) -> FusionEnsemble
             "fusion_hidden_dims": [64, 32],
             "ml_lr": 1e-5,
             "fusion_lr": 1e-3,
+            "freeze_ts_embedders": True,   # TimesFM encoders (~200M each) frozen; only CrossTSTransformer + fusion MLP train
             "num_epochs": 10,
             "batch_size": 16,
             "classification_type": "multi_label",

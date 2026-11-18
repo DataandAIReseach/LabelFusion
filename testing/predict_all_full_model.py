@@ -6,7 +6,7 @@ For every text of an articles JSON (dataset_scripts/article_creation.ipynb, read
   LLM label   the zero-shot label of GPT-5 nano (one OpenRouter call per text, cached; missing ones are created unless
               --no-make-llm-labels). The same zero-shot setting for training and test texts, so the fusion is trained on the
               kind of LLM label it later sees.
-  time series the real macro series of data/TSs_macro (default CPIAUCSL + UNRATE): the last --ts-window observations up to the
+  time series the DAILY real series of data/TSs_macro (default DFF, DGS10, DGS2, NASDAQCOM): the last --ts-window observations up to the
               date of the text, one frozen TimesFM encoder embedding per series, mean-pooled over the series (computed once,
               cached on disk). Switch off with --no-ts.
 
@@ -19,6 +19,10 @@ on 10, 20, ..., 100 percent of the training set and evaluated on the same full t
   roberta_mlp  MLP on the roberta-large embedding alone (the LLM input is zeroed)
   fusion_mlp   MLP on the roberta-large embedding + the LLM label as one-hot: LabelFusion
   fusion_ts_mlp  the same plus the time series embedding (LabelFusion with the time series branch; not with --no-ts)
+  fusion_ts_cross_mlp  the same, but the series embeddings are not just averaged: a TRAINABLE CrossTSTransformer (attention
+                 over the series, see textclassify/timeseries/CrossTSTransformer.py) turns them into the time series
+                 embedding. The TimesFM encoders stay FROZEN (their embeddings are cached); only the transformer and the
+                 MLP are trained (not with --no-ts or --no-ts-cross)
 
 The MLPs have the same architecture (as textclassify's FusionWrapper): the 1024-dim embedding is projected to
 --proj-dim (default 32) by Linear + ReLU, concatenated with the 3-dim LLM one-hot (and, for fusion_ts_mlp, the time series
@@ -32,7 +36,8 @@ Writes to ./outputs/predict_all_full_model/ (repo root):
     <name>_regime_predictions.csv  one row per test text, model, and training percentage
     <name>_regime_scores.csv       one row per training percentage, model, and text type
     embeddings/<model>_<hash>.npy   the cached embeddings (keyed by model and texts)
-    embeddings/ts_<series>_w<window>_<hash>.npy   the cached time series embeddings (keyed by series, window and dates)
+    embeddings/tsx_<series>_w<window>_<hash>.npy   the cached per-series time series embeddings (texts x series x 1280;
+                                                   keyed by series, window and dates)
 
     python testing/predict_all_full_model.py                        # missing LLM labels via OpenRouter (key from .env), then the rest
     python testing/predict_all_full_model.py --no-make-llm-labels   # never call the API: stop if LLM labels are missing
@@ -75,10 +80,13 @@ OUT_DIR = REPO_ROOT / "outputs" / "predict_all_full_model"
 LLM_CACHE_DIR = REPO_ROOT / "outputs" / "llm_cache"
 DATA_DIR = REPO_ROOT / "data"                            # default: the newest articles JSON here
 TS_DIR = DATA_DIR / "TSs_macro"                          # <series>.csv with the columns Date,value
-TS_SERIES = ["CPIAUCSL", "UNRATE"]                       # inflation and unemployment: the two topics of the articles
+TS_SERIES = ["DFF", "DGS10", "DGS2", "NASDAQCOM"]        # the DAILY series (fed funds rate, 10-year and 2-year Treasury yield, Nasdaq);
+                                                         # the monthly ones are not used. DGS2 starts 1976-06 and NASDAQCOM 1971-02, see
+                                                         # series_windows(early=...) for the texts dated before that
 TS_MODEL = "google/timesfm-2.5-200m-transformers"
 MODELS = ("llm", "logreg", "xgboost", "roberta_mlp", "fusion_mlp")
 TS_MODEL_NAME = "fusion_ts_mlp"
+TS_CROSS_MODEL_NAME = "fusion_ts_cross_mlp"
 XGBOOST_PARAMS = {
     "n_estimators": 200,
     "max_depth": 6,
@@ -150,27 +158,40 @@ def embeddings(df: pd.DataFrame, args) -> np.ndarray:
 
 # ---- time series embeddings (data/TSs_macro) ---------------------------------------------------------------------------
 
-def series_windows(path: Path, dates: np.ndarray, window: int) -> list[np.ndarray]:
+def series_windows(path: Path, dates: np.ndarray, window: int, early: str = "first") -> tuple[list[np.ndarray], int, int]:
     """For every date the last `window` observations of the series up to and including that date (window 0 = all of them).
+    Returns (windows, n_short, n_early).
 
-    The series have different frequencies (CPIAUCSL / UNRATE monthly, stamped on the 1st of the month): the window counts
-    observations, not days, so 21 = the last 21 months here. A monthly value counts from the 1st of its month on."""
+    Where fewer than `window` observations exist yet (the first weeks of the series), the window is simply the maximum
+    available (shorter; TimesFM pads and masks it): n_short counts these texts.
+    Dates BEFORE the series' first observation have no data at all. early="first" gives them the first `window`
+    observations of the series -- the earliest data there is, i.e. data from AFTER the text's date (a look-ahead, only
+    sensible because the dates of the generated texts are synthetic); n_early counts these texts. early="error" stops instead.
+
+    The window counts observations, not calendar days: with the daily series (DFF every calendar day, DGS10 / DGS2 /
+    NASDAQCOM on business days) 60 = about two months (DFF) or twelve weeks. A monthly series would count months."""
     raw = pd.read_csv(path, parse_dates=["Date"]).sort_values("Date")
     raw["value"] = pd.to_numeric(raw["value"], errors="coerce").ffill()       # gaps (holidays): the last known value
     raw = raw.dropna(subset=["value"])
     stamps, values = raw["Date"].to_numpy().astype("datetime64[ns]"), raw["value"].to_numpy(np.float32)
     ends = np.searchsorted(stamps, dates.astype("datetime64[ns]"), side="right")   # observations <= date
-    if (ends == 0).any():
-        raise SystemExit(f"{path.name} starts at {pd.Timestamp(stamps[0]).date()}, after the first text "
-                         f"({pd.Timestamp(dates.min()).date()})")
-    return [values[max(0, e - window) if window else 0:e] for e in ends]
+    before_start = ends == 0
+    if before_start.any():
+        if early != "first":
+            raise SystemExit(f"{path.name} starts at {pd.Timestamp(stamps[0]).date()}, after {int(before_start.sum())} texts "
+                             f"(the first is {pd.Timestamp(dates.min()).date()}); use --ts-early first or other --ts-series")
+        ends = np.where(before_start, min(window, len(values)) if window else len(values), ends)
+    windows = [values[max(0, e - window) if window else 0:e] for e in ends]
+    n_short = int(sum(len(w) < window for w, early_text in zip(windows, before_start) if not early_text)) if window else 0
+    return windows, n_short, int(before_start.sum())
 
 
 def ts_embeddings(df: pd.DataFrame, args) -> np.ndarray:
-    """One frozen TimesFM embedding per series and text (identical windows are embedded once), mean-pooled over the series."""
+    """One frozen TimesFM embedding per series and text (identical windows are embedded once): (texts, series, 1280).
+    fusion_ts_mlp averages it over the series, fusion_ts_cross_mlp feeds it to the trainable CrossTSTransformer."""
     dates = pd.to_datetime(df[json_dataset.DATE_COLUMN]).to_numpy()
     key = hashlib.md5(("\x1f".join(df[json_dataset.DATE_COLUMN]) + f"|{args.ts_model}").encode()).hexdigest()[:12]
-    path = OUT_DIR / "embeddings" / f"ts_{'-'.join(args.ts_series)}_w{args.ts_window}_{key}.npy"
+    path = OUT_DIR / "embeddings" / f"tsx_{'-'.join(args.ts_series)}_w{args.ts_window}_{key}.npy"
     if path.exists():
         print(f"time series embeddings: {path.name} (cached)")
         return np.load(path)
@@ -181,7 +202,7 @@ def ts_embeddings(df: pd.DataFrame, args) -> np.ndarray:
     encoder = TSEmbedder(args.ts_model, pooling="mean").to(device).eval()
     per_series = []
     for name in args.ts_series:
-        windows = series_windows(args.ts_dir / f"{name}.csv", dates, args.ts_window)
+        windows, n_short, n_early = series_windows(args.ts_dir / f"{name}.csv", dates, args.ts_window, args.ts_early)
         unique: dict[bytes, int] = {}
         index = np.array([unique.setdefault(w.tobytes(), len(unique)) for w in windows])
         first = {i: k for k, i in reversed(list(enumerate(index)))}           # unique id -> first text with that window
@@ -191,8 +212,11 @@ def ts_embeddings(df: pd.DataFrame, args) -> np.ndarray:
             with torch.no_grad():
                 out.append(encoder(todo[start:start + 64])["embeddings"].float().cpu().numpy())
         per_series.append(np.concatenate(out)[index])
-        print(f"  {name}: {len(unique)} distinct windows for {len(windows)} texts")
-    emb = np.mean(per_series, axis=0).astype(np.float32)
+        print(f"  {name}: {len(unique)} distinct windows for {len(windows)} texts"
+              + (f"; {n_short} with a shorter window (the series had fewer observations yet)" if n_short else "")
+              + (f"; {n_early} dated before the series starts -> its first {args.ts_window or 'all'} observations (look-ahead)"
+                 if n_early else ""))
+    emb = np.stack(per_series, axis=1).astype(np.float32)             # (texts, series, hidden)
     path.parent.mkdir(parents=True, exist_ok=True)
     np.save(path, emb)
     print(f"time series embeddings: {emb.shape} in {time.time() - t0:.0f}s -> {path.name}")
@@ -201,20 +225,55 @@ def ts_embeddings(df: pd.DataFrame, args) -> np.ndarray:
 
 # ---- the fusion MLP ---------------------------------------------------------------------------------------------------
 
+class CrossTSHead(nn.Module):
+    """Trainable time series branch on the FROZEN, cached TimesFM embeddings.
+
+    (B, series, 1280) -> Linear(1280 -> hidden), shared by the series -> CrossTSTransformer (learnable series positions,
+    attention over the series, mean pool, projection) -> (B, out_dim).
+    The 1280 -> hidden projection keeps the transformer small (the default CrossTSTransformer at 1280 dimensions has
+    ~24M parameters, far too many for a few hundred texts)."""
+
+    def __init__(self, series_names: list[str], in_dim: int, hidden: int, layers: int, heads: int, out_dim: int,
+                 dropout: float):
+        super().__init__()
+        from textclassify.timeseries import CrossTSTransformer
+        self.series_names = list(series_names)
+        self.in_proj = nn.Sequential(nn.Linear(in_dim, hidden), nn.Dropout(dropout))
+        self.transformer = CrossTSTransformer(series_names=self.series_names, hidden_size=hidden, output_dim=out_dim,
+                                              num_heads=heads, num_layers=layers, dropout=dropout,
+                                              feedforward_dim=4 * hidden)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = self.in_proj(x)                                                   # (B, series, hidden)
+        return self.transformer({name: h[:, i] for i, name in enumerate(self.series_names)})["output"]
+
+
 class FusionMLP(nn.Module):
     """embedding -> Linear(proj_dim) + ReLU, concatenated with the LLM one-hot (and, with ts_dim, the time series
-    embedding projected the same way) -> hidden layer -> 3 classes."""
+    embedding projected the same way) -> hidden layer -> 3 classes. With ts_head the time series input is the
+    (B, series, 1280) tensor of per-series embeddings, passed through the trainable CrossTSHead first."""
 
-    def __init__(self, emb_dim: int, proj_dim: int, hidden: int, dropout: float, ts_dim: int = 0):
+    def __init__(self, emb_dim: int, proj_dim: int, hidden: int, dropout: float, ts_dim: int = 0,
+                 ts_head: CrossTSHead | None = None):
         super().__init__()
+        self.ts_head = ts_head
+        if ts_head is not None:
+            ts_dim = ts_head.transformer.output_dim
         self.proj = nn.Sequential(nn.Linear(emb_dim, proj_dim), nn.ReLU())
         self.ts_proj = nn.Sequential(nn.Linear(ts_dim, proj_dim), nn.ReLU()) if ts_dim else None
         self.head = nn.Sequential(nn.Linear(proj_dim * (2 if ts_dim else 1) + len(LABELS), hidden), nn.ReLU(),
                                   nn.Dropout(dropout), nn.Linear(hidden, len(LABELS)))
 
     def forward(self, emb, llm_onehot, ts=None):
+        if self.ts_head is not None:
+            ts = self.ts_head(ts)
         parts = [self.proj(emb), llm_onehot] + ([self.ts_proj(ts)] if self.ts_proj is not None else [])
         return self.head(torch.cat(parts, dim=1))
+
+
+def make_ts_head(args, in_dim: int) -> CrossTSHead:
+    return CrossTSHead(args.ts_series, in_dim, args.cross_hidden, args.cross_layers, args.cross_heads,
+                       out_dim=args.proj_dim, dropout=args.dropout)
 
 
 def onehot(labels: np.ndarray) -> np.ndarray:
@@ -241,8 +300,11 @@ def train_predict_mlp(emb_tr, llm_tr, y_tr, emb_te, llm_te, args, seed: int, ts_
     else:
         t_fit = t_val = t_te = None
 
+    ts_head = None
+    if ts_tr is not None and ts_tr.ndim == 3:                             # (texts, series, 1280): the trainable transformer
+        ts_head = make_ts_head(args, ts_tr.shape[2])
     model = FusionMLP(emb_tr.shape[1], args.proj_dim, args.hidden, args.dropout,
-                      ts_dim=ts_tr.shape[1] if ts_tr is not None else 0)
+                      ts_dim=ts_tr.shape[1] if ts_tr is not None and ts_head is None else 0, ts_head=ts_head)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     loss_fn = nn.CrossEntropyLoss()
     best_f1, best_state, bad = -1.0, None, 0
@@ -308,10 +370,19 @@ def main() -> None:
     parser.add_argument("--drop-meta-text", action="store_true", help="drop texts in which the generator left notes")
     parser.add_argument("--ts", action=argparse.BooleanOptionalAction, default=True,
                         help="add the time series model fusion_ts_mlp (--no-ts: without, nothing is loaded from TimesFM)")
+    parser.add_argument("--ts-cross", action=argparse.BooleanOptionalAction, default=True,
+                        help="also train fusion_ts_cross_mlp: a trainable CrossTSTransformer on the frozen TimesFM "
+                             "embeddings instead of their mean (needs --ts)")
+    parser.add_argument("--cross-hidden", type=int, default=64, help="model size of the CrossTSTransformer (the 1280-dim embeddings are projected to it)")
+    parser.add_argument("--cross-layers", type=int, default=1, help="encoder layers of the CrossTSTransformer")
+    parser.add_argument("--cross-heads", type=int, default=4, help="attention heads of the CrossTSTransformer (divides --cross-hidden)")
     parser.add_argument("--ts-dir", type=Path, default=TS_DIR, help="folder with <series>.csv (columns Date,value)")
     parser.add_argument("--ts-series", nargs="+", default=TS_SERIES, help="series names = file names in --ts-dir")
-    parser.add_argument("--ts-window", type=int, default=21,
-                        help="last N observations up to the text's date, per series (monthly series: months; 0 = whole history)")
+    parser.add_argument("--ts-window", type=int, default=60,
+                        help="last N observations up to the text's date, per series (daily series: days; 0 = whole history)")
+    parser.add_argument("--ts-early", choices=("first", "error"), default="first",
+                        help="texts dated before a series starts (DGS2 1976-06, NASDAQCOM 1971-02): 'first' = the series' first "
+                             "--ts-window observations (look-ahead), 'error' = stop")
     parser.add_argument("--ts-model", default=TS_MODEL, help="frozen TimesFM encoder for the series")
     parser.add_argument("--proj-dim", type=int, default=32, help="size the embeddings are projected to")
     parser.add_argument("--hidden", type=int, default=64)
@@ -322,6 +393,8 @@ def main() -> None:
     parser.add_argument("--max-epochs", type=int, default=200)
     parser.add_argument("--patience", type=int, default=15, help="epochs without a better validation macro-F1 before stopping")
     args = parser.parse_args()
+    if args.cross_hidden % args.cross_heads:
+        parser.error("--cross-hidden must be divisible by --cross-heads")
 
     json_path = args.json if args.json else json_dataset.latest_json(DATA_DIR)
     df = json_dataset.read_articles_json(json_path, drop_meta_text=args.drop_meta_text)
@@ -336,8 +409,15 @@ def main() -> None:
     llm = llm_labels(df, args)
     emb = embeddings(df, args)
     llm_1h, zeros = onehot(llm), np.zeros((len(df), len(LABELS)), dtype=np.float32)
-    ts = ts_embeddings(df, args) if args.ts else None
-    models = MODELS + ((TS_MODEL_NAME,) if args.ts else ())
+    ts_series = ts_embeddings(df, args) if args.ts else None                # (texts, series, 1280), frozen TimesFM
+    ts = ts_series.mean(axis=1) if args.ts else None                         # fusion_ts_mlp: averaged over the series
+    use_cross = args.ts and args.ts_cross
+    if use_cross:
+        head = make_ts_head(args, ts_series.shape[2])
+        n_cross = sum(p.numel() for p in head.parameters())
+        print(f"{TS_CROSS_MODEL_NAME}: CrossTSTransformer head with {n_cross:,} trainable parameters "
+              f"(series {', '.join(args.ts_series)}, {args.cross_layers} layer(s), {args.cross_hidden} dim); TimesFM frozen")
+    models = MODELS + ((TS_MODEL_NAME,) if args.ts else ()) + ((TS_CROSS_MODEL_NAME,) if use_cross else ())
     all_idx = np.arange(len(df))
     train_idx, test_idx = train_test_split(
         all_idx, test_size=args.test_size, random_state=args.seed, stratify=y)
@@ -373,6 +453,10 @@ def main() -> None:
             preds[TS_MODEL_NAME] = train_predict_mlp(
                 emb[tr], llm_1h[tr], y[tr], emb[test_idx], llm_1h[test_idx], args, seed=args.seed + percent,
                 ts_tr=ts[tr], ts_te=ts[test_idx])
+        if use_cross:
+            preds[TS_CROSS_MODEL_NAME] = train_predict_mlp(
+                emb[tr], llm_1h[tr], y[tr], emb[test_idx], llm_1h[test_idx], args, seed=args.seed + percent,
+                ts_tr=ts_series[tr], ts_te=ts_series[test_idx])
         for model in models:
             for group, mask in groups.items():
                 if mask.any():
