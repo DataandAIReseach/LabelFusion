@@ -2,7 +2,9 @@
 
 For every text of an articles JSON (dataset_scripts/article_creation.ipynb, read by dataset_scripts/json_dataset.py):
 
-  embedding   the [CLS] embedding of the pretrained, FROZEN roberta-large (computed once, cached on disk)
+  embedding   the [CLS] embedding of roberta-large. LEARNABLE by default: roberta-large is fine-tuned together with the MLP head
+              inside every model that uses it (--roberta-lr, --ft-*; each training starts from the pretrained weights).
+              --no-finetune-roberta: the pretrained, FROZEN encoder instead (embeddings computed once, cached on disk)
   LLM label   the zero-shot label of GPT-5 nano (one OpenRouter call per text, cached; missing ones are created unless
               --no-make-llm-labels). The same zero-shot setting for training and test texts, so the fusion is trained on the
               kind of LLM label it later sees.
@@ -32,7 +34,7 @@ embedding projected to --proj-dim in the same way), one hidden layer (--hidden) 
 Scores: accuracy, macro-F1, and weighted-F1 per training regime, also split by text type (clean content texts,
 content-free fillers with a random label, content texts with a deliberately flipped label).
 
-Writes to ./outputs/predict_all_full_model/ (repo root):
+Writes to ./outputs/predict_all_full_model/ (repo root; <name> gets the suffix _finetuned when roberta learns):
     <name>_regime_predictions.csv  one row per test text, model, and training percentage
     <name>_regime_scores.csv       one row per training percentage, model, and text type
     embeddings/<model>_<hash>.npy   the cached embeddings (keyed by model and texts)
@@ -47,6 +49,8 @@ Writes to ./outputs/predict_all_full_model/ (repo root):
 from __future__ import annotations
 
 import argparse
+import copy
+import gc
 import hashlib
 import pickle
 import sys
@@ -330,6 +334,113 @@ def train_predict_mlp(emb_tr, llm_tr, y_tr, emb_te, llm_te, args, seed: int, ts_
         return model(E(emb_te), t(llm_te), t_te).argmax(1).numpy()
 
 
+# ---- the fusion MLP with a LEARNABLE roberta-large --------------------------------------------------------------------
+
+_PRETRAINED: dict = {}
+
+
+def pretrained_encoder(name: str) -> nn.Module:
+    """A fresh copy of the pretrained encoder (read from disk once): every training starts from the pretrained weights."""
+    if name not in _PRETRAINED:
+        from transformers import AutoModel
+        _PRETRAINED[name] = AutoModel.from_pretrained(name, add_pooling_layer=False)
+    return copy.deepcopy(_PRETRAINED[name])
+
+
+def tokenize(df: pd.DataFrame, args) -> dict:
+    """input_ids / attention_mask of all texts (padded to --max-length; batches are trimmed to their longest text)."""
+    from transformers import AutoTokenizer
+    enc = AutoTokenizer.from_pretrained(args.roberta_model)(
+        list(df[TEXT]), truncation=True, padding="max_length", max_length=args.max_length, return_tensors="pt")
+    return {"input_ids": enc["input_ids"], "attention_mask": enc["attention_mask"]}
+
+
+class JointFusion(nn.Module):
+    """roberta (trained) -> [CLS] -> the same FusionMLP head as above: LLM one-hot (and time series embedding) are added there."""
+
+    def __init__(self, encoder: nn.Module, args, ts_dim: int = 0):
+        super().__init__()
+        self.encoder = encoder
+        self.head = FusionMLP(encoder.config.hidden_size, args.proj_dim, args.hidden, args.dropout, ts_dim=ts_dim)
+
+    def forward(self, input_ids, attention_mask, llm_onehot, ts=None):
+        cls = self.encoder(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state[:, 0, :]
+        return self.head(cls.float(), llm_onehot, ts)
+
+
+def train_predict_finetuned(enc: dict, tr: np.ndarray, te: np.ndarray, llm: np.ndarray, y: np.ndarray, args, seed: int,
+                            ts: np.ndarray | None = None) -> np.ndarray:
+    """roberta-large and the MLP head are trained TOGETHER on 90 % of the regime (tr = indices into the whole table),
+    early stopping on the other 10 % (macro-F1), then the test texts (te) are predicted.
+
+    The encoder starts from the pretrained weights and learns with --roberta-lr, the head with --lr; AdamW, linear warm-up
+    and decay, gradient clipping, bf16 on a GPU. The time series embedding (ts) stays frozen, only its projection learns.
+    llm is the LLM one-hot (all zeros = no LLM input)."""
+    torch.manual_seed(seed)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    pos_fit, pos_val = train_test_split(np.arange(len(tr)), test_size=0.1, random_state=seed, stratify=y[tr])
+    fit, val = tr[pos_fit], tr[pos_val]
+    llm_t, y_t = torch.tensor(llm, dtype=torch.float32), torch.tensor(y)
+    if ts is not None:                                                    # standardised on the fitting part only
+        ts_t = torch.tensor((ts - ts[fit].mean(0)) / (ts[fit].std(0) + 1e-6), dtype=torch.float32)
+
+    def batch(idx):
+        idx = torch.as_tensor(idx)
+        mask = enc["attention_mask"][idx]
+        n = int(mask.sum(1).max())                                        # trim the padding of the batch
+        return (enc["input_ids"][idx][:, :n].to(device), mask[:, :n].to(device), llm_t[idx].to(device),
+                ts_t[idx].to(device) if ts is not None else None, y_t[idx].to(device))
+
+    model = JointFusion(pretrained_encoder(args.roberta_model), args, ts_dim=ts.shape[1] if ts is not None else 0).to(device)
+    opt = torch.optim.AdamW([{"params": model.encoder.parameters(), "lr": args.roberta_lr},
+                             {"params": model.head.parameters(), "lr": args.lr}], weight_decay=args.weight_decay)
+    steps_per_epoch = -(-len(fit) // args.ft_batch_size)
+    total, warmup = steps_per_epoch * args.ft_max_epochs, max(1, int(args.ft_warmup * steps_per_epoch * args.ft_max_epochs))
+    sched = torch.optim.lr_scheduler.LambdaLR(
+        opt, lambda s: (s + 1) / warmup if s < warmup else max(0.0, (total - s) / max(1, total - warmup)))
+    loss_fn = nn.CrossEntropyLoss()
+    autocast = lambda: torch.autocast(device_type=device, dtype=torch.bfloat16, enabled=device == "cuda")  # noqa: E731
+
+    def predict(idx: np.ndarray) -> np.ndarray:
+        model.eval()
+        out = []
+        with torch.no_grad():
+            for s in range(0, len(idx), 64):
+                ids, mask, l, t_, _ = batch(idx[s:s + 64])
+                with autocast():
+                    out.append(model(ids, mask, l, t_).argmax(1).cpu())
+        return torch.cat(out).numpy()
+
+    best_f1, best_state, bad = -1.0, None, 0
+    g = torch.Generator().manual_seed(seed)
+    for _ in range(args.ft_max_epochs):
+        model.train()
+        for b in torch.randperm(len(fit), generator=g).split(args.ft_batch_size):
+            ids, mask, l, t_, yb = batch(fit[b.numpy()])
+            opt.zero_grad()
+            with autocast():
+                loss = loss_fn(model(ids, mask, l, t_).float(), yb)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            opt.step()
+            sched.step()
+        val_f1 = f1_score(y[val], predict(val), average="macro")
+        if val_f1 > best_f1:
+            best_f1, bad = val_f1, 0
+            best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
+        else:
+            bad += 1
+            if bad >= args.ft_patience:
+                break
+    model.load_state_dict(best_state)
+    pred = predict(te)
+    del model, opt, sched, best_state
+    gc.collect()
+    if device == "cuda":
+        torch.cuda.empty_cache()
+    return pred
+
+
 def stratified_regime_indices(train_idx: np.ndarray, y: np.ndarray, percent: int,
                               seed: int) -> np.ndarray:
     """Return a reproducible stratified subset of the fixed training set."""
@@ -384,6 +495,15 @@ def main() -> None:
                         help="texts dated before a series starts (DGS2 1976-06, NASDAQCOM 1971-02): 'first' = the series' first "
                              "--ts-window observations (look-ahead), 'error' = stop")
     parser.add_argument("--ts-model", default=TS_MODEL, help="frozen TimesFM encoder for the series")
+    parser.add_argument("--finetune-roberta", action=argparse.BooleanOptionalAction, default=True,
+                        help="roberta-large learns together with the MLP head in roberta_mlp / fusion_mlp / fusion_ts_mlp "
+                             "(each training starts from the pretrained weights). --no-finetune-roberta: frozen, cached embeddings")
+    parser.add_argument("--roberta-lr", type=float, default=1e-5, help="learning rate of roberta-large (--lr is the head's)")
+    parser.add_argument("--ft-batch-size", type=int, default=16, help="batch size when roberta learns")
+    parser.add_argument("--ft-max-epochs", type=int, default=10, help="maximum epochs when roberta learns")
+    parser.add_argument("--ft-patience", type=int, default=3,
+                        help="epochs without a better validation macro-F1 before stopping, when roberta learns")
+    parser.add_argument("--ft-warmup", type=float, default=0.1, help="fraction of the steps with linear learning-rate warm-up")
     parser.add_argument("--proj-dim", type=int, default=32, help="size the embeddings are projected to")
     parser.add_argument("--hidden", type=int, default=64)
     parser.add_argument("--dropout", type=float, default=0.1)
@@ -407,7 +527,11 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
     llm = llm_labels(df, args)
-    emb = embeddings(df, args)
+    if args.finetune_roberta:
+        enc, emb = tokenize(df, args), None                  # roberta learns: no cached embeddings
+    else:
+        enc, emb = None, embeddings(df, args)
+    out_name = args.name + ("_finetuned" if args.finetune_roberta else "")   # does not overwrite the frozen runs
     llm_1h, zeros = onehot(llm), np.zeros((len(df), len(LABELS)), dtype=np.float32)
     ts_series = ts_embeddings(df, args) if args.ts else None                # (texts, series, 1280), frozen TimesFM
     ts = ts_series.mean(axis=1) if args.ts else None                         # fusion_ts_mlp: averaged over the series
@@ -445,14 +569,18 @@ def main() -> None:
                                   tree_method="hist", **XGBOOST_PARAMS)),
         ]).fit(df[TEXT].iloc[tr], y[tr])
         preds["xgboost"] = xgboost.predict(df[TEXT].iloc[test_idx])
-        preds["roberta_mlp"] = train_predict_mlp(
-            emb[tr], zeros[tr], y[tr], emb[test_idx], zeros[test_idx], args, seed=args.seed + percent)
-        preds["fusion_mlp"] = train_predict_mlp(
-            emb[tr], llm_1h[tr], y[tr], emb[test_idx], llm_1h[test_idx], args, seed=args.seed + percent)
+        def fit_predict(llm_input, ts_input=None):
+            seed = args.seed + percent
+            if args.finetune_roberta:
+                return train_predict_finetuned(enc, tr, test_idx, llm_input, y, args, seed, ts=ts_input)
+            return train_predict_mlp(emb[tr], llm_input[tr], y[tr], emb[test_idx], llm_input[test_idx], args, seed=seed,
+                                     ts_tr=ts_input[tr] if ts_input is not None else None,
+                                     ts_te=ts_input[test_idx] if ts_input is not None else None)
+
+        preds["roberta_mlp"] = fit_predict(zeros)
+        preds["fusion_mlp"] = fit_predict(llm_1h)
         if args.ts:
-            preds[TS_MODEL_NAME] = train_predict_mlp(
-                emb[tr], llm_1h[tr], y[tr], emb[test_idx], llm_1h[test_idx], args, seed=args.seed + percent,
-                ts_tr=ts[tr], ts_te=ts[test_idx])
+            preds[TS_MODEL_NAME] = fit_predict(llm_1h, ts)
         if use_cross:
             preds[TS_CROSS_MODEL_NAME] = train_predict_mlp(
                 emb[tr], llm_1h[tr], y[tr], emb[test_idx], llm_1h[test_idx], args, seed=args.seed + percent,
@@ -479,15 +607,15 @@ def main() -> None:
 
     predictions = pd.DataFrame(prediction_rows)
     scores_df = pd.DataFrame(score_rows)
-    predictions.to_csv(OUT_DIR / f"{args.name}_regime_predictions.csv", index=False)
-    scores_df.to_csv(OUT_DIR / f"{args.name}_regime_scores.csv", index=False)
+    predictions.to_csv(OUT_DIR / f"{out_name}_regime_predictions.csv", index=False)
+    scores_df.to_csv(OUT_DIR / f"{out_name}_regime_scores.csv", index=False)
     print(f"\n=== Fixed test set ({len(test_idx)} texts), training regimes ===")
     for percent in args.train_percents:
         rows = scores_df[(scores_df["train_percent"] == percent) & (scores_df["texts"] == "all")].set_index("model")
         print(f"{percent:3d}% " + "  ".join(
             f"{m} {rows.loc[m, 'f1_macro']:.3f} ({rows.loc[m, 'accuracy']:.3f})"
             for m in models if m in rows.index))
-    print(f"\nSaved in {OUT_DIR}: {args.name}_regime_predictions.csv, {args.name}_regime_scores.csv")
+    print(f"\nSaved in {OUT_DIR}: {out_name}_regime_predictions.csv, {out_name}_regime_scores.csv")
 
 if __name__ == "__main__":
     main()
