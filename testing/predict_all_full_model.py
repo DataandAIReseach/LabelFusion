@@ -498,6 +498,7 @@ def main() -> None:
     parser.add_argument("--cross-hidden", type=int, default=64, help="model size of the CrossTSTransformer (the 1280-dim embeddings are projected to it)")
     parser.add_argument("--cross-layers", type=int, default=1, help="encoder layers of the CrossTSTransformer")
     parser.add_argument("--cross-heads", type=int, default=4, help="attention heads of the CrossTSTransformer (divides --cross-hidden)")
+    parser.add_argument("--out-tag", help="suffix of the output file names, e.g. noise (so a control run does not overwrite the main one)")
     parser.add_argument("--ts-dir", type=Path, default=TS_DIR, help="folder with <series>.csv (columns Date,value)")
     parser.add_argument("--ts-series", nargs="+", default=TS_SERIES, help="series names = file names in --ts-dir")
     parser.add_argument("--ts-window", type=int, default=60,
@@ -547,7 +548,7 @@ def main() -> None:
         enc, emb = tokenize(df, args), None                  # roberta learns: no cached embeddings
     else:
         enc, emb = None, embeddings(df, args)
-    out_name = args.name + ("_finetuned" if args.finetune_roberta else "")   # does not overwrite the frozen runs
+    out_name = args.name + ("_finetuned" if args.finetune_roberta else "") + (f"_{args.out_tag}" if args.out_tag else "")   # does not overwrite the frozen runs
     llm_1h, zeros = onehot(llm), np.zeros((len(df), len(LABELS)), dtype=np.float32)
     ts_series = ts_embeddings(df, args) if args.ts else None                # (texts, series, 1280), frozen TimesFM
     ts = ts_series.mean(axis=1) if args.ts else None                         # fusion_ts_mlp: averaged over the series

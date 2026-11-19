@@ -1,23 +1,0 @@
-Fetching 12 files:   0%|          | 0/12 [00:00<?, ?it/s]Fetching 12 files: 100%|██████████| 12/12 [00:00<00:00, 39077.37it/s]
-Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
-Loading weights:   0%|          | 0/389 [00:00<?, ?it/s]Loading weights:  14%|█▍        | 56/389 [00:00<00:00, 554.72it/s]Loading weights:  46%|████▌     | 178/389 [00:00<00:00, 944.44it/s]Loading weights:  88%|████████▊ | 344/389 [00:00<00:00, 1260.77it/s]Loading weights: 100%|██████████| 389/389 [00:00<00:00, 1277.15it/s]
-[transformers] [1mRobertaModel LOAD REPORT[0m from: roberta-large
-Key                       | Status     |  | 
---------------------------+------------+--+-
-lm_head.dense.bias        | UNEXPECTED |  | 
-lm_head.dense.weight      | UNEXPECTED |  | 
-lm_head.layer_norm.weight | UNEXPECTED |  | 
-lm_head.layer_norm.bias   | UNEXPECTED |  | 
-lm_head.bias              | UNEXPECTED |  | 
-
-Notes:
-- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
-Traceback (most recent call last):
-  File "/mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/testing/predict_all_full_model.py", line 635, in <module>
-    main()
-  File "/mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/testing/predict_all_full_model.py", line 600, in main
-    emb[tr], llm_1h[tr], y[tr], emb[test_idx], llm_1h[test_idx], args, seed=args.seed + percent,
-    ~~~^^^^
-TypeError: 'NoneType' object is not subscriptable
-srun: error: ggpu145: task 0: Exited with exit code 1
-srun: Terminating StepId=17386413.1
