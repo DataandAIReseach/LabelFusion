@@ -1,0 +1,19 @@
+articles JSON: /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/data/articles_all_commodities_baseline_seed7_n5000_20261115_205224.json (name articles_all_commodities_baseline_seed7_n5000_20261115_205224)
+GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-e97bf2e1-20cf-2123-65e4-713c145e890d)
+downloading roberta-large -> /user/schlee2/u19147/.cache/huggingface/hub/models--roberta-large/snapshots/722cf37b1afa9454edce342e7895e588b6ff1d59
+articles_all_commodities_baseline_seed7_n5000_20261115_205224.json: 5000 texts, 559 fillers, 452 flipped labels
+time series embeddings: google/timesfm-2.5-200m-transformers on DFF, DGS10, DGS2, NASDAQCOM (window 60) ...
+  DFF: 4840 distinct windows for 5000 texts
+  DGS10: 5000 distinct windows for 5000 texts
+  DGS2: 4435 distinct windows for 5000 texts; 21 with a shorter window (the series had fewer observations yet); 566 dated before the series starts -> its first 60 observations (look-ahead)
+  NASDAQCOM: 4901 distinct windows for 5000 texts; 21 with a shorter window (the series had fewer observations yet); 100 dated before the series starts -> its first 60 observations (look-ahead)
+time series embeddings: (5000, 4, 1280) in 9s -> tsx_DFF-DGS10-DGS2-NASDAQCOM_w60_fc8fedb22478.npy
+fusion_ts_cross_mlp: CrossTSTransformer head with 134,432 trainable parameters (series DFF, DGS10, DGS2, NASDAQCOM, 1 layer(s), 64 dim); TimesFM frozen
+============ Job Information ===================================================
+Submitted: 2026-11-18T17:42:45
+Started: 2026-11-18T17:43:16
+Ended: 2026-11-18T17:45:10
+Elapsed: 2 min, Limit: 240 min, Difference: 238 min
+CPUs: 4, Nodes: 1
+Estimated credit Consumption: 5.00 core-hours
+================================================================================

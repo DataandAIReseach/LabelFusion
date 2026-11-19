@@ -1,20 +1,15 @@
 articles JSON: /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/data/articles_all_commodities_baseline_seed7_n5000_20261115_205224.json (name articles_all_commodities_baseline_seed7_n5000_20261115_205224)
-GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-e97bf2e1-20cf-2123-65e4-713c145e890d)
+GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-e60eaf97-5905-a30e-0c4a-4a02fdc92ead)
 downloading roberta-large -> /user/schlee2/u19147/.cache/huggingface/hub/models--roberta-large/snapshots/722cf37b1afa9454edce342e7895e588b6ff1d59
 articles_all_commodities_baseline_seed7_n5000_20261115_205224.json: 5000 texts, 559 fillers, 452 flipped labels
 embeddings: roberta-large_34661d20d83a.npy (cached)
-time series embeddings: google/timesfm-2.5-200m-transformers on DFF, DGS10, DGS2, NASDAQCOM (window 60) ...
-  DFF: 4840 distinct windows for 5000 texts
-  DGS10: 5000 distinct windows for 5000 texts
-  DGS2: 4435 distinct windows for 5000 texts; 21 with a shorter window (the series had fewer observations yet); 566 dated before the series starts -> its first 60 observations (look-ahead)
-  NASDAQCOM: 4901 distinct windows for 5000 texts; 21 with a shorter window (the series had fewer observations yet); 100 dated before the series starts -> its first 60 observations (look-ahead)
-time series embeddings: (5000, 4, 1280) in 11s -> tsx_DFF-DGS10-DGS2-NASDAQCOM_w60_fc8fedb22478.npy
+time series embeddings: tsx_DFF-DGS10-DGS2-NASDAQCOM_w60_fc8fedb22478.npy (cached)
 fusion_ts_cross_mlp: CrossTSTransformer head with 134,432 trainable parameters (series DFF, DGS10, DGS2, NASDAQCOM, 1 layer(s), 64 dim); TimesFM frozen
 train  10% (400 texts, 7s): llm 0.610  logreg 0.660  xgboost 0.594  roberta_mlp 0.593  fusion_mlp 0.589  fusion_ts_mlp 0.544  fusion_ts_cross_mlp 0.512
 train  20% (800 texts, 14s): llm 0.610  logreg 0.719  xgboost 0.661  roberta_mlp 0.643  fusion_mlp 0.647  fusion_ts_mlp 0.591  fusion_ts_cross_mlp 0.573
 train  30% (1200 texts, 26s): llm 0.610  logreg 0.743  xgboost 0.692  roberta_mlp 0.648  fusion_mlp 0.698  fusion_ts_mlp 0.597  fusion_ts_cross_mlp 0.577
 train  40% (1600 texts, 26s): llm 0.610  logreg 0.743  xgboost 0.714  roberta_mlp 0.697  fusion_mlp 0.714  fusion_ts_mlp 0.639  fusion_ts_cross_mlp 0.660
-train  50% (2000 texts, 33s): llm 0.610  logreg 0.763  xgboost 0.709  roberta_mlp 0.661  fusion_mlp 0.654  fusion_ts_mlp 0.661  fusion_ts_cross_mlp 0.672
+train  50% (2000 texts, 34s): llm 0.610  logreg 0.763  xgboost 0.709  roberta_mlp 0.661  fusion_mlp 0.654  fusion_ts_mlp 0.661  fusion_ts_cross_mlp 0.672
 train  60% (2400 texts, 41s): llm 0.610  logreg 0.753  xgboost 0.717  roberta_mlp 0.650  fusion_mlp 0.722  fusion_ts_mlp 0.617  fusion_ts_cross_mlp 0.694
 train  70% (2800 texts, 45s): llm 0.610  logreg 0.749  xgboost 0.729  roberta_mlp 0.682  fusion_mlp 0.719  fusion_ts_mlp 0.700  fusion_ts_cross_mlp 0.682
 train  80% (3200 texts, 50s): llm 0.610  logreg 0.749  xgboost 0.727  roberta_mlp 0.695  fusion_mlp 0.716  fusion_ts_mlp 0.664  fusion_ts_cross_mlp 0.687
@@ -35,10 +30,10 @@ train 100% (4000 texts, 63s): llm 0.610  logreg 0.744  xgboost 0.732  roberta_ml
 
 Saved in /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/outputs/predict_all_full_model: articles_all_commodities_baseline_seed7_n5000_20261115_205224_regime_predictions.csv, articles_all_commodities_baseline_seed7_n5000_20261115_205224_regime_scores.csv
 ============ Job Information ===================================================
-Submitted: 2026-11-18T13:22:55
-Started: 2026-11-18T13:23:05
-Ended: 2026-11-18T13:30:09
-Elapsed: 8 min, Limit: 240 min, Difference: 232 min
+Submitted: 2026-11-18T14:55:41
+Started: 2026-11-18T15:05:59
+Ended: 2026-11-18T15:12:56
+Elapsed: 7 min, Limit: 240 min, Difference: 233 min
 CPUs: 4, Nodes: 1
-Estimated credit Consumption: 20.00 core-hours
+Estimated credit Consumption: 17.50 core-hours
 ================================================================================

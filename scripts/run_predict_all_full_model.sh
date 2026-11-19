@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -J predict_all_full_model
 #SBATCH -p scc-gpu
-#SBATCH -G A100:1                 # the GPU is only needed for the roberta-large embeddings (once, then cached)
+#SBATCH -G A100:1                 # the GPU is needed to fine-tune roberta-large
 #SBATCH -c 4
 #SBATCH --mem 32G
 #SBATCH -t 04:00:00
@@ -14,9 +14,10 @@
 #   llm          the zero-shot GPT-5 nano label (read from the LLM cache)
 #   logreg       TF-IDF + logistic regression
 #   xgboost      TF-IDF + XGBoost with the fixed baseline configuration
-#   roberta_mlp  MLP on the frozen roberta-large [CLS] embedding alone
-#   fusion_mlp   MLP on the embedding + the LLM label (LabelFusion)
-# Output: outputs/predict_all_full_model/ (<name>_regime_predictions.csv, _regime_scores.csv; embeddings/ = cached embeddings)
+#   roberta_mlp  MLP trained jointly with the roberta-large encoder
+#   fusion_mlp   MLP trained jointly with roberta-large and fused with the LLM label (LabelFusion)
+# Output: outputs/predict_all_full_model/ (<name>_finetuned_regime_predictions.csv, _finetuned_regime_scores.csv)
+# Pass --no-finetune-roberta to use frozen, cached embeddings instead.
 #
 # No LLM is called by default (--no-make-llm-labels): the labels are read from
 #   outputs/llm_cache/predict_all_train_gpt-5-nano_zero_shot_<JSON name>/
@@ -39,7 +40,7 @@ PYTHON=$BASE/env_labelFusion/bin/python
 mkdir -p $BASE/logs
 
 # the JSON and dataset name the Python script will use (same defaults: newest JSON in data/, name = its file name)
-JSON="" NAME="" LLM_MODEL=gpt-5-nano MAKE_ARGS=(--no-make-llm-labels)
+JSON="" NAME="" LLM_MODEL=gpt-5-nano MAKE_ARGS=(--no-make-llm-labels) FINETUNE_ARGS=(--finetune-roberta)
 ARGS=("$@")
 for i in "${!ARGS[@]}"; do
     case "${ARGS[$i]}" in
@@ -47,6 +48,7 @@ for i in "${!ARGS[@]}"; do
         --name) NAME=${ARGS[$((i + 1))]} ;;
         --llm-model) LLM_MODEL=${ARGS[$((i + 1))]} ;;
         --make-llm-labels|--no-make-llm-labels) MAKE_ARGS=() ;;
+        --finetune-roberta|--no-finetune-roberta) FINETUNE_ARGS=() ;;
     esac
 done
 if [ -z "$JSON" ]; then
@@ -81,4 +83,4 @@ $PYTHON -c "from huggingface_hub import snapshot_download; print('downloading', 
 
 srun $PYTHON \
      $BASE/testing/predict_all_full_model.py \
-     ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"} "${ARGS[@]}"
+     ${MAKE_ARGS[@]+"${MAKE_ARGS[@]}"} ${FINETUNE_ARGS[@]+"${FINETUNE_ARGS[@]}"} "${ARGS[@]}"

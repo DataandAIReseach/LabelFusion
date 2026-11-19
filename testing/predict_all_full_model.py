@@ -366,11 +366,11 @@ def tokenize(df: pd.DataFrame, args) -> dict:
 class JointFusion(nn.Module):
     """roberta (trained) -> [CLS] -> the same FusionMLP head as above: LLM one-hot (and time series embedding) are added there."""
 
-    def __init__(self, encoder: nn.Module, args, ts_dim: int = 0):
+    def __init__(self, encoder: nn.Module, args, ts_dim: int = 0, ts_head: CrossTSHead | None = None):
         super().__init__()
         self.encoder = encoder
         self.head = FusionMLP(encoder.config.hidden_size, args.proj_dim, args.hidden, args.dropout, ts_dim=ts_dim,
-                              ts_proj_dim=args.ts_proj_dim)
+                              ts_head=ts_head, ts_proj_dim=args.ts_proj_dim)
 
     def forward(self, input_ids, attention_mask, llm_onehot, ts=None):
         cls = self.encoder(input_ids=input_ids, attention_mask=attention_mask).last_hidden_state[:, 0, :]
@@ -400,7 +400,9 @@ def train_predict_finetuned(enc: dict, tr: np.ndarray, te: np.ndarray, llm: np.n
         return (enc["input_ids"][idx][:, :n].to(device), mask[:, :n].to(device), llm_t[idx].to(device),
                 ts_t[idx].to(device) if ts is not None else None, y_t[idx].to(device))
 
-    model = JointFusion(pretrained_encoder(args.roberta_model), args, ts_dim=ts.shape[1] if ts is not None else 0).to(device)
+    ts_head = make_ts_head(args, ts.shape[2]) if ts is not None and ts.ndim == 3 else None   # (texts, series, 1280)
+    ts_dim = ts.shape[1] if ts is not None and ts_head is None else 0
+    model = JointFusion(pretrained_encoder(args.roberta_model), args, ts_dim=ts_dim, ts_head=ts_head).to(device)
     opt = torch.optim.AdamW([{"params": model.encoder.parameters(), "lr": args.roberta_lr},
                              {"params": model.head.parameters(), "lr": args.lr}], weight_decay=args.weight_decay)
     steps_per_epoch = -(-len(fit) // args.ft_batch_size)
@@ -596,9 +598,7 @@ def main() -> None:
         if args.ts:
             preds[TS_MODEL_NAME] = fit_predict(llm_1h, ts)
         if use_cross:
-            preds[TS_CROSS_MODEL_NAME] = train_predict_mlp(
-                emb[tr], llm_1h[tr], y[tr], emb[test_idx], llm_1h[test_idx], args, seed=args.seed + percent,
-                ts_tr=ts_series[tr], ts_te=ts_series[test_idx])
+            preds[TS_CROSS_MODEL_NAME] = fit_predict(llm_1h, ts_series)
         for model in models:
             for group, mask in groups.items():
                 if mask.any():

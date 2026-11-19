@@ -1,0 +1,14 @@
+articles JSON: /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/data/articles_all_commodities_baseline_seed7_n5000_20261115_205224.json (name articles_all_commodities_baseline_seed7_n5000_20261115_205224)
+GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-e60eaf97-5905-a30e-0c4a-4a02fdc92ead)
+downloading roberta-large -> /user/schlee2/u19147/.cache/huggingface/hub/models--roberta-large/snapshots/722cf37b1afa9454edce342e7895e588b6ff1d59
+articles_all_commodities_baseline_seed7_n5000_20261115_205224.json: 5000 texts, 559 fillers, 452 flipped labels
+time series embeddings: tsx_DFF-DGS10-DGS2-NASDAQCOM_w60_fc8fedb22478.npy (cached)
+fusion_ts_cross_mlp: CrossTSTransformer head with 134,432 trainable parameters (series DFF, DGS10, DGS2, NASDAQCOM, 1 layer(s), 64 dim); TimesFM frozen
+============ Job Information ===================================================
+Submitted: 2026-11-18T15:20:09
+Started: 2026-11-18T15:20:31
+Ended: 2026-11-18T15:22:04
+Elapsed: 2 min, Limit: 240 min, Difference: 238 min
+CPUs: 4, Nodes: 1
+Estimated credit Consumption: 5.00 core-hours
+================================================================================
