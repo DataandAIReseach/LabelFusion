@@ -8,7 +8,8 @@ For every text of an articles JSON (dataset_scripts/article_creation.ipynb, read
   LLM label   the zero-shot label of GPT-5 nano (one OpenRouter call per text, cached; missing ones are created unless
               --no-make-llm-labels). The same zero-shot setting for training and test texts, so the fusion is trained on the
               kind of LLM label it later sees.
-  time series the DAILY real series of data/TSs_macro (default DFF, DGS10, DGS2, NASDAQCOM): the last --ts-window observations up to the
+  time series the generated daily series of data/TSs_noise (default infl_gen, unemply_gen; business days 1970-2025; the real
+              macro series of data/TSs_macro with --ts-dir data/TSs_macro --ts-series DFF DGS10 DGS2 NASDAQCOM): the last --ts-window observations up to the
               date of the text, one frozen TimesFM encoder embedding per series, mean-pooled over the series (computed once,
               cached on disk). Switch off with --no-ts.
 
@@ -85,10 +86,10 @@ TEXT = json_dataset.TEXT_COLUMN
 OUT_DIR = REPO_ROOT / "outputs" / "predict_all_full_model"
 LLM_CACHE_DIR = REPO_ROOT / "outputs" / "llm_cache"
 DATA_DIR = REPO_ROOT / "data"                            # default: the newest articles JSON here
-TS_DIR = DATA_DIR / "TSs_macro"                          # <series>.csv with the columns Date,value
-TS_SERIES = ["DFF", "DGS10", "DGS2", "NASDAQCOM"]        # the DAILY series (fed funds rate, 10-year and 2-year Treasury yield, Nasdaq);
-                                                         # the monthly ones are not used. DGS2 starts 1976-06 and NASDAQCOM 1971-02, see
-                                                         # series_windows(early=...) for the texts dated before that
+TS_DIR = DATA_DIR / "TSs_noise"                          # <series>.csv with the columns Date,value
+TS_SERIES = ["infl_gen", "unemply_gen"]                  # the generated inflation and unemployment series (business days, 1970-2025);
+                                                         # the real ones: --ts-dir data/TSs_macro --ts-series DFF DGS10 DGS2 NASDAQCOM
+                                                         # (DGS2 starts 1976-06 and NASDAQCOM 1971-02, see series_windows(early=...))
 TS_MODEL = "google/timesfm-2.5-200m-transformers"
 MODELS = ("llm", "logreg", "xgboost", "roberta_mlp", "fusion_mlp")
 TS_MODEL_NAME = "fusion_ts_mlp"
@@ -162,7 +163,7 @@ def embeddings(df: pd.DataFrame, args) -> np.ndarray:
     return emb
 
 
-# ---- time series embeddings (data/TSs_macro) ---------------------------------------------------------------------------
+# ---- time series embeddings (--ts-dir, default data/TSs_noise) ---------------------------------------------------------------------------
 
 def series_windows(path: Path, dates: np.ndarray, window: int, early: str = "first") -> tuple[list[np.ndarray], int, int]:
     """For every date the last `window` observations of the series up to and including that date (window 0 = all of them).
@@ -196,7 +197,7 @@ def ts_embeddings(df: pd.DataFrame, args) -> np.ndarray:
     """One frozen TimesFM embedding per series and text (identical windows are embedded once): (texts, series, 1280).
     fusion_ts_mlp averages it over the series, fusion_ts_cross_mlp feeds it to the trainable CrossTSTransformer."""
     dates = pd.to_datetime(df[json_dataset.DATE_COLUMN]).to_numpy()
-    key = hashlib.md5(("\x1f".join(df[json_dataset.DATE_COLUMN]) + f"|{args.ts_model}").encode()).hexdigest()[:12]
+    key = hashlib.md5(("\x1f".join(df[json_dataset.DATE_COLUMN]) + f"|{args.ts_model}|{args.ts_dir.resolve()}").encode()).hexdigest()[:12]
     path = OUT_DIR / "embeddings" / f"tsx_{'-'.join(args.ts_series)}_w{args.ts_window}_{key}.npy"
     if path.exists():
         print(f"time series embeddings: {path.name} (cached)")
