@@ -37,9 +37,11 @@ regime, early stopping on the other 10 %
 Scores: accuracy, macro-F1, and weighted-F1 per training regime, also split by text type (clean content texts,
 content-free fillers with a random label, content texts with a deliberately flipped label).
 
-Writes to ./outputs/predict_all_full_model/ (repo root; <name> gets the suffix _finetuned when roberta learns):
-    <name>_regime_predictions.csv  one row per test text, model, and training percentage
-    <name>_regime_scores.csv       one row per training percentage, model, and text type
+Writes to ./outputs/predict_all_full_model/ (repo root). <out> = <name>_<run time>[_finetuned][_<out-tag>]: <name> without the
+JSON's creation time stamp (_YYYYMMDD_HHMMSS), then the start time of this run (so no run overwrites another), _finetuned
+when roberta learns:
+    <out>_regime_predictions.csv  one row per test text, model, and training percentage
+    <out>_regime_scores.csv       one row per training percentage, model, and text type
     embeddings/<model>_<hash>.npy   the cached embeddings (keyed by model and texts)
     embeddings/tsx_<series>_w<window>_<hash>.npy   the cached per-series time series embeddings (texts x series x 1280;
                                                    keyed by series, window and dates)
@@ -56,8 +58,10 @@ import copy
 import gc
 import hashlib
 import pickle
+import re
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 TESTING_DIR = Path(__file__).resolve().parent
@@ -474,6 +478,7 @@ def scores(y, p) -> dict:
 
 
 def main() -> None:
+    run_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")      # start of this run: in every output file name
     parser = argparse.ArgumentParser()
     parser.add_argument("--json", type=Path, help="articles JSON (default: the newest in data/)")
     parser.add_argument("--name", help="dataset name for the LLM cache and output files (default: the JSON's file name)")
@@ -549,7 +554,9 @@ def main() -> None:
         enc, emb = tokenize(df, args), None                  # roberta learns: no cached embeddings
     else:
         enc, emb = None, embeddings(df, args)
-    out_name = args.name + ("_finetuned" if args.finetune_roberta else "") + (f"_{args.out_tag}" if args.out_tag else "")   # does not overwrite the frozen runs
+    out_name = (re.sub(r"_\d{8}_\d{6}$", "", args.name) + f"_{run_stamp}"   # the run's time replaces the JSON's time stamp
+                + ("_finetuned" if args.finetune_roberta else "") + (f"_{args.out_tag}" if args.out_tag else ""))
+    print(f"output: {OUT_DIR}/{out_name}_regime_{{predictions,scores}}.csv")
     llm_1h, zeros = onehot(llm), np.zeros((len(df), len(LABELS)), dtype=np.float32)
     ts_series = ts_embeddings(df, args) if args.ts else None                # (texts, series, 1280), frozen TimesFM
     ts = ts_series.mean(axis=1) if args.ts else None                         # fusion_ts_mlp: averaged over the series

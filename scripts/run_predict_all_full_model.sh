@@ -16,7 +16,7 @@
 #   xgboost      TF-IDF + XGBoost with the fixed baseline configuration
 #   roberta_mlp  MLP trained jointly with the roberta-large encoder
 #   fusion_mlp   MLP trained jointly with roberta-large and fused with the LLM label (LabelFusion)
-# Output: outputs/predict_all_full_model/ (<name>_finetuned_regime_predictions.csv, _finetuned_regime_scores.csv)
+# Output: outputs/predict_all_full_model/ (<name>_<run time YYYYMMDD_HHMMSS>_finetuned_regime_predictions.csv, ..._regime_scores.csv)
 # Pass --no-finetune-roberta to use frozen, cached embeddings instead.
 #
 # No LLM is called by default (--no-make-llm-labels): the labels are read from

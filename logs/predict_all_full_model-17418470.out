@@ -1,0 +1,42 @@
+articles JSON: /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/data/articles_all_commodities_baseline_seed7_n5000_20261115_205224.json (name articles_all_commodities_baseline_seed7_n5000_20261115_205224)
+GPU 0: NVIDIA A100-SXM4-80GB (UUID: GPU-2262f06a-78ed-8efc-2386-73fc8af9cc28)
+downloading roberta-large -> /user/schlee2/u19147/.cache/huggingface/hub/models--roberta-large/snapshots/722cf37b1afa9454edce342e7895e588b6ff1d59
+articles_all_commodities_baseline_seed7_n5000_20261115_205224.json: 5000 texts, 559 fillers, 452 flipped labels
+output: /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/outputs/predict_all_full_model/articles_all_commodities_baseline_seed7_n5000_20261120_110651_finetuned_regime_{predictions,scores}.csv
+time series embeddings: google/timesfm-2.5-200m-transformers on infl_gen, unemply_gen (window 60) ...
+  infl_gen: 5000 distinct windows for 5000 texts; 21 with a shorter window (the series had fewer observations yet)
+  unemply_gen: 5000 distinct windows for 5000 texts; 21 with a shorter window (the series had fewer observations yet)
+time series embeddings: (5000, 2, 1280) in 11s -> tsx_infl_gen-unemply_gen_w60_a1f425357e0e.npy
+fusion_ts_cross_mlp: CrossTSTransformer head with 134,304 trainable parameters (series infl_gen, unemply_gen, 1 layer(s), 64 dim); TimesFM frozen
+train  10% (400 texts, 105s): llm 0.610  logreg 0.660  xgboost 0.594  roberta_mlp 0.454  fusion_mlp 0.735  fusion_ts_mlp 0.481  fusion_ts_cross_mlp 0.465
+train  20% (800 texts, 119s): llm 0.610  logreg 0.719  xgboost 0.661  roberta_mlp 0.207  fusion_mlp 0.207  fusion_ts_mlp 0.764  fusion_ts_cross_mlp 0.768
+train  30% (1200 texts, 191s): llm 0.610  logreg 0.743  xgboost 0.692  roberta_mlp 0.755  fusion_mlp 0.462  fusion_ts_mlp 0.744  fusion_ts_cross_mlp 0.778
+train  40% (1600 texts, 272s): llm 0.610  logreg 0.743  xgboost 0.714  roberta_mlp 0.797  fusion_mlp 0.802  fusion_ts_mlp 0.797  fusion_ts_cross_mlp 0.782
+train  50% (2000 texts, 283s): llm 0.610  logreg 0.763  xgboost 0.709  roberta_mlp 0.800  fusion_mlp 0.808  fusion_ts_mlp 0.804  fusion_ts_cross_mlp 0.791
+train  60% (2400 texts, 360s): llm 0.610  logreg 0.753  xgboost 0.717  roberta_mlp 0.800  fusion_mlp 0.790  fusion_ts_mlp 0.792  fusion_ts_cross_mlp 0.793
+train  70% (2800 texts, 406s): llm 0.610  logreg 0.749  xgboost 0.729  roberta_mlp 0.791  fusion_mlp 0.785  fusion_ts_mlp 0.795  fusion_ts_cross_mlp 0.791
+train  80% (3200 texts, 364s): llm 0.610  logreg 0.749  xgboost 0.727  roberta_mlp 0.786  fusion_mlp 0.797  fusion_ts_mlp 0.789  fusion_ts_cross_mlp 0.796
+train  90% (3600 texts, 527s): llm 0.610  logreg 0.745  xgboost 0.736  roberta_mlp 0.797  fusion_mlp 0.789  fusion_ts_mlp 0.791  fusion_ts_cross_mlp 0.796
+train 100% (4000 texts, 549s): llm 0.610  logreg 0.744  xgboost 0.732  roberta_mlp 0.798  fusion_mlp 0.800  fusion_ts_mlp 0.802  fusion_ts_cross_mlp 0.800
+
+=== Fixed test set (1000 texts), training regimes ===
+ 10% llm 0.610 (0.653)  logreg 0.660 (0.687)  xgboost 0.594 (0.609)  roberta_mlp 0.454 (0.588)  fusion_mlp 0.735 (0.747)  fusion_ts_mlp 0.481 (0.603)  fusion_ts_cross_mlp 0.465 (0.482)
+ 20% llm 0.610 (0.653)  logreg 0.719 (0.737)  xgboost 0.661 (0.679)  roberta_mlp 0.207 (0.450)  fusion_mlp 0.207 (0.450)  fusion_ts_mlp 0.764 (0.773)  fusion_ts_cross_mlp 0.768 (0.779)
+ 30% llm 0.610 (0.653)  logreg 0.743 (0.758)  xgboost 0.692 (0.709)  roberta_mlp 0.755 (0.767)  fusion_mlp 0.462 (0.601)  fusion_ts_mlp 0.744 (0.755)  fusion_ts_cross_mlp 0.778 (0.785)
+ 40% llm 0.610 (0.653)  logreg 0.743 (0.758)  xgboost 0.714 (0.729)  roberta_mlp 0.797 (0.803)  fusion_mlp 0.802 (0.809)  fusion_ts_mlp 0.797 (0.807)  fusion_ts_cross_mlp 0.782 (0.792)
+ 50% llm 0.610 (0.653)  logreg 0.763 (0.777)  xgboost 0.709 (0.725)  roberta_mlp 0.800 (0.808)  fusion_mlp 0.808 (0.815)  fusion_ts_mlp 0.804 (0.812)  fusion_ts_cross_mlp 0.791 (0.799)
+ 60% llm 0.610 (0.653)  logreg 0.753 (0.766)  xgboost 0.717 (0.732)  roberta_mlp 0.800 (0.807)  fusion_mlp 0.790 (0.799)  fusion_ts_mlp 0.792 (0.801)  fusion_ts_cross_mlp 0.793 (0.802)
+ 70% llm 0.610 (0.653)  logreg 0.749 (0.761)  xgboost 0.729 (0.743)  roberta_mlp 0.791 (0.799)  fusion_mlp 0.785 (0.794)  fusion_ts_mlp 0.795 (0.804)  fusion_ts_cross_mlp 0.791 (0.799)
+ 80% llm 0.610 (0.653)  logreg 0.749 (0.763)  xgboost 0.727 (0.742)  roberta_mlp 0.786 (0.793)  fusion_mlp 0.797 (0.809)  fusion_ts_mlp 0.789 (0.799)  fusion_ts_cross_mlp 0.796 (0.803)
+ 90% llm 0.610 (0.653)  logreg 0.745 (0.759)  xgboost 0.736 (0.749)  roberta_mlp 0.797 (0.805)  fusion_mlp 0.789 (0.798)  fusion_ts_mlp 0.791 (0.800)  fusion_ts_cross_mlp 0.796 (0.803)
+100% llm 0.610 (0.653)  logreg 0.744 (0.758)  xgboost 0.732 (0.747)  roberta_mlp 0.798 (0.807)  fusion_mlp 0.800 (0.810)  fusion_ts_mlp 0.802 (0.812)  fusion_ts_cross_mlp 0.800 (0.809)
+
+Saved in /mnt/ceph-ssd/workspaces/ws/scc_uwvn_kneib/u19147-labelFusion/outputs/predict_all_full_model: articles_all_commodities_baseline_seed7_n5000_20261120_110651_finetuned_regime_predictions.csv, articles_all_commodities_baseline_seed7_n5000_20261120_110651_finetuned_regime_scores.csv
+============ Job Information ===================================================
+Submitted: 2026-11-20T11:04:31
+Started: 2026-11-20T11:06:15
+Ended: 2026-11-20T12:00:19
+Elapsed: 55 min, Limit: 240 min, Difference: 185 min
+CPUs: 4, Nodes: 1
+Estimated credit Consumption: 137.50 core-hours
+================================================================================
