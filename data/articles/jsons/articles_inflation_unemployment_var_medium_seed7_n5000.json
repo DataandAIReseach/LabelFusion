@@ -10063,7 +10063,7 @@
       "regime": "var",
       "n_words_target": 58,
       "n_sentences_target": 1,
-      "n_words_actual": 71,
+      "n_words_actual": 54,
       "policy_mode": "filler",
       "opening": "a statement about the Federal Reserve's institutions, independence or legal framework, without naming its policy goals and without any assessment of current conditions",
       "policy_words_found": [],
@@ -10072,12 +10072,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 120
+      "baseline_obs_id": 120,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve System was established by the Congress as an independent agency within the government, and its structure of regional Reserve Banks, working alongside the Board of Governors in Washington, reflects a deliberate balance between national responsibility and local perspective that has served the country well since 1913. Word count check: roughly 56-58 words, one sentence, no banned terms, no figures beyond the year (1913 is a historical date, acceptable)."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve System was established by the Congress as an independent agency within the government, and its structure of regional Reserve Banks, working alongside the Board of Governors in Washington, reflects a deliberate balance between national responsibility and local perspective that has served the country well since 1913. Word count check: roughly 56-58 words, one sentence, no banned terms, no figures beyond the year (1913 is a historical date, acceptable)."
+    "body": "The Federal Reserve System was designed by the Congress as a body of regional Reserve Banks and a Board of Governors, and its structure, with its quasi-public character and its statutory responsibilities, reflects a deliberate balance between national direction and local perspective that I believe has served the country well through many changing circumstances."
   },
   {
     "metadata": {
@@ -25471,7 +25474,7 @@
       "regime": "var",
       "n_words_target": 46,
       "n_sentences_target": 1,
-      "n_words_actual": 104,
+      "n_words_actual": 47,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -25480,12 +25483,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 308
+      "baseline_obs_id": 308,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was established in 1913 as a response to the recurring banking panics that had plagued the country, and its founders intended it to provide an elastic currency and a lender of last resort to the banking system. Word count check: The(1) Federal(2) Reserve(3) was(4) established(5) in(6) 1913(7)... that includes a number, which violates the rule. Rewriting: The Federal Reserve System was created by the Congress after repeated banking panics had shown the need for an elastic currency and a lender of last resort to the nation's banks, a purpose its founders sought to serve through a decentralized structure of Reserve Banks."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was established in 1913 as a response to the recurring banking panics that had plagued the country, and its founders intended it to provide an elastic currency and a lender of last resort to the banking system. Word count check: The(1) Federal(2) Reserve(3) was(4) established(5) in(6) 1913(7)... that includes a number, which violates the rule. Rewriting: The Federal Reserve System was created by the Congress after repeated banking panics had shown the need for an elastic currency and a lender of last resort to the nation's banks, a purpose its founders sought to serve through a decentralized structure of Reserve Banks."
+    "body": "When the System was established by Congress before the First World War, its founders intended it to provide an elastic currency and effective supervision of banking, and they could not have anticipated how large a responsibility for the economy would fall to the Federal Open Market Committee."
   },
   {
     "metadata": {
@@ -36496,14 +36502,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 4,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 21,
       "n_sentences_target": 1,
-      "n_words_actual": 237,
+      "n_words_actual": 26,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -36512,12 +36518,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 596
+      "baseline_obs_id": 596,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a decentralized system, and its founders deliberately sought to balance regional voices against the authority of a central board in Washington. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, so revise. The Federal Reserve was created by Congress as a decentralized system, and its founders deliberately sought to balance regional voices against the authority of a central board in Washington. Count: The(1) Federal(2) Reserve(3) was(4) created(5) by(6) Congress(7) as(8) a(9) decentralized(10) system(11) and(12) its(13) founders(14) deliberately(15) sought(16) to(17) balance(18) regional(19) voices(20) against(21) the(22) authority(23) of(24) a(25) central(26) board(27) in(28) Washington(29). That is 29 words, too long. Shorten. The founders of the Federal Reserve deliberately balanced regional voices against the authority of a central board in Washington, a design that still shapes our deliberations. Count: The(1) founders(2) of(3) the(4) Federal(5) Reserve(6) deliberately(7) balanced(8) regional(9) voices(10) against(11) the(12) authority(13) of(14) a(15) central(16) board(17) in(18) Washington(19) a(20) design(21) that(22) still(23) shapes(24) our(25) deliberations(26). Still 26. Trim further. The founders of the Federal Reserve deliberately balanced regional voices against central authority in Washington, a design that still shapes our work. Count: The(1) founders(2) of(3) the(4) Federal(5) Reserve(6) deliberately(7) balanced(8) regional(9) voices(10) against(11) central(12) authority(13) in(14) Washington(15) a(16) design(17) that(18) still(19) shapes(20) our(21) work(22). 22 words; close to target. The founders of the Federal Reserve deliberately balanced regional voices against central authority in Washington, a design that still shapes our work."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a decentralized system, and its founders deliberately sought to balance regional voices against the authority of a central board in Washington. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, so revise. The Federal Reserve was created by Congress as a decentralized system, and its founders deliberately sought to balance regional voices against the authority of a central board in Washington. Count: The(1) Federal(2) Reserve(3) was(4) created(5) by(6) Congress(7) as(8) a(9) decentralized(10) system(11) and(12) its(13) founders(14) deliberately(15) sought(16) to(17) balance(18) regional(19) voices(20) against(21) the(22) authority(23) of(24) a(25) central(26) board(27) in(28) Washington(29). That is 29 words, too long. Shorten. The founders of the Federal Reserve deliberately balanced regional voices against the authority of a central board in Washington, a design that still shapes our deliberations. Count: The(1) founders(2) of(3) the(4) Federal(5) Reserve(6) deliberately(7) balanced(8) regional(9) voices(10) against(11) the(12) authority(13) of(14) a(15) central(16) board(17) in(18) Washington(19) a(20) design(21) that(22) still(23) shapes(24) our(25) deliberations(26). Still 26. Trim further. The founders of the Federal Reserve deliberately balanced regional voices against central authority in Washington, a design that still shapes our work. Count: The(1) founders(2) of(3) the(4) Federal(5) Reserve(6) deliberately(7) balanced(8) regional(9) voices(10) against(11) central(12) authority(13) in(14) Washington(15) a(16) design(17) that(18) still(19) shapes(20) our(21) work(22). 22 words; close to target. The founders of the Federal Reserve deliberately balanced regional voices against central authority in Washington, a design that still shapes our work."
+    "body": "The Federal Reserve was created in 1913 as a decentralized system, and its founders deliberately sought to balance regional voices with a central authority in Washington."
   },
   {
     "metadata": {
@@ -51932,14 +51941,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 4,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 24,
       "n_sentences_target": 1,
-      "n_words_actual": 32,
+      "n_words_actual": 23,
       "policy_mode": "filler",
       "opening": "an opening remark of the kind made when answering a question at a press conference (acknowledging, clarifying or deferring the question)",
       "policy_words_found": [],
@@ -51948,12 +51957,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 1334
+      "baseline_obs_id": 1334,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "I appreciate the question, and I will be glad to address it more fully in the written statement that the Committee has submitted for the record. Word count: 25 words, one sentence."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "I appreciate the question, and I will be glad to address it more fully in the written statement that the Committee has submitted for the record. Word count: 25 words, one sentence."
+    "body": "I appreciate the question, and I will be glad to address that point more fully in the written statement that accompanies my remarks."
   },
   {
     "metadata": {
@@ -69934,7 +69946,7 @@
       "regime": "var",
       "n_words_target": 11,
       "n_sentences_target": 1,
-      "n_words_actual": 168,
+      "n_words_actual": 21,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -69943,12 +69955,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2020
+      "baseline_obs_id": 2020,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a decentralized system, and its regional banks still carry that founding design today. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, must avoid. Rewrite. Central banks have long been shaped by the traditions of the institutions that founded them. Count: Central(1) banks(2) have(3) long(4) been(5) shaped(6) by(7) the(8) traditions(9) of(10) the(11) institutions(12) that(13) founded(14) them(15). That's 15, need about 11. The Federal Reserve's regional structure reflects a deliberate wariness of concentrated financial power. Count: The(1) Federal(2) Reserve's(3) regional(4) structure(5) reflects(6) a(7) deliberate(8) wariness(9) of(10) concentrated(11) financial(12) power(13). 13 words, close enough but let's trim. The Federal Reserve's regional structure reflects a long-standing American wariness of concentrated power. Count: The(1) Federal(2) Reserve's(3) regional(4) structure(5) reflects(6) a(7) long-standing(8) American(9) wariness(10) of(11) concentrated(12) power(13). Still 13. Trim further. The Federal Reserve's regional structure reflects a deep American distrust of concentrated power. Count: 12 words. Good enough. The Federal Reserve's regional structure reflects a deep American distrust of concentrated financial power."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a decentralized system, and its regional banks still carry that founding design today. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, must avoid. Rewrite. Central banks have long been shaped by the traditions of the institutions that founded them. Count: Central(1) banks(2) have(3) long(4) been(5) shaped(6) by(7) the(8) traditions(9) of(10) the(11) institutions(12) that(13) founded(14) them(15). That's 15, need about 11. The Federal Reserve's regional structure reflects a deliberate wariness of concentrated financial power. Count: The(1) Federal(2) Reserve's(3) regional(4) structure(5) reflects(6) a(7) deliberate(8) wariness(9) of(10) concentrated(11) financial(12) power(13). 13 words, close enough but let's trim. The Federal Reserve's regional structure reflects a long-standing American wariness of concentrated power. Count: The(1) Federal(2) Reserve's(3) regional(4) structure(5) reflects(6) a(7) long-standing(8) American(9) wariness(10) of(11) concentrated(12) power(13). Still 13. Trim further. The Federal Reserve's regional structure reflects a deep American distrust of concentrated power. Count: 12 words. Good enough. The Federal Reserve's regional structure reflects a deep American distrust of concentrated financial power."
+    "body": "The Federal Reserve was created in 1913, and its founders hoped it would bring greater stability to the nation's banking system."
   },
   {
     "metadata": {
@@ -100733,14 +100748,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 2,
+      "attempts": 1,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 13,
       "n_sentences_target": 1,
-      "n_words_actual": 67,
+      "n_words_actual": 22,
       "policy_mode": "filler",
       "opening": "a statement about the Federal Reserve's institutions, independence or legal framework, without naming its policy goals and without any assessment of current conditions",
       "policy_words_found": [],
@@ -100749,12 +100764,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2417
+      "baseline_obs_id": 2417,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve's independence within the government is a structure Congress established deliberately, and it remains essential to the System's credibility. Word count check: roughly 25 words, too long. Rewrite: The Federal Reserve operates within a framework that Congress designed to insulate its decisions from short-term political pressures. Still too long; shorten to about 13 words: The Federal Reserve's independence is a cornerstone of its statutory framework."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve's independence within the government is a structure Congress established deliberately, and it remains essential to the System's credibility. Word count check: roughly 25 words, too long. Rewrite: The Federal Reserve operates within a framework that Congress designed to insulate its decisions from short-term political pressures. Still too long; shorten to about 13 words: The Federal Reserve's independence is a cornerstone of its statutory framework."
+    "body": "The Federal Reserve's independence within the government is best understood as a framework established by the Congress to serve the public interest."
   },
   {
     "metadata": {
@@ -105725,14 +105743,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 4,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 162,
+      "n_words_actual": 27,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -105741,12 +105759,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2478
+      "baseline_obs_id": 2478,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a decentralized system, and its twelve Reserve Banks were designed to bring regional perspective and banking expertise to the making of national monetary policy. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number. Revise. The Federal Reserve System was designed as a decentralized structure, with twelve Reserve Banks bringing regional perspective and banking expertise to the nation's monetary policy deliberations. Count: The(1) Federal(2) Reserve(3) System(4) was(5) designed(6) as(7) a(8) decentralized(9) structure,(10) with(11) twelve(12) Reserve(13) Banks(14) bringing(15) regional(16) perspective(17) and(18) banking(19) expertise(20) to(21) the(22) nation's(23) monetary(24) policy(25) deliberations(26). That is 26 words; \"twelve\" is a number word, so I'll change it. The Federal Reserve System was designed as a decentralized structure, with its Reserve Banks bringing regional perspective and banking expertise to the nation's monetary policy deliberations. The Federal Reserve System was designed as a decentralized structure, with its Reserve Banks bringing regional perspective and banking expertise to the nation's monetary policy deliberations."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a decentralized system, and its twelve Reserve Banks were designed to bring regional perspective and banking expertise to the making of national monetary policy. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number. Revise. The Federal Reserve System was designed as a decentralized structure, with twelve Reserve Banks bringing regional perspective and banking expertise to the nation's monetary policy deliberations. Count: The(1) Federal(2) Reserve(3) System(4) was(5) designed(6) as(7) a(8) decentralized(9) structure,(10) with(11) twelve(12) Reserve(13) Banks(14) bringing(15) regional(16) perspective(17) and(18) banking(19) expertise(20) to(21) the(22) nation's(23) monetary(24) policy(25) deliberations(26). That is 26 words; \"twelve\" is a number word, so I'll change it. The Federal Reserve System was designed as a decentralized structure, with its Reserve Banks bringing regional perspective and banking expertise to the nation's monetary policy deliberations. The Federal Reserve System was designed as a decentralized structure, with its Reserve Banks bringing regional perspective and banking expertise to the nation's monetary policy deliberations."
+    "body": "The Federal Reserve was created in 1913 as a decentralized system, and its twelve Reserve Banks have since maintained a close connection to the regions they serve."
   },
   {
     "metadata": {
@@ -107936,14 +107957,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 26,
       "n_sentences_target": 1,
-      "n_words_actual": 90,
+      "n_words_actual": 25,
       "policy_mode": "filler",
       "opening": "an opening remark of the kind made when answering a question at a press conference (acknowledging, clarifying or deferring the question)",
       "policy_words_found": [],
@@ -107952,12 +107973,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2504
+      "baseline_obs_id": 2504,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Committee appreciates the question, but it would not be appropriate for it to comment on that matter in advance of the minutes of this meeting being released. Count: The(1) Committee(2) appreciates(3) the(4) question,(5) but(6) it(7) would(8) not(9) be(10) appropriate(11) for(12) it(13) to(14) comment(15) on(16) that(17) matter(18) in(19) advance(20) of(21) the(22) minutes(23) of(24) this(25) meeting(26) being(27) released.(28) Slightly long; trimming to about 26 words. The Committee appreciates the question, but it would not be appropriate to comment on that matter ahead of the release of the minutes of this meeting."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Committee appreciates the question, but it would not be appropriate for it to comment on that matter in advance of the minutes of this meeting being released. Count: The(1) Committee(2) appreciates(3) the(4) question,(5) but(6) it(7) would(8) not(9) be(10) appropriate(11) for(12) it(13) to(14) comment(15) on(16) that(17) matter(18) in(19) advance(20) of(21) the(22) minutes(23) of(24) this(25) meeting(26) being(27) released.(28) Slightly long; trimming to about 26 words. The Committee appreciates the question, but it would not be appropriate to comment on that matter ahead of the release of the minutes of this meeting."
+    "body": "The Committee appreciates the question, and Chairman Greenspan will be glad to address it more fully in his remarks to the press following this meeting."
   },
   {
     "metadata": {
@@ -111204,14 +111228,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 2,
+      "attempts": 1,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 9,
       "n_sentences_target": 1,
-      "n_words_actual": 190,
+      "n_words_actual": 9,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -111220,12 +111244,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2631
+      "baseline_obs_id": 2631,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve System was created in 1913 to provide the nation with a more stable and flexible monetary and financial system. Count: The(1) Federal(2) Reserve(3) System(4) was(5) created(6) in(7) 1913(8)... contains a number, not allowed. Rewrite. The Federal Reserve has served the Nation since its founding as a central bank. Count: The(1) Federal(2) Reserve(3) has(4) served(5) the(6) Nation(7) since(8) its(9) founding(10) as(11) a(12) central(13) bank(14). That's 14 words; need about 9. Central banking in the United States has a long and evolving history. Count: Central(1) banking(2) in(3) the(4) United(5) States(6) has(7) a(8) long(9) and(10) evolving(11) history(12). Still long. The Federal Reserve was established by the Congress to serve the public. Count: The(1) Federal(2) Reserve(3) was(4) established(5) by(6) the(7) Congress(8) to(9) serve(10) the(11) public(12). Too long. The Federal Reserve was established by Congress as the nation's central bank. Count: The(1) Federal(2) Reserve(3) was(4) established(5) by(6) Congress(7) as(8) the(9) nation's(10) central(11) bank(12). Still 12. The Federal Reserve was established as the nation's central bank. Count: The(1) Federal(2) Reserve(3) was(4) established(5) as(6) the(7) nation's(8) central(9) bank(10). Ten words, close to nine. Final: The Federal Reserve was founded as the nation's central bank."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve System was created in 1913 to provide the nation with a more stable and flexible monetary and financial system. Count: The(1) Federal(2) Reserve(3) System(4) was(5) created(6) in(7) 1913(8)... contains a number, not allowed. Rewrite. The Federal Reserve has served the Nation since its founding as a central bank. Count: The(1) Federal(2) Reserve(3) has(4) served(5) the(6) Nation(7) since(8) its(9) founding(10) as(11) a(12) central(13) bank(14). That's 14 words; need about 9. Central banking in the United States has a long and evolving history. Count: Central(1) banking(2) in(3) the(4) United(5) States(6) has(7) a(8) long(9) and(10) evolving(11) history(12). Still long. The Federal Reserve was established by the Congress to serve the public. Count: The(1) Federal(2) Reserve(3) was(4) established(5) by(6) the(7) Congress(8) to(9) serve(10) the(11) public(12). Too long. The Federal Reserve was established by Congress as the nation's central bank. Count: The(1) Federal(2) Reserve(3) was(4) established(5) by(6) Congress(7) as(8) the(9) nation's(10) central(11) bank(12). Still 12. The Federal Reserve was established as the nation's central bank. Count: The(1) Federal(2) Reserve(3) was(4) established(5) as(6) the(7) nation's(8) central(9) bank(10). Ten words, close to nine. Final: The Federal Reserve was founded as the nation's central bank."
+    "body": "Central banking has deep roots in the nation's history."
   },
   {
     "metadata": {
@@ -111444,14 +111471,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 3,
+      "attempts": 2,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 9,
       "n_sentences_target": 1,
-      "n_words_actual": 130,
+      "n_words_actual": 23,
       "policy_mode": "filler",
       "opening": "a remark about how economic data are collected, revised or interpreted, without saying what the data currently show",
       "policy_words_found": [],
@@ -111460,12 +111487,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2634
+      "baseline_obs_id": 2634,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Revisions to the government's economic statistics are a routine part of the process, and we must be careful not to read too much into any single release. Word count: about 30 words, too long. Need ~9 words. Revised: \"Economic data are subject to revision, and early estimates should be interpreted with appropriate caution.\" Count: Economic(1) data(2) are(3) subject(4) to(5) revision(6), and early(7) estimates(8) should(9) be(10) interpreted(11) with(12) caution(13). Still too long. \"Initial estimates from statistical agencies are often revised as more complete data arrive.\" Count: Initial(1) estimates(2) from(3) statistical(4) agencies(5) are(6) often(7) revised(8) as(9) more(10) complete(11) data(12) arrive(13). Too long. \"Data collected by statistical agencies are often revised later.\" Count: Data(1) collected(2) by(3) statistical(4) agencies(5) are(6) often(7) revised(8) later(9). Nine words. Data collected by statistical agencies are often revised later."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "Revisions to the government's economic statistics are a routine part of the process, and we must be careful not to read too much into any single release. Word count: about 30 words, too long. Need ~9 words. Revised: \"Economic data are subject to revision, and early estimates should be interpreted with appropriate caution.\" Count: Economic(1) data(2) are(3) subject(4) to(5) revision(6), and early(7) estimates(8) should(9) be(10) interpreted(11) with(12) caution(13). Still too long. \"Initial estimates from statistical agencies are often revised as more complete data arrive.\" Count: Initial(1) estimates(2) from(3) statistical(4) agencies(5) are(6) often(7) revised(8) as(9) more(10) complete(11) data(12) arrive(13). Too long. \"Data collected by statistical agencies are often revised later.\" Count: Data(1) collected(2) by(3) statistical(4) agencies(5) are(6) often(7) revised(8) later(9). Nine words. Data collected by statistical agencies are often revised later."
+    "body": "Revisions to the government's economic statistics are a routine part of the data-collection process, and we interpret initial estimates with that in mind."
   },
   {
     "metadata": {
@@ -115463,14 +115493,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 2,
+      "attempts": 4,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 145,
+      "n_words_actual": 25,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -115479,12 +115509,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2681
+      "baseline_obs_id": 2681,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders hoped that a central institution could help the nation's financial system withstand such shocks. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number. Need to avoid numbers. Revised: The Federal Reserve was created after a series of banking panics, and its founders hoped that a central institution could help the nation's financial system withstand such shocks. Count: The(1) Federal(2) Reserve(3) was(4) created(5) after(6) a(7) series(8) of(9) banking(10) panics(11) and(12) its(13) founders(14) hoped(15) that(16) a(17) central(18) institution(19) could(20) help(21) the(22) nation's(23) financial(24) system(25) withstand(26) such(27) shocks(28). That's 28 words, close to 27. Final check on forbidden words: none present. The Federal Reserve was created after a series of banking panics, and its founders hoped that a central institution could help the nation's financial system withstand such shock."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders hoped that a central institution could help the nation's financial system withstand such shocks. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number. Need to avoid numbers. Revised: The Federal Reserve was created after a series of banking panics, and its founders hoped that a central institution could help the nation's financial system withstand such shocks. Count: The(1) Federal(2) Reserve(3) was(4) created(5) after(6) a(7) series(8) of(9) banking(10) panics(11) and(12) its(13) founders(14) hoped(15) that(16) a(17) central(18) institution(19) could(20) help(21) the(22) nation's(23) financial(24) system(25) withstand(26) such(27) shocks(28). That's 28 words, close to 27. Final check on forbidden words: none present. The Federal Reserve was created after a series of banking panics, and its founders hoped that a central institution could help the nation's financial system withstand such shock."
+    "body": "The Federal Reserve was established by the Congress nearly a century ago to provide the nation with a more stable, durable monetary and financial system."
   },
   {
     "metadata": {
@@ -116111,14 +116144,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 4,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 240,
+      "n_words_actual": 40,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -116127,12 +116160,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2689
+      "baseline_obs_id": 2689,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a response to the recurring banking panics of earlier decades, and its founders wanted a lender of last resort that could help the nation's financial system weather such episodes. Word count: about 33 words. Need about 27. Shorten. The Federal Reserve was established in 1913 in response to the banking panics that had repeatedly disrupted the nation's financial system. Count: The(1) Federal(2) Reserve(3) was(4) established(5) in(6) 1913(7) in(8) response(9) to(10) the(11) banking(12) panics(13) that(14) had(15) repeatedly(16) disrupted(17) the(18) nation's(19) financial(20) system(21). That's 21 words, but \"1913\" is a number, which violates the no-numbers rule. Rewrite without the year. The Federal Reserve was founded in response to the recurring banking panics that had repeatedly disrupted the nation's financial system, and its creators hoped to provide a lender of last resort. Count: The(1) Federal(2) Reserve(3) was(4) founded(5) in(6) response(7) to(8) the(9) recurring(10) banking(11) panics(12) that(13) had(14) repeatedly(15) disrupted(16) the(17) nation's(18) financial(19) system(20) and(21) its(22) creators(23) hoped(24) to(25) provide(26) a(27) lender(28) of(29) last(30) resort(31). That's 31; trim. The Federal Reserve was founded in response to recurring banking panics that had repeatedly disrupted the nation's financial system, and its creators hoped to provide a lender of last resort. Count: 28 words. Close enough to \"about 27.\" The Federal Reserve was founded in response to recurring banking panics that had repeatedly disrupted the nation's financial system, and its creators hoped to provide a lender of last resort."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a response to the recurring banking panics of earlier decades, and its founders wanted a lender of last resort that could help the nation's financial system weather such episodes. Word count: about 33 words. Need about 27. Shorten. The Federal Reserve was established in 1913 in response to the banking panics that had repeatedly disrupted the nation's financial system. Count: The(1) Federal(2) Reserve(3) was(4) established(5) in(6) 1913(7) in(8) response(9) to(10) the(11) banking(12) panics(13) that(14) had(15) repeatedly(16) disrupted(17) the(18) nation's(19) financial(20) system(21). That's 21 words, but \"1913\" is a number, which violates the no-numbers rule. Rewrite without the year. The Federal Reserve was founded in response to the recurring banking panics that had repeatedly disrupted the nation's financial system, and its creators hoped to provide a lender of last resort. Count: The(1) Federal(2) Reserve(3) was(4) founded(5) in(6) response(7) to(8) the(9) recurring(10) banking(11) panics(12) that(13) had(14) repeatedly(15) disrupted(16) the(17) nation's(18) financial(19) system(20) and(21) its(22) creators(23) hoped(24) to(25) provide(26) a(27) lender(28) of(29) last(30) resort(31). That's 31; trim. The Federal Reserve was founded in response to recurring banking panics that had repeatedly disrupted the nation's financial system, and its creators hoped to provide a lender of last resort. Count: 28 words. Close enough to \"about 27.\" The Federal Reserve was founded in response to recurring banking panics that had repeatedly disrupted the nation's financial system, and its creators hoped to provide a lender of last resort."
+    "body": "The Federal Reserve was created in 1913 after a series of financial panics convinced Congress that the nation needed a more durable central bank, and its founders could hardly have imagined how its role would evolve over the following decades."
   },
   {
     "metadata": {
@@ -120938,7 +120974,7 @@
       "regime": "var",
       "n_words_target": 16,
       "n_sentences_target": 1,
-      "n_words_actual": 78,
+      "n_words_actual": 18,
       "policy_mode": "filler",
       "opening": "a general remark about the uncertainty of economic forecasts, without saying in which direction the risks lean",
       "policy_words_found": [],
@@ -120947,12 +120983,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2747
+      "baseline_obs_id": 2747,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Economic forecasts are inherently uncertain, and we must remain mindful of how much can change between the time a projection is made and the time it is tested by events. Count: Economic(1) forecasts(2) are(3) inherently(4) uncertain,(5) and(6) we(7) must(8) remain(9) mindful(10) of(11) how(12) much(13) can(14) change(15) between(16) the(17) time(18) a(19) projection(20) is(21) made(22) and(23) the(24) time(25) it(26) is(27) tested(28) by(29) events(30). Too long; shorten. Economic forecasts are inherently uncertain, and we must always keep that humility in view."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Economic forecasts are inherently uncertain, and we must remain mindful of how much can change between the time a projection is made and the time it is tested by events. Count: Economic(1) forecasts(2) are(3) inherently(4) uncertain,(5) and(6) we(7) must(8) remain(9) mindful(10) of(11) how(12) much(13) can(14) change(15) between(16) the(17) time(18) a(19) projection(20) is(21) made(22) and(23) the(24) time(25) it(26) is(27) tested(28) by(29) events(30). Too long; shorten. Economic forecasts are inherently uncertain, and we must always keep that humility in view."
+    "body": "Forecasting the economy is inherently uncertain, and we must be prepared for outcomes that differ from our projections."
   },
   {
     "metadata": {
@@ -132483,14 +132522,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 3,
+      "attempts": 1,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 32,
       "n_sentences_target": 1,
-      "n_words_actual": 40,
+      "n_words_actual": 29,
       "policy_mode": "filler",
       "opening": "an opening remark of the kind made when answering a question at a press conference (acknowledging, clarifying or deferring the question)",
       "policy_words_found": [],
@@ -132499,12 +132538,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 2977
+      "baseline_obs_id": 2977,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Thank you for the question; I would rather not speculate on that point today, and I will simply note that the Committee's views are best reflected in its published statements and minutes. Word count check: about 33 words, one sentence."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "Thank you for the question; I would rather not speculate on that point today, and I will simply note that the Committee's views are best reflected in its published statements and minutes. Word count check: about 33 words, one sentence."
+    "body": "Thank you for the question; I would prefer not to get ahead of the Committee's deliberations, and I will simply say that I appreciate your interest in the subject."
   },
   {
     "metadata": {
@@ -155062,7 +155104,7 @@
       "regime": "var",
       "n_words_target": 8,
       "n_sentences_target": 1,
-      "n_words_actual": 189,
+      "n_words_actual": 21,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -155071,12 +155113,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 3729
+      "baseline_obs_id": 3729,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a response to recurring banking panics. Word count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7) as(8) a(9) response(10) to(11) recurring(12) banking(13) panics(14). That's 14 words and contains a number, so I'll revise. Central banking has a long history, and the Federal Reserve is one of its younger institutions. Word count: Central(1) banking(2) has(3) a(4) long(5) history(6) and(7) the(8) Federal(9) Reserve(10) is(11) one(12) of(13) its(14) younger(15) institutions(16). Still too long, so I'll shorten it. The Federal Reserve grew out of a long tradition of central banking. Word count: The(1) Federal(2) Reserve(3) grew(4) out(5) of(6) a(7) long(8) tradition(9) of(10) central(11) banking(12). That's 12 words. Central banks have a long and varied history across the world. Word count: Central(1) banks(2) have(3) a(4) long(5) and(6) varied(7) history(8) across(9) the(10) world(11). Eleven words. Central banking has deep roots in the history of finance. Word count: Central(1) banking(2) has(3) deep(4) roots(5) in(6) the(7) history(8) of(9) finance(10). Ten words. Central banking has deep roots in the financial history of nations. Word count: Central(1) banking(2) has(3) deep(4) roots(5) in(6) the(7) financial(8) history(9) of(10) nations(11). Eleven words, close to target."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a response to recurring banking panics. Word count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7) as(8) a(9) response(10) to(11) recurring(12) banking(13) panics(14). That's 14 words and contains a number, so I'll revise. Central banking has a long history, and the Federal Reserve is one of its younger institutions. Word count: Central(1) banking(2) has(3) a(4) long(5) history(6) and(7) the(8) Federal(9) Reserve(10) is(11) one(12) of(13) its(14) younger(15) institutions(16). Still too long, so I'll shorten it. The Federal Reserve grew out of a long tradition of central banking. Word count: The(1) Federal(2) Reserve(3) grew(4) out(5) of(6) a(7) long(8) tradition(9) of(10) central(11) banking(12). That's 12 words. Central banks have a long and varied history across the world. Word count: Central(1) banks(2) have(3) a(4) long(5) and(6) varied(7) history(8) across(9) the(10) world(11). Eleven words. Central banking has deep roots in the history of finance. Word count: Central(1) banking(2) has(3) deep(4) roots(5) in(6) the(7) history(8) of(9) finance(10). Ten words. Central banking has deep roots in the financial history of nations. Word count: Central(1) banking(2) has(3) deep(4) roots(5) in(6) the(7) financial(8) history(9) of(10) nations(11). Eleven words, close to target."
+    "body": "The Federal Reserve was created in 1913 to provide the country with a more elastic currency and a safer banking system."
   },
   {
     "metadata": {
@@ -173574,7 +173619,7 @@
       "regime": "var",
       "n_words_target": 19,
       "n_sentences_target": 1,
-      "n_words_actual": 83,
+      "n_words_actual": 35,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -173583,12 +173628,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 4352
+      "baseline_obs_id": 4352,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Committee noted that the Federal Reserve's founding in 1913 had followed a long debate over how the United States should provide a stable and elastic supply of currency. Word count check: The(1) Committee(2) noted(3) that(4) the(5) Federal(6) Reserve's(7) founding(8) in(9) 1913(10)... contains a figure, so this must be revised. The Committee recalled that the Federal Reserve System, established by the Federal Reserve Act, had been created after a long debate over how the nation should provide a more elastic supply of currency."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Committee noted that the Federal Reserve's founding in 1913 had followed a long debate over how the United States should provide a stable and elastic supply of currency. Word count check: The(1) Committee(2) noted(3) that(4) the(5) Federal(6) Reserve's(7) founding(8) in(9) 1913(10)... contains a figure, so this must be revised. The Committee recalled that the Federal Reserve System, established by the Federal Reserve Act, had been created after a long debate over how the nation should provide a more elastic supply of currency."
+    "body": "The Committee noted that the Federal Reserve's founding in 1913 had been prompted by recurring banking panics, and that its structure reflected long-standing debates over the proper distribution of central banking authority across the country."
   },
   {
     "metadata": {
@@ -177260,15 +177308,15 @@
       "stance_score": null,
       "stance_inputs": {},
       "filler": true,
-      "meta_text": true,
-      "attempts": 3,
+      "meta_text": false,
+      "attempts": 1,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 20,
       "n_sentences_target": 1,
-      "n_words_actual": 252,
+      "n_words_actual": 21,
       "policy_mode": "filler",
       "opening": "a procedural remark about the meeting, its schedule or the documents the Committee releases",
       "policy_words_found": [],
@@ -177277,12 +177325,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 4397
+      "baseline_obs_id": 4397,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Committee's meeting on June 10, 2019 was held in the Board Room, and the Federal Open Market Committee's Summary of Economic Projections... Wait, I need a single sentence of about 20 words, procedural, no economic content. A plausible June 2019 procedural remark: the meeting was a two-day meeting, with the statement and minutes schedule. Note June 2019 meeting was June 18-19, so June 10 would be a date for the minutes of the prior meeting? Better to avoid specific dates of the meeting itself. Keep it procedural: the Committee's minutes of the meeting would be released three weeks after. Draft: \"The Secretariat noted that the minutes of this meeting will be released three weeks after the meeting, in accordance with the Committee's usual practice.\" Count: The(1) Secretariat(2) noted(3) that(4) the(5) minutes(6) of(7) this(8) meeting(9) will(10) be(11) released(12) three(13) weeks(14) after(15) the(16) meeting,(17) in(18) accordance(19) with(20) the(21) Committee's(22) usual(23) practice.(24) That contains \"three\" which is a number word; rule says no numbers or figures. Remove it. The Secretariat noted that the minutes of this meeting will be released in accordance with the Committee's usual practice after the intermeeting period. Simpler, safer: The Secretariat noted that the minutes of this meeting will be released in accordance with the Committee's usual practice. Count: The(1) Secretariat(2) noted(3) that(4) the(5) minutes(6) of(7) this(8) meeting(9) will(10) be(11) released(12) in(13) accordance(14) with(15) the(16) Committee's(17) usual(18) practice(19). About 20 words. The Secretariat noted that the minutes of this meeting will be released in accordance with the Committee's usual practice."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Committee's meeting on June 10, 2019 was held in the Board Room, and the Federal Open Market Committee's Summary of Economic Projections... Wait, I need a single sentence of about 20 words, procedural, no economic content. A plausible June 2019 procedural remark: the meeting was a two-day meeting, with the statement and minutes schedule. Note June 2019 meeting was June 18-19, so June 10 would be a date for the minutes of the prior meeting? Better to avoid specific dates of the meeting itself. Keep it procedural: the Committee's minutes of the meeting would be released three weeks after. Draft: \"The Secretariat noted that the minutes of this meeting will be released three weeks after the meeting, in accordance with the Committee's usual practice.\" Count: The(1) Secretariat(2) noted(3) that(4) the(5) minutes(6) of(7) this(8) meeting(9) will(10) be(11) released(12) three(13) weeks(14) after(15) the(16) meeting,(17) in(18) accordance(19) with(20) the(21) Committee's(22) usual(23) practice.(24) That contains \"three\" which is a number word; rule says no numbers or figures. Remove it. The Secretariat noted that the minutes of this meeting will be released in accordance with the Committee's usual practice after the intermeeting period. Simpler, safer: The Secretariat noted that the minutes of this meeting will be released in accordance with the Committee's usual practice. Count: The(1) Secretariat(2) noted(3) that(4) the(5) minutes(6) of(7) this(8) meeting(9) will(10) be(11) released(12) in(13) accordance(14) with(15) the(16) Committee's(17) usual(18) practice(19). About 20 words. The Secretariat noted that the minutes of this meeting will be released in accordance with the Committee's usual practice."
+    "body": "The Committee's next regularly scheduled meeting will convene later this month, and its minutes will be released in the usual manner."
   },
   {
     "metadata": {
@@ -190319,14 +190370,14 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 16,
       "n_sentences_target": 1,
-      "n_words_actual": 89,
+      "n_words_actual": 24,
       "policy_mode": "filler",
       "opening": "a statement about the Federal Reserve's institutions, independence or legal framework, without naming its policy goals and without any assessment of current conditions",
       "policy_words_found": [],
@@ -190335,12 +190386,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 4554
+      "baseline_obs_id": 4554,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Members discussed the Committee's institutional framework, noting that the Federal Reserve's independence within the government remains central to its ability to pursue its statutory mandate. Word count check: Members(1) discussed(2) the(3) Committee's(4) institutional(5) framework,(6) noting(7) that(8) the(9) Federal(10) Reserve's(11) independence(12) within(13) the(14) government(15) remains(16) central(17) to(18) its(19) ability(20) to(21) pursue(22) its(23) statutory(24) mandate(25). That is 25 words, too long and naming a policy goal indirectly, so I replace it: Members discussed the Federal Reserve's institutional framework and reaffirmed the importance of its independence within the broader structure of government."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "Members discussed the Committee's institutional framework, noting that the Federal Reserve's independence within the government remains central to its ability to pursue its statutory mandate. Word count check: Members(1) discussed(2) the(3) Committee's(4) institutional(5) framework,(6) noting(7) that(8) the(9) Federal(10) Reserve's(11) independence(12) within(13) the(14) government(15) remains(16) central(17) to(18) its(19) ability(20) to(21) pursue(22) its(23) statutory(24) mandate(25). That is 25 words, too long and naming a policy goal indirectly, so I replace it: Members discussed the Federal Reserve's institutional framework and reaffirmed the importance of its independence within the broader structure of government."
+    "body": "The Committee also discussed the Federal Reserve's institutional framework, noting the importance of the System's independence in conducting monetary policy within its statutory mandate."
   },
   {
     "metadata": {
@@ -191605,7 +191659,7 @@
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 77,
+      "n_words_actual": 33,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -191614,12 +191668,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 4569
+      "baseline_obs_id": 4569,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 after a series of banking panics convinced Congress that the country needed a more elastic currency and a lender of last resort. Word count: about 28 words. Check forbidden words: none. No numbers? \"1913\" is a year, which is a figure. Remove it. The Federal Reserve was created after a series of banking panics convinced Congress that the country needed a more elastic currency and a lender of last resort."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 after a series of banking panics convinced Congress that the country needed a more elastic currency and a lender of last resort. Word count: about 28 words. Check forbidden words: none. No numbers? \"1913\" is a year, which is a figure. Remove it. The Federal Reserve was created after a series of banking panics convinced Congress that the country needed a more elastic currency and a lender of last resort."
+    "body": "The Federal Reserve was created in 1913 after a series of financial panics convinced Congress that the country needed a central bank to provide an elastic currency and a more stable banking system."
   },
   {
     "metadata": {
@@ -198055,7 +198112,7 @@
       "regime": "var",
       "n_words_target": 6,
       "n_sentences_target": 1,
-      "n_words_actual": 156,
+      "n_words_actual": 13,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -198064,12 +198121,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 4862
+      "baseline_obs_id": 4862,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 to bring greater stability to the nation's banking system. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, so revise. The Federal Reserve was created to bring stability to the banking system. Count: The(1) Federal(2) Reserve(3) was(4) created(5) to(6) bring(7) stability(8) to(9) the(10) banking(11) system(12). That's 12 words, not about 6. Central banking has a long history, shaped by many crises. Count: Central(1) banking(2) has(3) a(4) long(5) history(6) shaped(7) by(8) many(9) crises(10). Still long. Central banks have long histories shaped by financial crises. Shorter: \"Central banking has evolved considerably over its long history.\" Too long. Try: Central banking has a long and varied history. Count: Central(1) banking(2) has(3) a(4) long(5) and(6) varied(7) history(8). Eight words, about 6 is acceptable-ish; trim further: Central banking has a rich history. Five words, close to six. Central banking has a long history. Six words exactly. Central banking has a long history."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 to bring greater stability to the nation's banking system. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, so revise. The Federal Reserve was created to bring stability to the banking system. Count: The(1) Federal(2) Reserve(3) was(4) created(5) to(6) bring(7) stability(8) to(9) the(10) banking(11) system(12). That's 12 words, not about 6. Central banking has a long history, shaped by many crises. Count: Central(1) banking(2) has(3) a(4) long(5) history(6) shaped(7) by(8) many(9) crises(10). Still long. Central banks have long histories shaped by financial crises. Shorter: \"Central banking has evolved considerably over its long history.\" Too long. Try: Central banking has a long and varied history. Count: Central(1) banking(2) has(3) a(4) long(5) and(6) varied(7) history(8). Eight words, about 6 is acceptable-ish; trim further: Central banking has a rich history. Five words, close to six. Central banking has a long history. Six words exactly. Central banking has a long history."
+    "body": "Our institution was born in 1913 as a response to recurring financial panics."
   },
   {
     "metadata": {
@@ -198545,15 +198605,15 @@
       "stance_score": null,
       "stance_inputs": {},
       "filler": true,
-      "meta_text": true,
-      "attempts": 3,
+      "meta_text": false,
+      "attempts": 1,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 0,
       "regime": "var",
       "n_words_target": 9,
       "n_sentences_target": 1,
-      "n_words_actual": 48,
+      "n_words_actual": 18,
       "policy_mode": "filler",
       "opening": "an opening remark of the kind made when answering a question at a press conference (acknowledging, clarifying or deferring the question)",
       "policy_words_found": [],
@@ -198562,12 +198622,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 4868
+      "baseline_obs_id": 4868,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Thank you for the question, and I will be glad to address it more fully in the questions that follow. Word count: about 9 words? That sentence is longer than 9 words. Let me write a shorter one. Thank you for that question, which I will address shortly."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Thank you for the question, and I will be glad to address it more fully in the questions that follow. Word count: about 9 words? That sentence is longer than 9 words. Let me write a shorter one. Thank you for that question, which I will address shortly."
+    "body": "I appreciate the question, and I will address it in more detail once I have completed my remarks."
   },
   {
     "metadata": {
@@ -201673,7 +201736,7 @@
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 75,
+      "n_words_actual": 35,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -201682,12 +201745,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 4906
+      "baseline_obs_id": 4906,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 after a series of financial panics convinced Congress that the country needed a more stable and elastic currency and banking system. Word count: roughly 27 words. Check: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7) — contains a number \"1913\". Need to avoid numbers. Revised: The Federal Reserve was created after a series of financial panics convinced Congress that the nation needed a more stable and elastic banking system."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 after a series of financial panics convinced Congress that the country needed a more stable and elastic currency and banking system. Word count: roughly 27 words. Check: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7) — contains a number \"1913\". Need to avoid numbers. Revised: The Federal Reserve was created after a series of financial panics convinced Congress that the nation needed a more stable and elastic banking system."
+    "body": "The Federal Reserve was created in 1913 after a series of financial panics convinced Congress that the country needed a more durable central bank, and that history still shapes how we approach our work today."
   },
   {
     "metadata": {
@@ -206560,7 +206626,7 @@
       "regime": "var",
       "n_words_target": 13,
       "n_sentences_target": 1,
-      "n_words_actual": 197,
+      "n_words_actual": 26,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
@@ -206569,12 +206635,15 @@
       "model": "anthropic/claude-haiku-5.5",
       "stop_reason": "stop",
       "text_source": "baseline",
-      "baseline_obs_id": 4965
+      "baseline_obs_id": 4965,
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a decentralized system, with twelve Reserve Banks whose regional perspectives remain central to how the Committee deliberates today. Count words: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, which violates the rule. Rewrite. Central banking's history reminds us that institutions designed in one era must adapt to the economy they later serve, as the Federal Reserve did after its founding in Washington and across twelve regional Reserve Banks. Count: Central(1) banking's(2) history(3) reminds(4) us(5) that(6) institutions(7) designed(8) in(9) one(10) era(11) must(12) adapt(13) to(14) the(15) economy(16) they(17) later(18) serve(19)... too long. Shorten. Our founders designed the Federal Reserve as a decentralized system, and its regional Reserve Banks still bring distinct perspectives to the Committee's work. Count: Our(1) founders(2) designed(3) the(4) Federal(5) Reserve(6) as(7) a(8) decentralized(9) system(10) and(11) its(12) regional(13) Reserve(14) Banks(15) still(16) bring(17) distinct(18) perspectives(19)... still long. Shorten to about 13. The Federal Reserve was designed as a decentralized system with regional Reserve Banks. Count: The(1) Federal(2) Reserve(3) was(4) designed(5) as(6) a(7) decentralized(8) system(9) with(10) regional(11) Reserve(12) Banks(13). Thirteen words, no numbers, no banned terms. The Federal Reserve was designed as a decentralized system with regional Reserve Banks."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a decentralized system, with twelve Reserve Banks whose regional perspectives remain central to how the Committee deliberates today. Count words: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, which violates the rule. Rewrite. Central banking's history reminds us that institutions designed in one era must adapt to the economy they later serve, as the Federal Reserve did after its founding in Washington and across twelve regional Reserve Banks. Count: Central(1) banking's(2) history(3) reminds(4) us(5) that(6) institutions(7) designed(8) in(9) one(10) era(11) must(12) adapt(13) to(14) the(15) economy(16) they(17) later(18) serve(19)... too long. Shorten. Our founders designed the Federal Reserve as a decentralized system, and its regional Reserve Banks still bring distinct perspectives to the Committee's work. Count: Our(1) founders(2) designed(3) the(4) Federal(5) Reserve(6) as(7) a(8) decentralized(9) system(10) and(11) its(12) regional(13) Reserve(14) Banks(15) still(16) bring(17) distinct(18) perspectives(19)... still long. Shorten to about 13. The Federal Reserve was designed as a decentralized system with regional Reserve Banks. Count: The(1) Federal(2) Reserve(3) was(4) designed(5) as(6) a(7) decentralized(8) system(9) with(10) regional(11) Reserve(12) Banks(13). Thirteen words, no numbers, no banned terms. The Federal Reserve was designed as a decentralized system with regional Reserve Banks."
+    "body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders hoped to give the nation a more elastic currency."
   },
   {
     "metadata": {
@@ -212278,19 +212347,22 @@
       "regime": "var",
       "n_words_target": 21,
       "n_sentences_target": 1,
-      "n_words_actual": 30,
+      "n_words_actual": 26,
       "policy_mode": "filler",
       "opening": "a general remark about the uncertainty of economic forecasts, without saying in which direction the risks lean",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Forecasting the economy is an inherently uncertain undertaking, and we should be candid with ourselves and with the public about the margin of error that attends any projection we make.",
+      "duplicate_of": "var_high #2535"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Forecasting the economy is an inherently uncertain undertaking, and we should be candid with ourselves and with the public about the margin of error that attends any projection we make."
+    "body": "Any projection of the economy carries a wide margin of error, and those of us who make such projections would do well to say so plainly."
   },
   {
     "metadata": {
@@ -213458,26 +213530,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 3,
+      "attempts": 1,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 29,
       "n_sentences_target": 1,
-      "n_words_actual": 29,
+      "n_words_actual": 27,
       "policy_mode": "filler",
       "opening": "an opening remark of the kind made when answering a question at a press conference (acknowledging, clarifying or deferring the question)",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "I appreciate the question, but I would prefer not to get ahead of the Committee's deliberations, and I will leave that matter for the record of our next meeting.",
+      "duplicate_of": "rho_medium #2550"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "I appreciate the question, but I would prefer not to get ahead of the Committee's deliberations, and I will leave that matter for the record of our next meeting."
+    "body": "Thank you for the question; I would rather not anticipate the Committee's discussion, so I will let the minutes of our upcoming session speak to that point."
   },
   {
     "metadata": {
@@ -220294,12 +220369,15 @@
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Preliminary figures of this kind are always subject to later revision as fuller reports come in.",
+      "duplicate_of": "struct_low #2634"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "Preliminary figures of this kind are always subject to later revision as fuller reports come in."
+    "body": "Benchmark revisions to these series often change the picture considerably once complete survey returns are tabulated."
   },
   {
     "metadata": {
@@ -224148,19 +224226,22 @@
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 201,
+      "n_words_actual": 30,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders hoped that a central institution could give the nation a more elastic currency and a safer banking system. Word count: roughly 33 words. Need about 27. Shorten. The Federal Reserve was established in 1913 in response to repeated banking panics, with the aim of providing the nation a more elastic currency and a safer banking system. Count: The(1) Federal(2) Reserve(3) was(4) established(5) in(6) 1913(7) in(8) response(9) to(10) repeated(11) banking(12) panics(13) with(14) the(15) aim(16) of(17) providing(18) the(19) nation(20) a(21) more(22) elastic(23) currency(24) and(25) a(26) safer(27) banking(28) system(29). Still 29 and includes a number \"1913\", which violates \"no numbers.\" Revised: The Federal Reserve was founded in response to repeated banking panics, with the aim of giving the nation a more elastic currency and a safer banking system. Count: The(1) Federal(2) Reserve(3) was(4) founded(5) in(6) response(7) to(8) repeated(9) banking(10) panics(11) with(12) the(13) aim(14) of(15) giving(16) the(17) nation(18) a(19) more(20) elastic(21) currency(22) and(23) a(24) safer(25) banking(26) system(27). That is 27 words. The Federal Reserve was founded in response to repeated banking panics, with the aim of giving the nation a more elastic currency and a safer banking system."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders hoped that a central institution could give the nation a more elastic currency and a safer banking system. Word count: roughly 33 words. Need about 27. Shorten. The Federal Reserve was established in 1913 in response to repeated banking panics, with the aim of providing the nation a more elastic currency and a safer banking system. Count: The(1) Federal(2) Reserve(3) was(4) established(5) in(6) 1913(7) in(8) response(9) to(10) repeated(11) banking(12) panics(13) with(14) the(15) aim(16) of(17) providing(18) the(19) nation(20) a(21) more(22) elastic(23) currency(24) and(25) a(26) safer(27) banking(28) system(29). Still 29 and includes a number \"1913\", which violates \"no numbers.\" Revised: The Federal Reserve was founded in response to repeated banking panics, with the aim of giving the nation a more elastic currency and a safer banking system. Count: The(1) Federal(2) Reserve(3) was(4) founded(5) in(6) response(7) to(8) repeated(9) banking(10) panics(11) with(12) the(13) aim(14) of(15) giving(16) the(17) nation(18) a(19) more(20) elastic(21) currency(22) and(23) a(24) safer(25) banking(26) system(27). That is 27 words. The Federal Reserve was founded in response to repeated banking panics, with the aim of giving the nation a more elastic currency and a safer banking system."
+    "body": "The Federal Reserve was established in 1913 as a decentralized system, and its founders intended that regional Reserve Banks would bring the perspective of diverse communities to national monetary deliberations."
   },
   {
     "metadata": {
@@ -224846,19 +224927,22 @@
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 86,
+      "n_words_actual": 32,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a decentralized system, and its founders intended that the regional Reserve Banks would give the nation a voice that reflected its many economic regions. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number figure \"1913\" — violates the no-numbers rule. Rewrite. The Federal Reserve was designed by the Congress as a decentralized system, and its founders intended that the regional Reserve Banks would give the many sections of our country a voice in national monetary affairs."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a decentralized system, and its founders intended that the regional Reserve Banks would give the nation a voice that reflected its many economic regions. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number figure \"1913\" — violates the no-numbers rule. Rewrite. The Federal Reserve was designed by the Congress as a decentralized system, and its founders intended that the regional Reserve Banks would give the many sections of our country a voice in national monetary affairs."
+    "body": "Since its founding in 1913, the Federal Reserve has been shaped by the lessons of earlier financial panics, and it remains committed to learning from that history as it serves the Nation."
   },
   {
     "metadata": {
@@ -229633,19 +229717,22 @@
       "regime": "var",
       "n_words_target": 16,
       "n_sentences_target": 1,
-      "n_words_actual": 17,
+      "n_words_actual": 25,
       "policy_mode": "filler",
       "opening": "a general remark about the uncertainty of economic forecasts, without saying in which direction the risks lean",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Economic forecasts are inherently uncertain, and we should hold our projections with a healthy measure of humility.",
+      "duplicate_of": "struct_high #3037"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Economic forecasts are inherently uncertain, and we should hold our projections with a healthy measure of humility."
+    "body": "Forecasting is an imperfect art, and each of us must recognize how much unexpected change can separate a projection from the outcome that actually unfolds."
   },
   {
     "metadata": {
@@ -233186,26 +233273,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 17,
       "n_sentences_target": 1,
-      "n_words_actual": 26,
+      "n_words_actual": 23,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Committee recognizes that the public benefits from understanding the reasoning behind its decisions, and it will continue to explain them as clearly as it can.",
+      "duplicate_of": "rho_medium #2791"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Committee recognizes that the public benefits from understanding the reasoning behind its decisions, and it will continue to explain them as clearly as it can."
+    "body": "The Committee values candor with the Congress and the public, and it intends to set out its reasoning as fully as circumstances allow."
   },
   {
     "metadata": {
@@ -234301,19 +234391,22 @@
       "regime": "var",
       "n_words_target": 25,
       "n_sentences_target": 1,
-      "n_words_actual": 28,
+      "n_words_actual": 32,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Record of Policy Actions of the FOMC",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Committee agreed that it would continue to explain its decisions to the public as fully and clearly as possible, consistent with the deliberative character of its discussions.",
+      "duplicate_of": "rho_low #2805"
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Committee agreed that it would continue to explain its decisions to the public as fully and clearly as possible, consistent with the deliberative character of its discussions."
+    "body": "The Chairman noted that the Committee's public statements following each meeting were intended to convey the reasoning behind its actions in plain terms, and members concurred in the value of such openness."
   },
   {
     "metadata": {
@@ -238172,19 +238265,22 @@
       "regime": "var",
       "n_words_target": 34,
       "n_sentences_target": 1,
-      "n_words_actual": 32,
+      "n_words_actual": 29,
       "policy_mode": "filler",
       "opening": "a remark about the role of the regional Reserve Banks and their business contacts, without reporting any findings",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Reserve Banks, through their directors and the business contacts they maintain across their districts, provide the Board with a valuable perspective on local developments that complements the information gathered in Washington.",
+      "duplicate_of": "rho_high #2852"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Reserve Banks, through their directors and the business contacts they maintain across their districts, provide the Board with a valuable perspective on local developments that complements the information gathered in Washington."
+    "body": "The twelve Reserve Banks serve as our eyes and ears in the regions, and their officers meet regularly with the businesspeople and community leaders who know their localities best."
   },
   {
     "metadata": {
@@ -241330,26 +241426,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 8,
       "n_sentences_target": 1,
-      "n_words_actual": 20,
+      "n_words_actual": 16,
       "policy_mode": "filler",
       "opening": "a statement about the Federal Reserve's institutions, independence or legal framework, without naming its policy goals and without any assessment of current conditions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Federal Reserve remains an independent agency within the government, accountable to the Congress for the conduct of its responsibilities.",
+      "duplicate_of": "rho_low #2890"
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve remains an independent agency within the government, accountable to the Congress for the conduct of its responsibilities."
+    "body": "The Federal Reserve's statutory framework, enacted by Congress, continues to guide the conduct of our work."
   },
   {
     "metadata": {
@@ -244849,19 +244948,22 @@
       "regime": "var",
       "n_words_target": 29,
       "n_sentences_target": 1,
-      "n_words_actual": 112,
+      "n_words_actual": 25,
       "policy_mode": "filler",
       "opening": "a remark about how economic data are collected, revised or interpreted, without saying what the data currently show",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Record of Policy Actions of the FOMC",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Members noted that the preliminary estimates of the monthly employment and price data are subject to substantial revision as late reports are received and seasonal factors are updated. Word count: about 29 words. Check: Members(1) noted(2) that(3) the(4) preliminary(5) estimates(6) of(7) the(8) monthly(9) employment(10) and(11) price(12) data(13) are(14) subject(15) to(16) substantial(17) revision(18) as(19) late(20) reports(21) are(22) received(23) and(24) seasonal(25) factors(26) are(27) updated(28). Note: this draft mentions employment and price data by name, which the rules forbid in content terms only as conditions; however, to be safe, I'll replace it: Members noted that preliminary estimates from recent monthly surveys are subject to substantial revision as late reports arrive and seasonal factors are updated."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "Members noted that the preliminary estimates of the monthly employment and price data are subject to substantial revision as late reports are received and seasonal factors are updated. Word count: about 29 words. Check: Members(1) noted(2) that(3) the(4) preliminary(5) estimates(6) of(7) the(8) monthly(9) employment(10) and(11) price(12) data(13) are(14) subject(15) to(16) substantial(17) revision(18) as(19) late(20) reports(21) are(22) received(23) and(24) seasonal(25) factors(26) are(27) updated(28). Note: this draft mentions employment and price data by name, which the rules forbid in content terms only as conditions; however, to be safe, I'll replace it: Members noted that preliminary estimates from recent monthly surveys are subject to substantial revision as late reports arrive and seasonal factors are updated."
+    "body": "Several members cautioned that the figures available at this meeting reflect incomplete reporting and would be refined as survey returns and benchmark adjustments came in."
   },
   {
     "metadata": {
@@ -245889,26 +245991,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 31,
       "n_sentences_target": 1,
-      "n_words_actual": 116,
+      "n_words_actual": 39,
       "policy_mode": "filler",
       "opening": "a statement about the Federal Reserve's institutions, independence or legal framework, without naming its policy goals and without any assessment of current conditions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was designed by the Congress as an institution with a measure of independence from the Treasury and from day-to-day political pressures, and that arrangement has served the public well through many changes in administration. Count: The(1) Federal(2) Reserve(3) was(4) designed(5) by(6) the(7) Congress(8) as(9) an(10) institution(11) with(12) a(13) measure(14) of(15) independence(16) from(17) the(18) Treasury(19) and(20) from(21) day-to-day(22) political(23) pressures,(24) and(25) that(26) arrangement(27) has(28) served(29) the(30) public(31) well(32) through(33) many(34) changes(35) in(36) administration.(37) That is 37 words; I need about 31. Revised: The Federal Reserve was designed by the Congress as an institution with a measure of independence from the Treasury and from short-term political pressures, an arrangement that has served the public well."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was designed by the Congress as an institution with a measure of independence from the Treasury and from day-to-day political pressures, and that arrangement has served the public well through many changes in administration. Count: The(1) Federal(2) Reserve(3) was(4) designed(5) by(6) the(7) Congress(8) as(9) an(10) institution(11) with(12) a(13) measure(14) of(15) independence(16) from(17) the(18) Treasury(19) and(20) from(21) day-to-day(22) political(23) pressures,(24) and(25) that(26) arrangement(27) has(28) served(29) the(30) public(31) well(32) through(33) many(34) changes(35) in(36) administration.(37) That is 37 words; I need about 31. Revised: The Federal Reserve was designed by the Congress as an institution with a measure of independence from the Treasury and from short-term political pressures, an arrangement that has served the public well."
+    "body": "The Federal Reserve was designed by the Congress as an institution with a specific legal framework, and its governors and Reserve Banks operate within that structure of public accountability and regional representation that has served the nation since 1913."
   },
   {
     "metadata": {
@@ -249899,26 +250004,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 29,
       "n_sentences_target": 1,
-      "n_words_actual": 252,
+      "n_words_actual": 30,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was founded in 1913 as a decentralized system, and its regional banks and Board in Washington have long had to balance local perspectives with a single national purpose. Word count: 29. Check: The(1) Federal(2) Reserve(3) was(4) founded(5) in(6) 1913(7)... contains a number, so revise. The Federal Reserve System was created by the Congress in the aftermath of financial panics, and its founders sought an institution that would combine regional perspectives with a single national purpose. Count: The(1) Federal(2) Reserve(3) System(4) was(5) created(6) by(7) the(8) Congress(9) in(10) the(11) aftermath(12) of(13) financial(14) panics(15) and(16) its(17) founders(18) sought(19) an(20) institution(21) that(22) would(23) combine(24) regional(25) perspectives(26) with(27) a(28) single(29) national(30) purpose(31). That is 31 words; trim. The Federal Reserve was created in the aftermath of financial panics, and its founders sought to combine regional perspectives with a single national purpose. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) the(7) aftermath(8) of(9) financial(10) panics(11) and(12) its(13) founders(14) sought(15) to(16) combine(17) regional(18) perspectives(19) with(20) a(21) single(22) national(23) purpose(24). That is 24; add a few words. The Federal Reserve was created in the aftermath of financial panics, and its founders sought to combine regional perspectives with a single national purpose that would serve the whole country. Count: 24 + that(25) would(26) serve(27) the(28) whole(29) country(30). Thirty words; close enough to about 29 but I'll trim \"whole\" for 29. The Federal Reserve was created in the aftermath of financial panics, and its founders sought to combine regional perspectives with a single national purpose that would serve the country."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was founded in 1913 as a decentralized system, and its regional banks and Board in Washington have long had to balance local perspectives with a single national purpose. Word count: 29. Check: The(1) Federal(2) Reserve(3) was(4) founded(5) in(6) 1913(7)... contains a number, so revise. The Federal Reserve System was created by the Congress in the aftermath of financial panics, and its founders sought an institution that would combine regional perspectives with a single national purpose. Count: The(1) Federal(2) Reserve(3) System(4) was(5) created(6) by(7) the(8) Congress(9) in(10) the(11) aftermath(12) of(13) financial(14) panics(15) and(16) its(17) founders(18) sought(19) an(20) institution(21) that(22) would(23) combine(24) regional(25) perspectives(26) with(27) a(28) single(29) national(30) purpose(31). That is 31 words; trim. The Federal Reserve was created in the aftermath of financial panics, and its founders sought to combine regional perspectives with a single national purpose. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) the(7) aftermath(8) of(9) financial(10) panics(11) and(12) its(13) founders(14) sought(15) to(16) combine(17) regional(18) perspectives(19) with(20) a(21) single(22) national(23) purpose(24). That is 24; add a few words. The Federal Reserve was created in the aftermath of financial panics, and its founders sought to combine regional perspectives with a single national purpose that would serve the whole country. Count: 24 + that(25) would(26) serve(27) the(28) whole(29) country(30). Thirty words; close enough to about 29 but I'll trim \"whole\" for 29. The Federal Reserve was created in the aftermath of financial panics, and its founders sought to combine regional perspectives with a single national purpose that would serve the country."
+    "body": "The Federal Reserve was created in 1913 as a decentralized system, and the tensions between its regional banks and the Board in Washington have shaped its institutional development ever since."
   },
   {
     "metadata": {
@@ -250513,19 +250621,22 @@
       "regime": "var",
       "n_words_target": 26,
       "n_sentences_target": 1,
-      "n_words_actual": 24,
+      "n_words_actual": 30,
       "policy_mode": "filler",
       "opening": "an opening remark of the kind made when answering a question at a press conference (acknowledging, clarifying or deferring the question)",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "I appreciate the question, and I will be glad to address the Committee's concerns more fully in the written materials that accompany my testimony.",
+      "duplicate_of": "struct_low #3001"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "I appreciate the question, and I will be glad to address the Committee's concerns more fully in the written materials that accompany my testimony."
+    "body": "I think that is a fair question, and I would prefer to take up the details in the written statement that will be submitted to the Committee for the record."
   },
   {
     "metadata": {
@@ -251323,26 +251434,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 18,
       "n_sentences_target": 1,
-      "n_words_actual": 88,
+      "n_words_actual": 34,
       "policy_mode": "filler",
       "opening": "a remark about the role of the regional Reserve Banks and their business contacts, without reporting any findings",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Reserve Banks, through their directors and the business contacts they maintain across their districts, give the Board a valuable window on local conditions that complements our national statistics. Count: The(1) Reserve(2) Banks,(3) through(4) their(5) directors(6) and(7) the(8) business(9) contacts(10) they(11) maintain(12) across(13) their(14) districts,(15) give(16) the(17) Board(18) a(19) valuable(20) window(21) on(22) local(23) conditions(24) that(25) complements(26) our(27) national(28) statistics.(29) That is about 29 words, too long. Revised: The Reserve Banks and their business contacts across the country give the Board a useful perspective that complements our national statistics."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Reserve Banks, through their directors and the business contacts they maintain across their districts, give the Board a valuable window on local conditions that complements our national statistics. Count: The(1) Reserve(2) Banks,(3) through(4) their(5) directors(6) and(7) the(8) business(9) contacts(10) they(11) maintain(12) across(13) their(14) districts,(15) give(16) the(17) Board(18) a(19) valuable(20) window(21) on(22) local(23) conditions(24) that(25) complements(26) our(27) national(28) statistics.(29) That is about 29 words, too long. Revised: The Reserve Banks and their business contacts across the country give the Board a useful perspective that complements our national statistics."
+    "body": "Our twelve Reserve Banks keep the Board in close touch with businesspeople and community leaders in every part of the country, and their reports help us see how national developments are taking shape locally."
   },
   {
     "metadata": {
@@ -253482,19 +253596,22 @@
       "regime": "var",
       "n_words_target": 13,
       "n_sentences_target": 1,
-      "n_words_actual": 14,
+      "n_words_actual": 22,
       "policy_mode": "filler",
       "opening": "a general remark about the uncertainty of economic forecasts, without saying in which direction the risks lean",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Economic forecasts are inherently uncertain, and we should hold our projections with appropriate humility.",
+      "duplicate_of": "rho_high #3037"
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "Economic forecasts are inherently uncertain, and we should hold our projections with appropriate humility."
+    "body": "Any economic forecast, however carefully constructed, is subject to a considerable margin of error, and we would do well to remember that."
   },
   {
     "metadata": {
@@ -257355,26 +257472,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 19,
       "n_sentences_target": 1,
-      "n_words_actual": 88,
+      "n_words_actual": 20,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Record of Policy Actions of the FOMC",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Members noted that the Federal Reserve System, established by the Federal Reserve Act of 1913, had long been guided by the principle of serving as lender of last resort. Count: Members(1) noted(2) that(3) the(4) Federal(5) Reserve(6) System,(7) established(8) by(9) the(10) Federal(11) Reserve(12) Act(13) of(14) 1913,(15) had(16) long(17) been(18) guided(19) by(20) the(21) principle(22) of(23) serving(24) as(25) lender(26) of(27) last(28) resort.(29) That is 29 words, too long and includes a figure. Revised: Members recalled that Walter Bagehot's dictum on the lender of last resort had long shaped central banking practice."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Members noted that the Federal Reserve System, established by the Federal Reserve Act of 1913, had long been guided by the principle of serving as lender of last resort. Count: Members(1) noted(2) that(3) the(4) Federal(5) Reserve(6) System,(7) established(8) by(9) the(10) Federal(11) Reserve(12) Act(13) of(14) 1913,(15) had(16) long(17) been(18) guided(19) by(20) the(21) principle(22) of(23) serving(24) as(25) lender(26) of(27) last(28) resort.(29) That is 29 words, too long and includes a figure. Revised: Members recalled that Walter Bagehot's dictum on the lender of last resort had long shaped central banking practice."
+    "body": "Members recalled that the Federal Reserve System had been created largely in response to recurring banking panics and financial crises."
   },
   {
     "metadata": {
@@ -257767,26 +257887,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 4,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 9,
       "n_sentences_target": 1,
-      "n_words_actual": 28,
+      "n_words_actual": 17,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders hoped it would bring greater stability to the nation's financial system.",
+      "duplicate_of": "rho_medium #4155"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders hoped it would bring greater stability to the nation's financial system."
+    "body": "The Reserve System was born of a long debate over how to balance national and regional authority."
   },
   {
     "metadata": {
@@ -258623,19 +258746,22 @@
       "regime": "var",
       "n_words_target": 40,
       "n_sentences_target": 1,
-      "n_words_actual": 33,
+      "n_words_actual": 26,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Public understanding of the Committee's decisions depends on clear explanation, and I believe we owe the public a candid account of how we reach our judgments and what we are trying to achieve.",
+      "duplicate_of": "struct_low #3098"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "Public understanding of the Committee's decisions depends on clear explanation, and I believe we owe the public a candid account of how we reach our judgments and what we are trying to achieve."
+    "body": "Explaining our deliberations is not a courtesy extended to outside observers; it is part of how the Committee earns the confidence that makes its actions effective."
   },
   {
     "metadata": {
@@ -259719,26 +259845,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 3,
+      "attempts": 1,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 165,
+      "n_words_actual": 32,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was founded in 1913 as a response to the banking panics that had repeatedly disrupted the American economy, and its early history reminds us how much the institution has changed since then. Word count: about 35 words. Need about 27. Shorten. The Federal Reserve System was created in 1913 in response to repeated banking panics, and its history reminds us how much its purposes have evolved. Count: The(1) Federal(2) Reserve(3) System(4) was(5) created(6) in(7) 1913(8)... contains a number \"1913\" — forbidden. Rewrite. The Federal Reserve System was created in response to repeated banking panics, and its early history reminds us how its purposes have evolved over time. Count: The1 Federal2 Reserve3 System4 was5 created6 in7 response8 to9 repeated10 banking11 panics12 and13 its14 early15 history16 reminds17 us18 how19 its20 purposes21 have22 evolved23 over24 time25. About 25 words. Good. The Federal Reserve System was created in response to repeated banking panics, and its early history reminds us how its purposes have evolved over time."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve was founded in 1913 as a response to the banking panics that had repeatedly disrupted the American economy, and its early history reminds us how much the institution has changed since then. Word count: about 35 words. Need about 27. Shorten. The Federal Reserve System was created in 1913 in response to repeated banking panics, and its history reminds us how much its purposes have evolved. Count: The(1) Federal(2) Reserve(3) System(4) was(5) created(6) in(7) 1913(8)... contains a number \"1913\" — forbidden. Rewrite. The Federal Reserve System was created in response to repeated banking panics, and its early history reminds us how its purposes have evolved over time. Count: The1 Federal2 Reserve3 System4 was5 created6 in7 response8 to9 repeated10 banking11 panics12 and13 its14 early15 history16 reminds17 us18 how19 its20 purposes21 have22 evolved23 over24 time25. About 25 words. Good. The Federal Reserve System was created in response to repeated banking panics, and its early history reminds us how its purposes have evolved over time."
+    "body": "The Federal Reserve was created in 1913 as a decentralized system, and its founders intended that the twelve regional Reserve Banks would retain a meaningful voice in shaping the nation's monetary arrangements."
   },
   {
     "metadata": {
@@ -268097,19 +268226,22 @@
       "regime": "var",
       "n_words_target": 16,
       "n_sentences_target": 1,
-      "n_words_actual": 19,
+      "n_words_actual": 27,
       "policy_mode": "filler",
       "opening": "a procedural remark about the meeting, its schedule or the documents the Committee releases",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Committee's minutes for this meeting will be released after the next regular meeting, as is our usual practice.",
+      "duplicate_of": "rho_high #3210"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Committee's minutes for this meeting will be released after the next regular meeting, as is our usual practice."
+    "body": "The Committee's discussion at today's session will be summarized in the record, and the staff's background materials will be made available to the public in due course."
   },
   {
     "metadata": {
@@ -278656,12 +278788,15 @@
       "themes": [],
       "outlet": "the Record of Policy Actions of the FOMC",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Members agreed that the economic outlook was subject to a considerable degree of uncertainty, and that forecasts should be regarded with caution.",
+      "duplicate_of": "baseline"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "Members agreed that the economic outlook was subject to a considerable degree of uncertainty, and that forecasts should be regarded with caution."
+    "body": "Participants emphasized that projections for the economy remained highly unsettled, and they cautioned against placing heavy reliance on any single point estimate."
   },
   {
     "metadata": {
@@ -290294,26 +290429,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 29,
       "n_sentences_target": 1,
-      "n_words_actual": 107,
+      "n_words_actual": 25,
       "policy_mode": "filler",
       "opening": "a remark about how economic data are collected, revised or interpreted, without saying what the data currently show",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Record of Policy Actions of the FOMC",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Members noted that the preliminary estimates of several monthly series were subject to substantial revision as more complete reporting became available, and the staff cautioned against reading too much into any single release. Word count check: Members(1) noted(2) that(3) the(4) preliminary(5) estimates(6) of(7) several(8) monthly(9) series(10) were(11) subject(12) to(13) substantial(14) revision(15) as(16) more(17) complete(18) reporting(19) became(20) available(21) and(22) the(23) staff(24) cautioned(25) against(26) reading(27) too(28) much(29) into(30) any(31) single(32) release(33). That is 33 words, so I need to trim. Members noted that preliminary estimates of several monthly series were subject to substantial revision as fuller reporting became available, and cautioned against reading too much into any single release."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "Members noted that the preliminary estimates of several monthly series were subject to substantial revision as more complete reporting became available, and the staff cautioned against reading too much into any single release. Word count check: Members(1) noted(2) that(3) the(4) preliminary(5) estimates(6) of(7) several(8) monthly(9) series(10) were(11) subject(12) to(13) substantial(14) revision(15) as(16) more(17) complete(18) reporting(19) became(20) available(21) and(22) the(23) staff(24) cautioned(25) against(26) reading(27) too(28) much(29) into(30) any(31) single(32) release(33). That is 33 words, so I need to trim. Members noted that preliminary estimates of several monthly series were subject to substantial revision as fuller reporting became available, and cautioned against reading too much into any single release."
+    "body": "Members noted that the staff's preliminary estimates of recent data would be subject to revision as fuller information on sources and seasonal adjustments became available."
   },
   {
     "metadata": {
@@ -291187,26 +291325,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 3,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 9,
       "n_sentences_target": 1,
-      "n_words_actual": 20,
+      "n_words_actual": 12,
       "policy_mode": "filler",
       "opening": "a statement about the Federal Reserve's institutions, independence or legal framework, without naming its policy goals and without any assessment of current conditions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Federal Reserve remains an independent body within the government, accountable to the Congress for the conduct of its responsibilities.",
+      "duplicate_of": "rho_high #2890"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve remains an independent body within the government, accountable to the Congress for the conduct of its responsibilities."
+    "body": "The Federal Reserve's authority derives from statutes that the Congress may amend."
   },
   {
     "metadata": {
@@ -294900,26 +295041,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 24,
       "n_sentences_target": 1,
-      "n_words_actual": 90,
+      "n_words_actual": 35,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders wished to give the nation a more elastic currency and a more stable banking system. Word count check: \"The Federal Reserve was created in 1913 as a response to recurring banking panics\" contains a number (1913), which violates the rule. Rewriting: The Federal Reserve was established by Congress in the aftermath of recurring banking panics, and its founders hoped to give the nation a more elastic currency and a more stable banking system."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders wished to give the nation a more elastic currency and a more stable banking system. Word count check: \"The Federal Reserve was created in 1913 as a response to recurring banking panics\" contains a number (1913), which violates the rule. Rewriting: The Federal Reserve was established by Congress in the aftermath of recurring banking panics, and its founders hoped to give the nation a more elastic currency and a more stable banking system."
+    "body": "The Federal Reserve System was established in 1913, and its founders drew on the experience of earlier central banks in Europe and on the lessons of the banking panics that had repeatedly disrupted American commerce."
   },
   {
     "metadata": {
@@ -295432,19 +295576,22 @@
       "regime": "var",
       "n_words_target": 29,
       "n_sentences_target": 1,
-      "n_words_actual": 135,
+      "n_words_actual": 34,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a decentralized system, and its twelve regional Banks have long been central to how the institution reflects the diverse economy it serves. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, which violates the rule. Rewrite. Revised: The Federal Reserve was established by the Congress in response to repeated banking panics, and its founders deliberately dispersed authority among regional Banks and a central Board in Washington. Count: The(1) Federal(2) Reserve(3) was(4) established(5) by(6) the(7) Congress(8) in(9) response(10) to(11) repeated(12) banking(13) panics(14) and(15) its(16) founders(17) deliberately(18) dispersed(19) authority(20) among(21) regional(22) Banks(23) and(24) a(25) central(26) Board(27) in(28) Washington(29). The Federal Reserve was established by the Congress in response to repeated banking panics, and its founders deliberately dispersed authority among regional Banks and a central Board in Washington."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a decentralized system, and its twelve regional Banks have long been central to how the institution reflects the diverse economy it serves. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, which violates the rule. Rewrite. Revised: The Federal Reserve was established by the Congress in response to repeated banking panics, and its founders deliberately dispersed authority among regional Banks and a central Board in Washington. Count: The(1) Federal(2) Reserve(3) was(4) established(5) by(6) the(7) Congress(8) in(9) response(10) to(11) repeated(12) banking(13) panics(14) and(15) its(16) founders(17) deliberately(18) dispersed(19) authority(20) among(21) regional(22) Banks(23) and(24) a(25) central(26) Board(27) in(28) Washington(29). The Federal Reserve was established by the Congress in response to repeated banking panics, and its founders deliberately dispersed authority among regional Banks and a central Board in Washington."
+    "body": "The Federal Reserve was created in 1913, and in the decades since, its founders' hope that a central bank could bring stability to the nation's banking system has been tested repeatedly by changing circumstances."
   },
   {
     "metadata": {
@@ -305656,19 +305803,22 @@
       "regime": "var",
       "n_words_target": 23,
       "n_sentences_target": 1,
-      "n_words_actual": 29,
+      "n_words_actual": 27,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Committee recognizes that the public benefits from understanding the reasoning behind its decisions, and we will continue to explain our actions as clearly and fully as we can.",
+      "duplicate_of": "rho_medium #3669"
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Committee recognizes that the public benefits from understanding the reasoning behind its decisions, and we will continue to explain our actions as clearly and fully as we can."
+    "body": "The Federal Reserve believes that openness about how we reach our judgments helps the Congress and the American people hold us accountable for the results we seek."
   },
   {
     "metadata": {
@@ -310753,27 +310903,30 @@
       "stance_score": null,
       "stance_inputs": {},
       "filler": true,
-      "meta_text": true,
-      "attempts": 3,
+      "meta_text": false,
+      "attempts": 2,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 8,
       "n_sentences_target": 1,
-      "n_words_actual": 54,
+      "n_words_actual": 18,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve System was founded in 1913, and its early years were shaped by the lessons of earlier American banking panics. Wait, that's more than one sentence and contains a number. Rewritten: Central banking in this country grew out of repeated financial panics that exposed the need for a lender of last resort."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Federal Reserve System was founded in 1913, and its early years were shaped by the lessons of earlier American banking panics. Wait, that's more than one sentence and contains a number. Rewritten: Central banking in this country grew out of repeated financial panics that exposed the need for a lender of last resort."
+    "body": "The Federal Reserve's founders in 1913 hoped to end the recurring banking panics that had plagued the country."
   },
   {
     "metadata": {
@@ -315205,19 +315358,22 @@
       "regime": "var",
       "n_words_target": 23,
       "n_sentences_target": 1,
-      "n_words_actual": 71,
+      "n_words_actual": 35,
       "policy_mode": "filler",
       "opening": "a remark about how economic data are collected, revised or interpreted, without saying what the data currently show",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the minutes of an FOMC meeting",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Members noted that the annual benchmark revisions to the national income and product accounts would incorporate more complete source data, and that the initial estimates for recent quarters could be revised considerably as additional information became available. Word count: about 37 words, which exceeds the target. I need a shorter sentence. Members observed that revisions to the source data would be incorporated as additional information became available over the coming months."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Members noted that the annual benchmark revisions to the national income and product accounts would incorporate more complete source data, and that the initial estimates for recent quarters could be revised considerably as additional information became available. Word count: about 37 words, which exceeds the target. I need a shorter sentence. Members observed that revisions to the source data would be incorporated as additional information became available over the coming months."
+    "body": "Members noted that the annual benchmark revisions to the industrial production and employment series would be incorporated in the coming months, and that revisions of this kind can alter the picture of recent history considerably."
   },
   {
     "metadata": {
@@ -325034,19 +325190,22 @@
       "regime": "var",
       "n_words_target": 5,
       "n_sentences_target": 1,
-      "n_words_actual": 12,
+      "n_words_actual": 15,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Clear communication helps the public understand how the Committee reaches its decisions.",
+      "duplicate_of": "rho_high #4170"
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "Clear communication helps the public understand how the Committee reaches its decisions."
+    "body": "The Committee owes the public a clear account of its reasoning, not merely its conclusions."
   },
   {
     "metadata": {
@@ -330651,26 +330810,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 2,
+      "attempts": 1,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 11,
       "n_sentences_target": 1,
-      "n_words_actual": 17,
+      "n_words_actual": 23,
       "policy_mode": "filler",
       "opening": "a remark about how economic data are collected, revised or interpreted, without saying what the data currently show",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Economic statistics are only estimates, and they are often revised as more complete survey responses come in.",
+      "duplicate_of": "rho_high #3972"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Economic statistics are only estimates, and they are often revised as more complete survey responses come in."
+    "body": "Revisions to the initial estimates reflect the gradual arrival of fuller source data, so each release should be read with that in mind."
   },
   {
     "metadata": {
@@ -331565,12 +331727,15 @@
       "themes": [],
       "outlet": "the FOMC's post-meeting policy statement",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Committee believes that clear communication of its assessments and decisions contributes to the effectiveness of monetary policy.",
+      "duplicate_of": "var_low #3983"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Committee believes that clear communication of its assessments and decisions contributes to the effectiveness of monetary policy."
+    "body": "The Committee believes that its explanations of decisions help the public understand how policy responds to incoming information."
   },
   {
     "metadata": {
@@ -336043,26 +336208,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 2,
+      "attempts": 4,
       "series_stance": "neutral",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 13,
       "n_sentences_target": 1,
-      "n_words_actual": 59,
+      "n_words_actual": 30,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913, and its founders drew on earlier experience with central banks in Europe and with the financial panics that had repeatedly disrupted the American economy. Word count: about 30 words, which is too long. Shortening to about 13 words: The Federal Reserve was founded in 1913 after a long series of banking panics."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913, and its founders drew on earlier experience with central banks in Europe and with the financial panics that had repeatedly disrupted the American economy. Word count: about 30 words, which is too long. Shortening to about 13 words: The Federal Reserve was founded in 1913 after a long series of banking panics."
+    "body": "The Federal Reserve was created in 1913, and its founders drew on a long tradition of central banking that stretches back to the Bank of England in the seventeenth century."
   },
   {
     "metadata": {
@@ -340991,19 +341159,22 @@
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 25,
+      "n_words_actual": 21,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the FOMC's post-meeting policy statement",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Committee believes that clear communication of its assessments and decisions contributes to the effectiveness of monetary policy and helps the public understand its actions.",
+      "duplicate_of": "rho_low #4100"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Committee believes that clear communication of its assessments and decisions contributes to the effectiveness of monetary policy and helps the public understand its actions."
+    "body": "The Committee values openness in explaining its decisions, recognizing that candid, timely disclosure helps households and businesses anticipate its future actions."
   },
   {
     "metadata": {
@@ -343839,19 +344010,22 @@
       "regime": "var",
       "n_words_target": 52,
       "n_sentences_target": 1,
-      "n_words_actual": 25,
+      "n_words_actual": 29,
       "policy_mode": "filler",
       "opening": "a general remark about the uncertainty of economic forecasts, without saying in which direction the risks lean",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the FOMC's post-meeting policy statement",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Committee recognizes that considerable uncertainty surrounds any economic forecast, and it will continue to assess incoming information carefully as the outlook evolves over time.",
+      "duplicate_of": "struct_low #4135"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Committee recognizes that considerable uncertainty surrounds any economic forecast, and it will continue to assess incoming information carefully as the outlook evolves over time."
+    "body": "Economic forecasts are subject to a substantial margin of error, and the Committee will keep weighing new data as they become available to judge how the outlook is unfolding."
   },
   {
     "metadata": {
@@ -346641,26 +346815,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 6,
       "n_sentences_target": 1,
-      "n_words_actual": 12,
+      "n_words_actual": 11,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Clear communication helps the public understand how the Committee reaches its decisions.",
+      "duplicate_of": "rho_high #4170"
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "Clear communication helps the public understand how the Committee reaches its decisions."
+    "body": "Explaining our reasoning candidly is part of earning the public's trust."
   },
   {
     "metadata": {
@@ -350570,19 +350747,22 @@
       "regime": "var",
       "n_words_target": 34,
       "n_sentences_target": 1,
-      "n_words_actual": 77,
+      "n_words_actual": 33,
       "policy_mode": "filler",
       "opening": "a procedural remark about the meeting, its schedule or the documents the Committee releases",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Committee publishes the minutes of each meeting three weeks after the date of the policy decision, and the Federal Reserve releases its Monetary Policy Report to the Congress in February and July, as required by law. Word count check: The(1) Committee(2) publishes(3) the(4) minutes(5) of(6) each(7) meeting(8) three(9) weeks(10) after(11) the(12) date(13) of(14) the(15) policy(16) decision(17), and(18) the(19) Federal(20) Reserve(21) releases(22) its(23) Monetary(24) Policy(25) Report(26) to(27) the(28) Congress(29) in(30) February(31) and(32) July(33), as(34) required(35) by(36) law(37)."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Committee publishes the minutes of each meeting three weeks after the date of the policy decision, and the Federal Reserve releases its Monetary Policy Report to the Congress in February and July, as required by law. Word count check: The(1) Committee(2) publishes(3) the(4) minutes(5) of(6) each(7) meeting(8) three(9) weeks(10) after(11) the(12) date(13) of(14) the(15) policy(16) decision(17), and(18) the(19) Federal(20) Reserve(21) releases(22) its(23) Monetary(24) Policy(25) Report(26) to(27) the(28) Congress(29) in(30) February(31) and(32) July(33), as(34) required(35) by(36) law(37)."
+    "body": "The minutes of the Committee's late-January meeting will be released next week and will provide a fuller account of participants' deliberations, including the range of views expressed around the table, as is customary."
   },
   {
     "metadata": {
@@ -352390,26 +352570,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 21,
       "n_sentences_target": 1,
-      "n_words_actual": 31,
+      "n_words_actual": 21,
       "policy_mode": "filler",
       "opening": "a remark about the role of the regional Reserve Banks and their business contacts, without reporting any findings",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Our Bank's directors and business contacts across the District remain an essential part of how we understand the economy, and we value their candid perspectives as we prepare for each meeting.",
+      "duplicate_of": "rho_medium #4238"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Our Bank's directors and business contacts across the District remain an essential part of how we understand the economy, and we value their candid perspectives as we prepare for each meeting."
+    "body": "Each Reserve Bank draws on a wide network of business contacts, which helps keep our national perspective grounded in local experience."
   },
   {
     "metadata": {
@@ -360444,19 +360627,22 @@
       "regime": "var",
       "n_words_target": 14,
       "n_sentences_target": 1,
-      "n_words_actual": 20,
+      "n_words_actual": 19,
       "policy_mode": "filler",
       "opening": "a remark about the role of the regional Reserve Banks and their business contacts, without reporting any findings",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the FOMC's post-meeting policy statement",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Federal Reserve Banks, through their directors and business contacts, continue to play an important role in the Committee's deliberations.",
+      "duplicate_of": "rho_low #4335"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve Banks, through their directors and business contacts, continue to play an important role in the Committee's deliberations."
+    "body": "The Committee values the perspectives that the Reserve Banks gather from their directors and from contacts across their districts."
   },
   {
     "metadata": {
@@ -364107,27 +364293,30 @@
       "stance_score": null,
       "stance_inputs": {},
       "filler": true,
-      "meta_text": true,
-      "attempts": 3,
+      "meta_text": false,
+      "attempts": 1,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 24,
       "n_sentences_target": 1,
-      "n_words_actual": 71,
+      "n_words_actual": 19,
       "policy_mode": "filler",
       "opening": "a procedural remark about the meeting, its schedule or the documents the Committee releases",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the FOMC's post-meeting policy statement",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Committee's next regularly scheduled meeting will be held on August 9 and 10, 2010, and a statement of its policy decision will be released at the conclusion of that meeting. Let me check: that's about 33 words and includes numbers (dates). Rewrite to avoid figures and be about 24 words. The Committee will release the minutes of this meeting within three weeks, as required by its normal schedule of publication."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "The Committee's next regularly scheduled meeting will be held on August 9 and 10, 2010, and a statement of its policy decision will be released at the conclusion of that meeting. Let me check: that's about 33 words and includes numbers (dates). Rewrite to avoid figures and be about 24 words. The Committee will release the minutes of this meeting within three weeks, as required by its normal schedule of publication."
+    "body": "The Committee will release minutes of this meeting three weeks after the policy decision, as is its usual practice."
   },
   {
     "metadata": {
@@ -365037,19 +365226,22 @@
       "regime": "var",
       "n_words_target": 15,
       "n_sentences_target": 1,
-      "n_words_actual": 24,
+      "n_words_actual": 20,
       "policy_mode": "filler",
       "opening": "a remark about how economic data are collected, revised or interpreted, without saying what the data currently show",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Economic statistics are compiled from surveys that are often revised as more complete information arrives, so early estimates should be read with appropriate caution.",
+      "duplicate_of": "struct_medium #4392"
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "Economic statistics are compiled from surveys that are often revised as more complete information arrives, so early estimates should be read with appropriate caution."
+    "body": "Preliminary readings from our surveys are routinely revised as late responses come in, so we treat first prints as provisional."
   },
   {
     "metadata": {
@@ -365423,27 +365615,30 @@
       "stance_score": null,
       "stance_inputs": {},
       "filler": true,
-      "meta_text": true,
-      "attempts": 3,
+      "meta_text": false,
+      "attempts": 2,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 20,
       "n_sentences_target": 1,
-      "n_words_actual": 48,
+      "n_words_actual": 12,
       "policy_mode": "filler",
       "opening": "a procedural remark about the meeting, its schedule or the documents the Committee releases",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the FOMC's post-meeting policy statement",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Committee's next regularly scheduled meeting will be held on April 27-28, 2010. Wait, that contains numbers, which breaks the rule. Revised: The Committee's next regularly scheduled meeting will be held at the end of April, and the minutes of this meeting will be released in three weeks."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Committee's next regularly scheduled meeting will be held on April 27-28, 2010. Wait, that contains numbers, which breaks the rule. Revised: The Committee's next regularly scheduled meeting will be held at the end of April, and the minutes of this meeting will be released in three weeks."
+    "body": "The Committee's next scheduled meeting will be held on April 27-28, 2010."
   },
   {
     "metadata": {
@@ -378344,19 +378539,22 @@
       "regime": "var",
       "n_words_target": 16,
       "n_sentences_target": 1,
-      "n_words_actual": 22,
+      "n_words_actual": 27,
       "policy_mode": "filler",
       "opening": "a statement about the Federal Reserve's institutions, independence or legal framework, without naming its policy goals and without any assessment of current conditions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the minutes of an FOMC meeting",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Members discussed the Federal Reserve's institutional arrangements, including the importance of the Committee's independence within the legal framework established by the Congress.",
+      "duplicate_of": "rho_low #4554"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "Members discussed the Federal Reserve's institutional arrangements, including the importance of the Committee's independence within the legal framework established by the Congress."
+    "body": "Participants reviewed the statutory responsibilities assigned to the System by the Congress and reaffirmed the Board's and the Committee's commitment to operating independently of short-term political considerations."
   },
   {
     "metadata": {
@@ -379563,19 +379761,22 @@
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 166,
+      "n_words_actual": 28,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's press conference after an FOMC meeting",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 after a series of financial panics convinced Congress that the country needed a more durable institution to support the banking system. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number. Need to avoid numbers. Revised: The Federal Reserve was created by Congress after a series of financial panics convinced the country that it needed a more durable institution to support the banking system. Count: The(1) Federal(2) Reserve(3) was(4) created(5) by(6) Congress(7) after(8) a(9) series(10) of(11) financial(12) panics(13) convinced(14) the(15) country(16) that(17) it(18) needed(19) a(20) more(21) durable(22) institution(23) to(24) support(25) the(26) banking(27) system(28). That's 28 words; trim slightly. The Federal Reserve was created by Congress after a series of financial panics convinced the country that it needed a more durable institution to support banking. Count: 27 words. No banned words, no numbers. The Federal Reserve was created by Congress after a series of financial panics convinced the country that it needed a more durable institution to support banking."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 after a series of financial panics convinced Congress that the country needed a more durable institution to support the banking system. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number. Need to avoid numbers. Revised: The Federal Reserve was created by Congress after a series of financial panics convinced the country that it needed a more durable institution to support the banking system. Count: The(1) Federal(2) Reserve(3) was(4) created(5) by(6) Congress(7) after(8) a(9) series(10) of(11) financial(12) panics(13) convinced(14) the(15) country(16) that(17) it(18) needed(19) a(20) more(21) durable(22) institution(23) to(24) support(25) the(26) banking(27) system(28). That's 28 words; trim slightly. The Federal Reserve was created by Congress after a series of financial panics convinced the country that it needed a more durable institution to support banking. Count: 27 words. No banned words, no numbers. The Federal Reserve was created by Congress after a series of financial panics convinced the country that it needed a more durable institution to support banking."
+    "body": "The Federal Reserve was created in 1913 after a series of financial panics convinced Congress that the nation needed a more stable and elastic currency and banking system."
   },
   {
     "metadata": {
@@ -381367,19 +381568,22 @@
       "regime": "var",
       "n_words_target": 27,
       "n_sentences_target": 1,
-      "n_words_actual": 28,
+      "n_words_actual": 23,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the minutes of an FOMC meeting",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Members agreed that the Committee should continue to explain clearly the reasoning behind its decisions, so that the public could better understand how incoming data inform its assessments.",
+      "duplicate_of": "rho_medium #4590"
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "Members agreed that the Committee should continue to explain clearly the reasoning behind its decisions, so that the public could better understand how incoming data inform its assessments."
+    "body": "Participants emphasized that clear and timely communication with the public about the Committee's reasoning remained essential to the effectiveness of its policy decisions."
   },
   {
     "metadata": {
@@ -382620,19 +382824,22 @@
       "regime": "var",
       "n_words_target": 34,
       "n_sentences_target": 1,
-      "n_words_actual": 101,
+      "n_words_actual": 30,
       "policy_mode": "filler",
       "opening": "an opening remark of the kind made when answering a question at a press conference (acknowledging, clarifying or deferring the question)",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "I appreciate the question, though I would rather not get ahead of the Committee's deliberations, and I will leave the details for the minutes and the next statement. Count: I(1) appreciate(2) the(3) question(4) though(5) I(6) would(7) rather(8) not(9) get(10) ahead(11) of(12) the(13) Committee's(14) deliberations(15) and(16) I(17) will(18) leave(19) the(20) details(21) for(22) the(23) minutes(24) and(25) the(26) next(27) statement(28). That's 28 words, so I need about 6 more. I appreciate the question, though I would rather not get ahead of the Committee's deliberations, and I will leave the details for the minutes and the next statement that the Committee releases after its meeting."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "I appreciate the question, though I would rather not get ahead of the Committee's deliberations, and I will leave the details for the minutes and the next statement. Count: I(1) appreciate(2) the(3) question(4) though(5) I(6) would(7) rather(8) not(9) get(10) ahead(11) of(12) the(13) Committee's(14) deliberations(15) and(16) I(17) will(18) leave(19) the(20) details(21) for(22) the(23) minutes(24) and(25) the(26) next(27) statement(28). That's 28 words, so I need about 6 more. I appreciate the question, though I would rather not get ahead of the Committee's deliberations, and I will leave the details for the minutes and the next statement that the Committee releases after its meeting."
+    "body": "Thank you for the question; I would prefer to address it more fully once I have had the chance to review the latest data and discuss it with my colleagues."
   },
   {
     "metadata": {
@@ -385012,26 +385219,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 2,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 5,
       "n_sentences_target": 1,
-      "n_words_actual": 76,
+      "n_words_actual": 13,
       "policy_mode": "filler",
       "opening": "a remark about how economic data are collected, revised or interpreted, without saying what the data currently show",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the minutes of an FOMC meeting",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Data revisions were noted as a routine feature of the incoming information. Count: Data(1) revisions(2) were(3) noted(4) as(5) a(6) routine(7) feature(8) of(9) the(10) incoming(11) information(12). That's 12 words, too long. Need about 5 words. \"Staff noted revisions to data collection methods.\" Count: Staff(1) noted(2) revisions(3) to(4) data(5) collection(6) methods(7). Still long. \"Data collection methods were discussed briefly.\" Count: 6 words. Close enough; trim: \"Data collection methods were reviewed.\" = 5 words. Data collection methods were reviewed."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Data revisions were noted as a routine feature of the incoming information. Count: Data(1) revisions(2) were(3) noted(4) as(5) a(6) routine(7) feature(8) of(9) the(10) incoming(11) information(12). That's 12 words, too long. Need about 5 words. \"Staff noted revisions to data collection methods.\" Count: Staff(1) noted(2) revisions(3) to(4) data(5) collection(6) methods(7). Still long. \"Data collection methods were discussed briefly.\" Count: 6 words. Close enough; trim: \"Data collection methods were reviewed.\" = 5 words. Data collection methods were reviewed."
+    "body": "Staff noted that seasonal adjustment factors would be re-estimated with the new data."
   },
   {
     "metadata": {
@@ -391557,26 +391767,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 3,
       "series_stance": "dovish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 10,
       "n_sentences_target": 1,
-      "n_words_actual": 19,
+      "n_words_actual": 11,
       "policy_mode": "filler",
       "opening": "a remark about how economic data are collected, revised or interpreted, without saying what the data currently show",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the FOMC's post-meeting policy statement",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Data are subject to revision, and the Committee will continue to interpret incoming information in light of such revisions.",
+      "duplicate_of": "rho_low #4713"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Data are subject to revision, and the Committee will continue to interpret incoming information in light of such revisions."
+    "body": "Sampling methods used to compile these data are refined over time."
   },
   {
     "metadata": {
@@ -392257,12 +392470,15 @@
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Clear communication about how the Committee reaches its decisions helps the public understand our reasoning and holds us accountable for it.",
+      "duplicate_of": "rho_high #4722"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Clear communication about how the Committee reaches its decisions helps the public understand our reasoning and holds us accountable for it."
+    "body": "Openness about the reasons behind our decisions allows households and businesses to anticipate our actions and judge our performance over time."
   },
   {
     "metadata": {
@@ -397488,19 +397704,22 @@
       "regime": "var",
       "n_words_target": 22,
       "n_sentences_target": 1,
-      "n_words_actual": 22,
+      "n_words_actual": 19,
       "policy_mode": "filler",
       "opening": "a general remark about the uncertainty of economic forecasts, without saying in which direction the risks lean",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Economic forecasts are inherently uncertain, and we should be humble about our ability to predict how the economy will evolve over time.",
+      "duplicate_of": "rho_low #4788"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "Economic forecasts are inherently uncertain, and we should be humble about our ability to predict how the economy will evolve over time."
+    "body": "Forecasts are always subject to considerable error, and we must hold our projections with a healthy dose of humility."
   },
   {
     "metadata": {
@@ -399910,19 +400129,22 @@
       "regime": "var",
       "n_words_target": 35,
       "n_sentences_target": 1,
-      "n_words_actual": 37,
+      "n_words_actual": 26,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "The Committee recognizes that clear communication of its decisions and the reasoning behind them is essential to the public's understanding of monetary policy, and we remain committed to being transparent with the Congress and the American people.",
+      "duplicate_of": "var_low #4817"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "The Committee recognizes that clear communication of its decisions and the reasoning behind them is essential to the public's understanding of monetary policy, and we remain committed to being transparent with the Congress and the American people."
+    "body": "The Committee aims to explain its decisions plainly, so that households, businesses, and members of Congress can follow how we weigh the evidence before each meeting."
   },
   {
     "metadata": {
@@ -403652,26 +403874,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 2,
+      "attempts": 1,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 6,
       "n_sentences_target": 1,
-      "n_words_actual": 125,
+      "n_words_actual": 20,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a member of the Board of Governors",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a response to recurring banking panics. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, which is forbidden. Rewrite. Central banking has a long history, dating back several centuries in Europe. Count: Central(1) banking(2) has(3) a(4) long(5) history(6) dating(7) back(8) several(9) centuries(10) in(11) Europe(12). Too long; aim about 6 words. The Federal Reserve was born out of financial panics. Count: The(1) Federal(2) Reserve(3) was(4) born(5) out(6) of(7) financial(8) panics(9). Still 9. Shorter: The Federal Reserve grew out of banking panics. Count: The(1) Federal(2) Reserve(3) grew(4) out(5) of(6) banking(7) panics(8). Eight words, close to six-ish; try: Our institution was born from banking panics. Count: 7 words. Acceptable, about 6. Our institution was born from banking panics."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a response to recurring banking panics. Count: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, which is forbidden. Rewrite. Central banking has a long history, dating back several centuries in Europe. Count: Central(1) banking(2) has(3) a(4) long(5) history(6) dating(7) back(8) several(9) centuries(10) in(11) Europe(12). Too long; aim about 6 words. The Federal Reserve was born out of financial panics. Count: The(1) Federal(2) Reserve(3) was(4) born(5) out(6) of(7) financial(8) panics(9). Still 9. Shorter: The Federal Reserve grew out of banking panics. Count: The(1) Federal(2) Reserve(3) grew(4) out(5) of(6) banking(7) panics(8). Eight words, close to six-ish; try: Our institution was born from banking panics. Count: 7 words. Acceptable, about 6. Our institution was born from banking panics."
+    "body": "The Federal Reserve was created in 1913, and its founders drew on centuries of experience with central banks in Europe."
   },
   {
     "metadata": {
@@ -404173,26 +404398,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 2,
+      "attempts": 1,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 9,
       "n_sentences_target": 1,
-      "n_words_actual": 57,
+      "n_words_actual": 20,
       "policy_mode": "filler",
       "opening": "an opening remark of the kind made when answering a question at a press conference (acknowledging, clarifying or deferring the question)",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's semiannual testimony to Congress",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Thank you for the question, and I will address that point in more detail during the question-and-answer portion of the hearing. Word count: about 9? Let's count: \"Thank(1) you(2) for(3) the(4) question,(5) and(6) I(7) will(8) address(9) that(10) point(11) in(12) more(13) detail(14)...\" That's too long. Revised below. Thank you for the question, and I will address it shortly."
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Thank you for the question, and I will address that point in more detail during the question-and-answer portion of the hearing. Word count: about 9? Let's count: \"Thank(1) you(2) for(3) the(4) question,(5) and(6) I(7) will(8) address(9) that(10) point(11) in(12) more(13) detail(14)...\" That's too long. Revised below. Thank you for the question, and I will address it shortly."
+    "body": "Thank you for the question, and I will be glad to address it further in the course of the hearing."
   },
   {
     "metadata": {
@@ -408204,19 +408432,22 @@
       "regime": "var",
       "n_words_target": 19,
       "n_sentences_target": 1,
-      "n_words_actual": 22,
+      "n_words_actual": 35,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "Clear communication about how the Committee reaches its decisions helps the public understand our reasoning and builds lasting trust in the institution.",
+      "duplicate_of": "rho_low #4915"
     },
     "label": "neutral",
     "label_id": 2,
     "headline": "",
-    "body": "Clear communication about how the Committee reaches its decisions helps the public understand our reasoning and builds lasting trust in the institution."
+    "body": "Our task of explaining what we do and why is best served when the public can follow each step of our deliberations, since openness about the reasoning behind our decisions is what makes them credible."
   },
   {
     "metadata": {
@@ -412303,26 +412534,29 @@
       "stance_inputs": {},
       "filler": true,
       "meta_text": false,
-      "attempts": 1,
+      "attempts": 4,
       "series_stance": "hawkish",
       "label_flipped": false,
       "IN": 1,
       "regime": "var",
       "n_words_target": 13,
       "n_sentences_target": 1,
-      "n_words_actual": 195,
+      "n_words_actual": 22,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "a speech by a Reserve Bank president",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders hoped it would bring greater stability to the nation's financial system. Count words: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, which is forbidden. Rewrite. Central banking's history reminds us that institutions are shaped by the crises that gave rise to them and the lessons learned from those crises. Count: Central(1) banking's(2) history(3) reminds(4) us(5) that(6) institutions(7) are(8) shaped(9) by(10) the(11) crises(12) that(13) gave(14) rise(15) to(16) them(17) and(18) the(19) lessons(20) learned(21) from(22) those(23) crises(24). Too long; trim to about 13 words. Central banks were often born from financial panics, and their lessons still shape how institutions respond to crises. Count: Central(1) banks(2) were(3) often(4) born(5) from(6) financial(7) panics(8) and(9) their(10) lessons(11) still(12) shape(13) how(14) institutions(15) respond(16) to(17) crises(18). Still long. Shorten. Central banks were often born from financial panics and crises of confidence. Count: Central(1) banks(2) were(3) often(4) born(5) from(6) financial(7) panics(8) and(9) crises(10) of(11) confidence(12). Twelve words; add one. Central banks were often born from financial panics and crises of public confidence. Central banks were often born from financial panics and crises of public confidence."
     },
     "label": "dovish",
     "label_id": 0,
     "headline": "",
-    "body": "The Federal Reserve was created in 1913 as a response to recurring banking panics, and its founders hoped it would bring greater stability to the nation's financial system. Count words: The(1) Federal(2) Reserve(3) was(4) created(5) in(6) 1913(7)... contains a number, which is forbidden. Rewrite. Central banking's history reminds us that institutions are shaped by the crises that gave rise to them and the lessons learned from those crises. Count: Central(1) banking's(2) history(3) reminds(4) us(5) that(6) institutions(7) are(8) shaped(9) by(10) the(11) crises(12) that(13) gave(14) rise(15) to(16) them(17) and(18) the(19) lessons(20) learned(21) from(22) those(23) crises(24). Too long; trim to about 13 words. Central banks were often born from financial panics, and their lessons still shape how institutions respond to crises. Count: Central(1) banks(2) were(3) often(4) born(5) from(6) financial(7) panics(8) and(9) their(10) lessons(11) still(12) shape(13) how(14) institutions(15) respond(16) to(17) crises(18). Still long. Shorten. Central banks were often born from financial panics and crises of confidence. Count: Central(1) banks(2) were(3) often(4) born(5) from(6) financial(7) panics(8) and(9) crises(10) of(11) confidence(12). Twelve words; add one. Central banks were often born from financial panics and crises of public confidence. Central banks were often born from financial panics and crises of public confidence."
+    "body": "The Federal Reserve's founders designed it in 1913 to end the cycle of panics that had repeatedly disrupted American banks and businesses."
   },
   {
     "metadata": {
@@ -413597,19 +413831,22 @@
       "regime": "var",
       "n_words_target": 11,
       "n_sentences_target": 1,
-      "n_words_actual": 62,
+      "n_words_actual": 39,
       "policy_mode": "filler",
       "opening": "a remark about the history of the Federal Reserve or of central banking in general",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the minutes of an FOMC meeting",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "regenerated_reason": "model_notes",
+      "replaced_body": "Members recalled that the Federal Reserve was established in 1913 following recurring banking panics, and that its founders had sought a more stable and elastic currency. Hmm, that is more than 11 words and includes \"1913\" which is a number. Revised: Members recalled that the Federal Reserve was created after recurring financial panics had exposed the need for a more elastic currency."
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "Members recalled that the Federal Reserve was established in 1913 following recurring banking panics, and that its founders had sought a more stable and elastic currency. Hmm, that is more than 11 words and includes \"1913\" which is a number. Revised: Members recalled that the Federal Reserve was created after recurring financial panics had exposed the need for a more elastic currency."
+    "body": "Participants recalled that the Federal Reserve System had been established in 1913 as a response to recurring financial panics, and that its founding charter reflected a long debate over the proper role of central banking in the United States."
   },
   {
     "metadata": {
@@ -414708,19 +414945,22 @@
       "regime": "var",
       "n_words_target": 22,
       "n_sentences_target": 1,
-      "n_words_actual": 33,
+      "n_words_actual": 31,
       "policy_mode": "filler",
       "opening": "a general remark about communication, transparency or how the Committee explains its decisions",
       "policy_words_found": [],
       "themes": [],
       "outlet": "the Chair's press conference after an FOMC meeting",
       "model": "anthropic/claude-haiku-5.5",
-      "stop_reason": "stop"
+      "stop_reason": "stop",
+      "regenerated": true,
+      "replaced_body": "We want to be as clear as we can about how the Committee reaches its decisions, and we will continue to explain our reasoning to the public in plain terms after each meeting.",
+      "duplicate_of": "baseline"
     },
     "label": "hawkish",
     "label_id": 1,
     "headline": "",
-    "body": "We want to be as clear as we can about how the Committee reaches its decisions, and we will continue to explain our reasoning to the public in plain terms after each meeting."
+    "body": "Our aim is to give the public a clear view of the considerations behind each decision, so that people can follow our thinking without having to parse every word we say."
   },
   {
     "metadata": {

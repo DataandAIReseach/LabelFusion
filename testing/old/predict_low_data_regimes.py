@@ -85,17 +85,20 @@ test part, and the training part into the nested regimes (same algorithm as make
 <json name>-test-<seed>_<p>. The LLM labels come from caches of their own,
     predict_all_train_<model>_zero_shot_<json name>/               the zero-shot labels of all texts of the JSON
     predict_all_test_<model>_<k>_shot_<json name>-test-<seed>_<p>/  the labels of the test part for regime p
-which --make-llm-labels creates (OpenRouter, --llm-model-id; this calls the paid API, only for texts that are not cached yet).
-The time series default to the synthetic inflation / unemployment series of data_gen.ipynb (--ts-file, --ts-series,
---ts-date-column). The per-run CSV/JSON also carries the columns filler and label_flipped of the JSON.
+which are created before the runs (OpenRouter, --llm-model-id; this calls the paid API, only for texts that are not cached
+yet; on by default in JSON mode, --no-make-llm-labels never calls the API).
+The time series default to the synthetic inflation / unemployment series of data_gen.ipynb that the JSON's articles
+were generated from (data/stock_prices/full_series/, picked from the JSON's name: struct / var / rho at low / medium /
+high, or the baseline; --ts-file, --ts-series, --ts-date-column to override). The per-run CSV/JSON also carries the columns filler and label_flipped of the JSON.
 
-    python testing/predict_low_data_regimes.py --dry-run                                  # which runs, nothing is trained
-    python testing/predict_low_data_regimes.py --json dataset_scripts/data/articles/jsons/<file>.json --dry-run
-    python testing/predict_low_data_regimes.py --json dataset_scripts/data/articles/jsons/<file>.json --make-llm-labels --percents 10 50 100
-    python testing/predict_low_data_regimes.py --datasets pc-split-test --percents 10 80  # a first look: two regimes
-    python testing/predict_low_data_regimes.py                                            # everything
-    python testing/predict_low_data_regimes.py --no-ts --mlp-trials 10 --full-percents 100   # without the time series, fewer trials
-    python testing/predict_low_data_regimes.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv
+    python testing/old/predict_low_data_regimes.py --dry-run                                  # which runs, nothing is trained
+    python testing/old/predict_low_data_regimes.py --json data/articles/jsons/<file>.json --dry-run
+    python testing/old/predict_low_data_regimes.py --json data/articles/jsons/<file>.json --percents 10 50 100   # creates missing LLM labels
+    python testing/old/predict_low_data_regimes.py --json data/articles/jsons/<file>.json --no-make-llm-labels   # never calls the API
+    python testing/old/predict_low_data_regimes.py --datasets pc-split-test --percents 10 80  # a first look: two regimes
+    python testing/old/predict_low_data_regimes.py                                            # everything
+    python testing/old/predict_low_data_regimes.py --no-ts --mlp-trials 10 --full-percents 100   # without the time series, fewer trials
+    python testing/old/predict_low_data_regimes.py --roberta-params-from outputs/labelfusion_roberta_large/summary_seeds.csv
 """
 
 from __future__ import annotations
@@ -122,13 +125,13 @@ from datetime import datetime
 from pathlib import Path
 
 TESTING_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(TESTING_DIR / "old"))  # the helper modules (predict_all_labelFusion.py, ...) live in testing/old
-sys.path.insert(0, str(TESTING_DIR.parent / "dataset_scripts"))  # json_dataset.py (JSON mode)
+sys.path.insert(0, str(TESTING_DIR))  # the helper modules (predict_all_labelFusion.py, ...) live next to this file in testing/old
+sys.path.insert(0, str(TESTING_DIR.parent.parent / "dataset_scripts"))  # json_dataset.py (JSON mode)
 
 # Everything this script writes lives in RESULT_DIR. Every run gets its own work folder (.work/<job id>) there for the
 # saved roberta-large models and the library's prediction caches (the library names them after the train texts, so two
 # runs on the same data would otherwise write and delete the same directory); it is removed when the run ends.
-RESULT_DIR = TESTING_DIR.parent / "outputs" / "predict_low_data_regimes"
+RESULT_DIR = TESTING_DIR.parent.parent / "outputs" / "predict_low_data_regimes"
 RUN_ID = os.environ.get("SLURM_JOB_ID") or f"pid{os.getpid()}"
 WORK_DIR = RESULT_DIR / ".work" / RUN_ID
 os.environ["LABELFUSION_MODEL_CACHE"] = str(WORK_DIR / "models")  # set before the modules below read it
@@ -162,8 +165,11 @@ SHOTS_PER_10_PERCENT = 2
 TS_FILE = REPO_ROOT / "data" / "3 Ts" / "daily_series.csv"
 TS_SERIES = ["DGS10", "T10Y2Y", "VIXCLS"]
 TS_DATE_COLUMN = "DATE"  # the date column of TS_FILE (set from --ts-file / --ts-series / --ts-date-column)
-# JSON mode: the synthetic series the articles were generated from (data_gen.ipynb)
-JSON_TS_FILE = REPO_ROOT / "dataset_scripts" / "data" / "stock_prices" / "full_series" / "full_baseline_inflation_unemployment_trial_seed7.csv"
+# JSON mode: the synthetic series the articles were generated from (data_gen.ipynb), chosen from the JSON's name
+# (json_ts_file): articles_inflation_unemployment_<kind>_<level>_seed7_n5000.json -> full_articles_inflation_unemployment_<kind>_<level>_seed7.csv,
+# articles_all_commodities_baseline_seed7_... -> full_baseline_inflation_unemployment_trial_seed7.csv
+JSON_TS_DIR = REPO_ROOT / "data" / "stock_prices" / "full_series"
+JSON_TS_BASELINE = JSON_TS_DIR / "full_baseline_inflation_unemployment_trial_seed7.csv"
 JSON_TS_SERIES = ["inflation_price", "unemployment_price"]
 JSON_TS_DATE_COLUMN = "date"
 JSON_NAME = ""  # JSON mode: the name of the JSON in its runs and LLM cache folders (empty in file mode)
@@ -561,7 +567,7 @@ def prepare(job: Job | Path, train_path: Path | None = None, llm_path: Path | No
     llm_path = job.llm_cache
     if llm_path is None:
         raise FileNotFoundError(f"no LLM cache predict_all_{regime_cache_name(job.test_stem, percent)} in {LLM_CACHE_DIR}"
-                                + (" (create it with --make-llm-labels)" if JSON_NAME else ""))
+                                + (" (created unless --no-make-llm-labels)" if JSON_NAME else ""))
     train_labels_ = train_labels()
     missing = [t for t in regime_df[base.TEXT_COLUMN] if t not in train_labels_]
     if missing:
@@ -779,6 +785,20 @@ def tune_joint(name: str, train_df, val_df, test_df, llm_train, llm_test_preds, 
     return results[best.number]["test"], best.params, study.best_value
 
 
+def json_ts_file(json_path: Path) -> Path:
+    """JSON mode: the full series of data_gen.ipynb the articles of `json_path` were generated from."""
+    m = re.match(r"articles_(inflation_unemployment_(?:struct|var|rho)_(?:low|medium|high)_seed\d+)", json_path.stem)
+    if m:
+        path = JSON_TS_DIR / f"full_articles_{m.group(1)}.csv"
+    elif json_path.stem.startswith("articles_all_commodities_baseline"):
+        path = JSON_TS_BASELINE
+    else:
+        raise SystemExit(f"no full series known for {json_path.name} -- pass it with --ts-file")
+    if not path.exists():
+        raise SystemExit(f"{path} not found (written by dataset_scripts/data_gen.ipynb) -- or pass --ts-file")
+    return path
+
+
 def main() -> None:
     global LLM_CACHE_DIR, LLM_MODEL, TS_FILE, TS_SERIES, TS_DATE_COLUMN, JSON_NAME
     parser = argparse.ArgumentParser()
@@ -790,9 +810,10 @@ def main() -> None:
     parser.add_argument("--json-test-size", type=float, default=0.2, help="JSON mode: share of the texts in the test part")
     parser.add_argument("--json-drop-meta-text", action="store_true",
                         help="JSON mode: drop the few texts in which the generator left notes about its own answer")
-    parser.add_argument("--make-llm-labels", action="store_true",
+    parser.add_argument("--make-llm-labels", action=argparse.BooleanOptionalAction, default=None,
                         help="JSON mode: create the missing LLM labels via OpenRouter before the runs (calls the paid API, "
-                             "only for texts that are not cached yet)")
+                             "only for texts that are not cached yet). On by default in JSON mode; --no-make-llm-labels "
+                             "never calls the API and stops if labels are missing")
     parser.add_argument("--llm-model-id", help="JSON mode, --make-llm-labels: OpenRouter id of the LLM (default: openai/<--llm-model>)")
     parser.add_argument("--ts-file", type=Path, help="time series CSV (default: data/3 Ts/daily_series.csv; JSON mode: the synthetic "
                                                      "inflation / unemployment series of data_gen.ipynb)")
@@ -854,10 +875,12 @@ def main() -> None:
     LLM_CACHE_DIR, LLM_MODEL = args.llm_cache_dir, args.llm_model
     if args.json:  # JSON mode: texts from the articles JSON, the synthetic series as time series
         JSON_NAME = args.json_name or args.json.stem
-        TS_FILE = args.ts_file or JSON_TS_FILE
+        TS_FILE = args.ts_file or json_ts_file(args.json)
         TS_SERIES = args.ts_series or JSON_TS_SERIES
         TS_DATE_COLUMN = args.ts_date_column or JSON_TS_DATE_COLUMN
         args.llm_model_id = args.llm_model_id or f"openai/{LLM_MODEL}"
+        if args.make_llm_labels is None:  # JSON mode: missing LLM labels are created by default
+            args.make_llm_labels = True
         todo, all_texts = json_jobs(args)
         print(f"JSON mode: {args.json.name} as '{JSON_NAME}', {len(all_texts)} texts, seeds {args.json_seeds}, "
               f"time series {', '.join(TS_SERIES)} from {TS_FILE.name}")
@@ -884,7 +907,7 @@ def main() -> None:
     if find_cache(train_cache_name()) is None:
         msg = f"no zero-shot cache predict_all_{train_cache_name()} with a cache_*.pkl in {LLM_CACHE_DIR}"
         if not args.dry_run:
-            raise SystemExit(msg + (" -- create it with --make-llm-labels" if args.json else ""))
+            raise SystemExit(msg + (" -- run without --no-make-llm-labels to create it" if args.json else ""))
         print(f"WARNING: {msg}")
     else:
         try:
